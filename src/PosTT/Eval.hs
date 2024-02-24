@@ -260,15 +260,18 @@ doExtFun ws (VNeu k)      = VExtFun ws k
 
 -- | Smart constructor for VCoePartial
 --
--- We maintain the following two invariants:
--- 1. At the current stage r0 != r1 (otherwise coe reduces to the identity)
--- 2. The head constructor of the line of types is known for VCoePartial.
---    Otherwise, the coersion is neutral, and given by VNeuCoePartial.
+-- We maintain the following three invariants:
+-- (1) At the current stage r0 != r1 (otherwise coe reduces to the identity)
+-- (2) The head constructor of the line of types is known for VCoePartial.
+--     Otherwise, the coersion is neutral, and given by VNeuCoePartial.
+-- (3) In case of an Ext type, we keep the line fully forced.
 --
 -- We are very careful (TODO: is this neccessary?): We peak under the closure
 -- to see the type. In the cases where we have restriction stable type formers,
 -- we can safely construct a VCoePartial value to be evaluated when applied.
--- Otherwise, we force the delayed restriction, and 
+-- Otherwise, we force the delayed restriction, and check again.
+--
+-- TODO: what is with U?
 vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
 vCoePartial r0 r1 | r0 === r1 = \l -> pId `doApp` (l $$ r0)
 vCoePartial r0 r1 = go False
@@ -279,16 +282,17 @@ vCoePartial r0 r1 = go False
       VPi{}    -> VCoePartial r0 r1 l
       VSigma{} -> VCoePartial r0 r1 l
       VPath{}  -> VCoePartial r0 r1 l
-      VNeu k   | forced -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k) 
-      VExt{}   | forced -> VCoePartial r0 r1 l -- forced needed?
+      VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k) 
+      VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced
       _        | not forced -> go True (force l)
 
 doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
-doCoe r0 r1 l v -- by invariant r0 != r1; we delay coe for negative types
-  | TrIntClosure z (VExt a bs) IdRestr <- l = doCoeExt r0 r1 z a bs v -- this is wrong, right? IdRestr does not mean we did not introduce constraints
-  | TrIntClosure z (VExt a bs) _       <- l = doCoe r0 r1 (force l) v
-  | TrIntClosure z (VSum _ _)  _       <- l = error "TODO: copy + simplify"
-  | otherwise                               = VCoe r0 r1 l v -- coe in neg type 
+doCoe r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
+  TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) fully restr (including no new equations!)
+  TrIntClosure z (VSum _ _)  _       -> error "TODO: copy + simplify"
+  l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
+  l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
+  l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
 
 doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
 doCoeExt = error "TODO: copy"
@@ -304,14 +308,24 @@ doHComp' r₀ r₁ a u0 = either ($$ r₁) (doHComp r₀ r₁ a u0)
 doHComp :: AtStage (VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val)
 doHComp r₀ r₁ _ u₀ _ | r₀ === r₁ = u₀
 doHComp r₀ r₁ a u₀ tb = case a of
+  VNeu k        -> VNeuHComp r₀ r₁ k u₀ tb
   VPi a b       -> VHCompPi r₀ r₁ a b u₀ tb
   VSigma a b    -> VHCompSigma r₀ r₁ a b u₀ tb
   VPath a a₀ a₁ -> VHCompPath r₀ r₁ a a₀ a₁ u₀ tb
-  VNeu k        -> VNeuHComp r₀ r₁ k u₀ tb
---  VSum d lbl    -> doHCompSum r₀ r₁ d lbl u₀ tb
---  VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
---  VU            -> doHCompU r₀ r₁ u₀ tb
+  VSum d lbl    -> doHCompSum r₀ r₁ d lbl u₀ tb
+  VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
+  VU            -> doHCompU r₀ r₁ u₀ tb
 
+---- Cases for positive types
+
+doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
+doHCompSum = error "TODO: copy"
+
+doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
+doHCompExt = error "TODO: copy"
+
+doHCompU :: AtStage (VI -> VI -> Val -> VSys TrIntClosure -> Val)
+doHCompU = error "TODO: copy"
 
 
 --------------------------------------------------------------------------------
