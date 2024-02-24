@@ -1,0 +1,53 @@
+cabal-version:      3.0
+name:               fancy-postt
+version:            0.1.0.0
+synopsis:
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            MIT
+license-file:       LICENSE
+author:             Jonas Hoefer
+maintainer:         hoferj@chalmers.se
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+executable fancy-postt
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    other-modules:
+        Algebra.Lattice
+      , PosTT.Conversion
+      , PosTT.Eval
+      , PosTT.Poset
+      , PosTT.Pretty
+      , PosTT.Quotation
+      , PosTT.Terms
+      , PosTT.TypeChecker
+      , PosTT.Values
+
+    default-extensions:
+        TypeFamilies
+      , ImplicitParams
+      , LambdaCase
+      , PatternSynonyms
+      , ViewPatterns
+      , OverloadedStrings
+      , UndecidableInstances
+      , StrictData
+    build-depends:    
+        base ^>=4.17.2.1
+      , mtl
+      , extra
+      , containers
+      , prettyprinter
+    hs-source-dirs:   src
+    default-language: GHC2021
