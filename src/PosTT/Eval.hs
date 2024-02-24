@@ -36,6 +36,9 @@ class Eval a where
   type Sem a
   eval :: AtStage (Env -> a -> Sem a)
 
+closedEval :: Eval a => a -> Sem a
+closedEval = bindStage terminalStage $ eval EmptyEnv
+
 instance Eval Tm where
   type Sem Tm = Val
 
@@ -58,7 +61,7 @@ instance Eval Tm where
     PLam t t0 t1   -> VPLam (eval rho t) (eval rho t0) (eval rho t1)
     PApp t t0 t1 r -> doPApp (eval rho t) (eval rho t0) (eval rho t1) (eval rho r)
 
-    Coe r0 r1 l         -> VCoePartial (eval rho r0) (eval rho r1) (eval rho l)
+    Coe r0 r1 l         -> vCoePartial (eval rho r0) (eval rho r1) (eval rho l)
     HComp r0 r1 a u0 tb -> doHComp' (eval rho r0) (eval rho r1) (eval rho a) (eval rho u0) (eval rho tb)
 
     Ext a bs    -> vExt (eval rho a) (eval rho bs)
@@ -157,8 +160,6 @@ instance (Eval a, Eval b, Eval c) => Eval (a, b, c) where
 
 
 --------------------------------------------------------------------------------
----- Semantic Combinators
-
 ---- Closure Evaluation
 
 class Apply c where
@@ -181,6 +182,13 @@ instance Apply IntClosure where
   ($$) :: AtStage (IntClosure -> VI -> Val)
   IntClosure i t rho $$ r = eval (EnvInt rho i r) t
 
+instance Apply TrIntClosure where
+  type ArgType TrIntClosure = VI
+  type ResType TrIntClosure = Val
+
+  ($$) :: AtStage (TrIntClosure -> VI -> Val)
+  TrIntClosure i v alpha $$ r = v @ Restr [(i, r)]
+
 instance Apply SplitClosure where
   type ArgType SplitClosure = [Val]
   type ResType SplitClosure = Val
@@ -188,8 +196,21 @@ instance Apply SplitClosure where
   ($$) :: AtStage (SplitClosure -> [Val] -> Val)
   SplitClosure xs t rho $$ vs = eval (rho `envFibs` (xs `zip` vs)) t 
 
+-- | Forces the delayed restriction under the binder.
+force :: AtStage (TrIntClosure -> TrIntClosure)
+force cl@(TrIntClosure i _ _) = trIntCl i $ \j -> cl $$ iVar j
 
----- Basic Combinators
+
+--------------------------------------------------------------------------------
+---- Prelude Combinators
+
+pId :: Val
+pId = closedEval $ Lam $ Binder "A" $ Lam $ Binder "x" $ Var "x"
+
+
+
+--------------------------------------------------------------------------------
+---- Basic MLTT Combinators
 
 doPr1 :: AtStage (Val -> Val)
 doPr1 (VPair s _) = s
@@ -200,9 +221,10 @@ doPr2 (VPair _ t) = t
 doPr2 (VNeu k)    = VPr2 k
 
 doApp :: AtStage (Val -> Val -> Val)
-doApp (VLam cl)            v = cl $$ v
-doApp (VNeu k)             v = VApp k v
-doApp (VSplitPartial f bs) v = doSplit f bs v
+doApp (VLam cl)             v = cl $$ v
+doApp (VNeu k)              v = VApp k v
+doApp (VSplitPartial f bs)  v = doSplit f bs v
+doApp (VCoePartial r0 r1 l) v = doCoe r0 r1 l v
 
 doPApp :: AtStage (Val -> Val -> Val -> VI -> Val)
 doPApp (VPLam cl _ _) _  _  r = cl $$ r
@@ -216,6 +238,7 @@ doSplit f bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
 doSplit f bs (VNeu k)    = VSplit f bs k
 
 
+--------------------------------------------------------------------------------
 ---- Extension Types
 
 vExt :: AtStage (Val -> Either (VTy, Val, Val) (VSys (VTy, Val, Val)) -> Val)
@@ -224,25 +247,55 @@ vExt a = either fst3 (VExt a)
 vExtElm :: AtStage (Val -> Either Val (VSys Val) -> Val)
 vExtElm v = either id (VExtElm v) 
 
-doExtFun' :: AtStage (Either Val (Sys Val) -> Val -> Val)
+doExtFun' :: AtStage (Either Val (VSys Val) -> Val -> Val)
 doExtFun' ws v = either (`doApp` v) (`doExtFun` v) ws
 
-doExtFun :: AtStage (Sys Val -> Val -> Val)
+doExtFun :: AtStage (VSys Val -> Val -> Val)
 doExtFun _  (VExtElm v _) = v
 doExtFun ws (VNeu k)      = VExtFun ws k
 
 
+--------------------------------------------------------------------------------
+---- Coercion
+
+-- | Smart constructor for VCoePartial
+--
+-- We maintain the following two invariants:
+-- 1. At the current stage r0 != r1 (otherwise coe reduces to the identity)
+-- 2. The head constructor of the line of types is known for VCoePartial.
+--    Otherwise, the coersion is neutral, and given by VNCoePartial.
+vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
+vCoePartial r0 r1 l | r0 === r1 = pId `doApp` (l $$ r0)
+vCoePartial r0 r1 l = _
+
+doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
+doCoe r0 r1 l v -- by invariant r0 != r1; we delay coe for negative types
+  | TrIntClosure z (VExt a bs) IdRestr <- l = doCoeExt r0 r1 z a bs v
+  | TrIntClosure z (VExt a bs) _       <- l = doCoe r0 r1 (force l) v
+  | TrIntClosure z (VSum _ _)  _       <- l = error "TODO: copy + simplify"
+  | otherwise                               = VCoe r0 r1 l v -- coe in neg type 
+
+doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
+doCoeExt = error "TODO: copy"
+
+
+
+--------------------------------------------------------------------------------
 ---- HComp
 
 -- | HComp where the system could be trivial
 doHComp' :: AtStage (VI -> VI -> VTy -> Val -> Either TrIntClosure (VSys TrIntClosure) -> Val)
-doHComp' = _
+doHComp' = error "TODO: copy"
 
 doHComp :: AtStage (VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val)
-doHComp = _
-
+doHComp = error "TODO: copy"
 
 
 --------------------------------------------------------------------------------
 ---- Restriction Operations
 
+instance Restrictable Val where
+  type Alt Val = Val
+
+  (@) :: Val -> Restr -> Val
+  _v @ f = case _v of

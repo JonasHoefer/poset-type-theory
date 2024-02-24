@@ -9,8 +9,8 @@ import PosTT.Terms
 -- We have two types of binders in cubical NbE: 
 -- 1. Those which just have to be evaluated at some poitn
 -- 2. Those which have to be peeked under during the evaluation
--- We call the semantic values associated to a binder a *closure* and call
--- those of the second type *transparant*.
+-- We call the semantic values associated to a binder a *closure*, and call
+-- those closures associated to binders of the second type *transparant*.
 
 
 --------------------------------------------------------------------------------
@@ -28,9 +28,10 @@ data Val where
   VPLam :: IntClosure -> Val -> Val -> Val
 
   VCoePartial :: VI -> VI -> TrIntClosure -> Val
-  -- OLD INT CLOSURE
-  -- VCoe :: VI -> VI -> IntClosure -> Val -> Val
-  -- VHComp :: VI -> VI -> VTy -> Val -> VSys IntClosure -> Val
+
+  -- In negative types, we delay coe and hcomp until elimination
+  VCoe :: VI -> VI -> TrIntClosure -> Val -> Val
+  VHComp :: VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val
 
   VExt :: VTy -> VSys (VTy, Val, Val) -> Val
   VExtElm :: Val -> VSys Val -> Val
@@ -52,7 +53,7 @@ data Neu where
   NPr1 :: Neu -> Neu
   NPr2 :: Neu -> Neu
   NPApp :: Neu -> Val -> Val -> VI -> Neu
-  -- NCoePartial :: VI -> VI -> NIntClosure -> Neu
+  NCoePartial :: VI -> VI -> TrNeuIntClosure -> Neu
   -- NHComp :: VI -> VI -> Neu -> Val -> VSys IntClosure -> Neu
   -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
@@ -91,8 +92,6 @@ type VBranch = (Name, SplitClosure)
 data SplitClosure = SplitClosure [Name] Tm Env
 
 
-
-
 --------------------------------------------------------------------------------
 ---- Values for Base Category (interval and cofibrations)
 
@@ -101,11 +100,17 @@ data SplitClosure = SplitClosure [Name] Tm Env
 newtype VI = VI [[Gen]] -- DNF
 
 instance SupSemilattice VI where
+  (\/) :: VI -> VI -> VI
   VI r \/ VI s = VI (r ++ s)
+
+  bot :: VI
   bot = VI []
 
 instance InfSemilattice VI where
+  (/\) :: VI -> VI -> VI
   VI r /\ VI s = VI [ m ++ n | m <- r, n <- s ]
+
+  top :: VI
   top = VI [[]]
 
 instance Num VI where fromInteger 0 = bot ; fromInteger 1 = top
@@ -127,7 +132,7 @@ data TrIntClosure = TrIntClosure Gen Val Restr
 -- Abstracts a fresh variable for the current stage, prefering the given name.
 -- The continuation works at the extended stage to produce the captured value.
 trIntCl :: AtStage (Gen -> AtStage (Gen -> Val) -> TrIntClosure)
-trIntCl i k = refreshGen i $ \i' -> TrIntClosure i' (k i') idRestr
+trIntCl i k = refreshGen i $ \i' -> TrIntClosure i' (k i') IdRestr
 
 -- | A "transpart" closure binding an interval variable,
 --   whose captured value is guarantied to be neutral. 
@@ -199,8 +204,8 @@ refreshGen j k = extGen i $ k i
 
 newtype Restr = Restr [(Gen, VI)]
 
-idRestr :: Restr
-idRestr = Restr []
+pattern IdRestr :: Restr
+pattern IdRestr = Restr []
 
 class Restrictable a where
   type Alt a
@@ -241,11 +246,11 @@ envRestr = Restr . go
 
 
 --------------------------------------------------------------------------------
----- Convertebility 
+---- Convertibility  
 
--- | Our notation of equality for semantic values is convertebility.
+-- | Our notion of equality for semantic values is convertibility .
 --
--- This class is defined here, because evaluation depends on convertebility of
+-- This class is defined here, because evaluation depends on convertibility of
 -- values of pre-type I, but conversion checking for fibrant values depends on
 -- evaluation. We break this cycle, by factorring out this class.
 class Convertible a where
