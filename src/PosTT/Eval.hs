@@ -63,7 +63,7 @@ instance Eval Tm where
 
     Ext a bs    -> vExt (eval rho a) (eval rho bs)
     ExtElm s ts -> vExtElm (eval rho s) (eval rho ts)
-    -- ExtFun :: (Sys Tm) -> Tm -> Tm
+    ExtFun ws t -> doExtFun' (eval rho ws) (eval rho t)
 
     Sum d lbl  -> VSum (reAppDef d rho) (eval rho lbl)
     Con c args -> VCon c (eval rho args)
@@ -223,6 +223,13 @@ vExt a = either fst3 (VExt a)
 
 vExtElm :: AtStage (Val -> Either Val (VSys Val) -> Val)
 vExtElm v = either id (VExtElm v) 
+
+doExtFun' :: AtStage (Either Val (Sys Val) -> Val -> Val)
+doExtFun' ws v = either (`doApp` v) (`doExtFun` v) ws
+
+doExtFun :: AtStage (Sys Val -> Val -> Val)
+doExtFun _  (VExtElm v _) = v
+doExtFun ws (VNeu k)      = VExtFun ws k
 
 
 ---- HComp
