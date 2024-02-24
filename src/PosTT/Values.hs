@@ -43,6 +43,26 @@ data Val where
   VNeu :: Neu -> Val
 type VTy = Val
 
+pattern VCoePi :: VI -> VI -> Gen -> Val -> Closure Tm -> Restr -> Val -> Val
+pattern VCoePi r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VPi a b) α)  u
+
+pattern VCoeSigma :: VI -> VI -> Gen -> Val -> Closure Tm -> Restr -> Val -> Val
+pattern VCoeSigma r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VSigma a b) α)  u
+
+pattern VCoePath :: VI -> VI -> Gen -> Val -> Val -> Val -> Restr -> Val -> Val
+pattern VCoePath r₀ r₁ i a a₀ a₁ α u = VCoe r₀ r₁ (TrIntClosure i (VPath a a₀ a₁) α)  u
+
+
+pattern VHCompPi :: VI -> VI -> Val -> Closure Tm -> Val -> VSys TrIntClosure -> Val
+pattern VHCompPi r r' a b a0 sys = VHComp r r' (VPi a b) a0 sys
+
+pattern VHCompSigma :: VI -> VI -> Val -> Closure Tm -> Val -> VSys TrIntClosure -> Val
+pattern VHCompSigma r r' a b a0 sys = VHComp r r' (VSigma a b) a0 sys
+
+pattern VHCompPath :: VI -> VI -> Val -> Val -> Val -> Val -> VSys TrIntClosure -> Val
+pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
+
+
 newtype VSys a = VSys [(VCof, a)]
 
 data Closure a = Closure Name a Env
@@ -54,7 +74,7 @@ data Neu where
   NPr2 :: Neu -> Neu
   NPApp :: Neu -> Val -> Val -> VI -> Neu
   NCoePartial :: VI -> VI -> TrNeuIntClosure -> Neu
-  -- NHComp :: VI -> VI -> Neu -> Val -> VSys IntClosure -> Neu
+  NHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Neu
   -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
   NSplit :: Val -> [VBranch] -> Neu -> Neu
@@ -73,6 +93,12 @@ pattern VPr2 v = VNeu (NPr2 v)
 
 pattern VPApp :: Neu -> Val -> Val -> VI -> Val
 pattern VPApp k p0 p1 r = VNeu (NPApp k p0 p1 r)
+
+pattern VNeuCoePartial :: VI -> VI -> TrNeuIntClosure -> Val
+pattern VNeuCoePartial r0 r1 cl = VNeu (NCoePartial r0 r1 cl)
+
+pattern VNeuHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Val
+pattern VNeuHComp r r' a u₀ tb = VNeu (NHComp r r' a u₀ tb)
 
 pattern VExtFun :: VSys Val -> Neu -> Val
 pattern VExtFun ws k = VNeu (NExtFun ws k)
@@ -209,10 +235,10 @@ pattern IdRestr = Restr []
 
 class Restrictable a where
   type Alt a
-  act :: Restr -> a -> Alt a
+  act :: AtStage (Restr -> a -> Alt a)
 
 infixl 7 @
-(@) :: Restrictable a => a -> Restr -> Alt a
+(@) :: Restrictable a => AtStage (a -> Restr -> Alt a)
 a @ f = f `act` a
 
 

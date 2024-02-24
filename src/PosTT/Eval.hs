@@ -111,7 +111,7 @@ instance Eval (IntBinder Tm) where
 instance Eval (TrIntBinder Tm) where
   type Sem (TrIntBinder Tm) = TrIntClosure
 
-  -- | We evaluate a transparant binder, by evaluating the *open* terms t under
+  -- | We evaluate a transparant binder, by evaluating the *open* term t under
   --   the binder. (TODO: How can i be already used if the terms have no shadowing?)
   eval :: AtStage (Env -> TrIntBinder Tm -> TrIntClosure)
   eval rho (TrIntBinder i t) = trIntCl i $ \i' -> eval (EnvInt rho i (iVar i')) t
@@ -263,14 +263,29 @@ doExtFun ws (VNeu k)      = VExtFun ws k
 -- We maintain the following two invariants:
 -- 1. At the current stage r0 != r1 (otherwise coe reduces to the identity)
 -- 2. The head constructor of the line of types is known for VCoePartial.
---    Otherwise, the coersion is neutral, and given by VNCoePartial.
+--    Otherwise, the coersion is neutral, and given by VNeuCoePartial.
+--
+-- We are very careful (TODO: is this neccessary?): We peak under the closure
+-- to see the type. In the cases where we have restriction stable type formers,
+-- we can safely construct a VCoePartial value to be evaluated when applied.
+-- Otherwise, we force the delayed restriction, and 
 vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
-vCoePartial r0 r1 l | r0 === r1 = pId `doApp` (l $$ r0)
-vCoePartial r0 r1 l = _
+vCoePartial r0 r1 | r0 === r1 = \l -> pId `doApp` (l $$ r0)
+vCoePartial r0 r1 = go False
+  where
+    go :: Bool -> TrIntClosure -> Val
+    go forced l@(TrIntClosure i a _) = case a of
+      VSum{}   -> VCoePartial r0 r1 l
+      VPi{}    -> VCoePartial r0 r1 l
+      VSigma{} -> VCoePartial r0 r1 l
+      VPath{}  -> VCoePartial r0 r1 l
+      VNeu k   | forced -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k) 
+      VExt{}   | forced -> VCoePartial r0 r1 l -- forced needed?
+      _        | not forced -> go True (force l)
 
 doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
 doCoe r0 r1 l v -- by invariant r0 != r1; we delay coe for negative types
-  | TrIntClosure z (VExt a bs) IdRestr <- l = doCoeExt r0 r1 z a bs v
+  | TrIntClosure z (VExt a bs) IdRestr <- l = doCoeExt r0 r1 z a bs v -- this is wrong, right? IdRestr does not mean we did not introduce constraints
   | TrIntClosure z (VExt a bs) _       <- l = doCoe r0 r1 (force l) v
   | TrIntClosure z (VSum _ _)  _       <- l = error "TODO: copy + simplify"
   | otherwise                               = VCoe r0 r1 l v -- coe in neg type 
@@ -284,10 +299,19 @@ doCoeExt = error "TODO: copy"
 
 -- | HComp where the system could be trivial
 doHComp' :: AtStage (VI -> VI -> VTy -> Val -> Either TrIntClosure (VSys TrIntClosure) -> Val)
-doHComp' = error "TODO: copy"
+doHComp' r₀ r₁ a u0 = either ($$ r₁) (doHComp r₀ r₁ a u0)
 
 doHComp :: AtStage (VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val)
-doHComp = error "TODO: copy"
+doHComp r₀ r₁ _ u₀ _ | r₀ === r₁ = u₀
+doHComp r₀ r₁ a u₀ tb = case a of
+  VPi a b       -> VHCompPi r₀ r₁ a b u₀ tb
+  VSigma a b    -> VHCompSigma r₀ r₁ a b u₀ tb
+  VPath a a₀ a₁ -> VHCompPath r₀ r₁ a a₀ a₁ u₀ tb
+  VNeu k        -> VNeuHComp r₀ r₁ k u₀ tb
+--  VSum d lbl    -> doHCompSum r₀ r₁ d lbl u₀ tb
+--  VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
+--  VU            -> doHCompU r₀ r₁ u₀ tb
+
 
 
 --------------------------------------------------------------------------------
@@ -296,53 +320,108 @@ doHComp = error "TODO: copy"
 instance Restrictable Val where
   type Alt Val = Val
 
-  act :: Restr -> Val -> Val
+  act :: AtStage (Restr -> Val -> Val)
   act f = \case
     VU -> VU
     
     VPi a b -> VPi (a @ f) (b @ f)
---  VLam :: Closure Tm -> Val
+    VLam cl -> VLam (cl @ f)
 
---  VSigma :: Val -> Closure Ty -> Val
---  VPair :: Val -> Val -> Val
+    VSigma a b -> VSigma (a @ f) (b @ f)
+    VPair u v  -> VPair (u @ f) (v @ f)
 
---  VPath :: Val -> Val -> Val -> Val
---  VPLam :: IntClosure -> Val -> Val -> Val
+    VPath a a0 a1  -> VPath (a @ f) (a0 @ f) (a1 @ f)
+    VPLam cl p0 p1 -> VPLam (cl @ f) (p0 @ f) (p1 @ f)
 
---  VCoePartial :: VI -> VI -> TrIntClosure -> Val
+    VCoePartial r0 r1 l -> vCoePartial (r0 @ f) (r1 @ f) (l @ f)
 
---  VCoe :: VI -> VI -> TrIntClosure -> Val -> Val
---  VHComp :: VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val
+    VCoe r0 r1 l u0      -> vCoePartial (r0 @ f) (r1 @ f) (l @ f) `doApp` (u0 @ f)
+    VHComp r0 r1 a u0 tb -> doHComp' (r0 @ f) (r1 @ f) (a @ f)(u0 @ f) (tb @ f)
 
---  VExt :: VTy -> VSys (VTy, Val, Val) -> Val
---  VExtElm :: Val -> VSys Val -> Val
+    VExt a bs    -> vExt (a @ f) (bs @ f)
+    VExtElm v ws -> vExtElm (v @ f) (ws @ f)
 
---  VSum :: Val -> [VLabel] -> VTy
---  VCon :: Name -> [Val] -> Val
---  VSplitPartial :: Val -> [VBranch] -> Val
+    VSum a lbl         -> VSum (a @ f) (lbl @ f)
+    VCon c as          -> VCon c (as @ f)
+    VSplitPartial v bs -> VSplitPartial (v @ f) (bs @ f)
 
- -- VNeu :: Neu -> Val    
+    VNeu k -> either id VNeu (k @ f)    
 
 instance Restrictable Neu where
   -- a neutral can get "unstuck" when restricted
   type Alt Neu = Either Val Neu
 
-  act :: Restr -> Neu -> Either Val Neu
-  act f = \case
+  act :: AtStage (Restr -> Neu -> Either Val Neu)
+  act f = error "TODO: copy"
+
+instance Restrictable a => Restrictable (VSys a) where
+  type Alt (VSys a) = Either (Alt a) (VSys (Alt a))
+
+  act :: Restr -> VSys a -> Either (Alt a) (VSys (Alt a))
+  act f = error "TODO"
+
+instance Restrictable VLabel where
+  type Alt VLabel = VLabel
+
+  act :: AtStage (Restr -> VLabel -> VLabel)
+  act f = fmap (@ f) 
+
+instance Restrictable VBranch where
+  type Alt VBranch = VBranch
+
+  act :: AtStage (Restr -> VBranch -> VBranch)
+  act f = fmap (@ f)
 
 instance Restrictable (Closure a) where
   type Alt (Closure a) = (Closure a)
 
   -- | ((λx.t)ρ)f = (λx.t)(ρf)
-  act :: Restr -> Closure a -> Closure a
+  act :: AtStage (Restr -> Closure a -> Closure a)
   act f (Closure x t env) = Closure x t (env @ f)
+
+instance Restrictable IntClosure where
+  type Alt IntClosure = IntClosure
+
+  -- | ((λi.t)ρ)f = (λi.t)(ρf)
+  act :: AtStage (Restr -> IntClosure -> IntClosure)
+  act f (IntClosure x t env) = IntClosure x t (env @ f)
+
+instance Restrictable SplitClosure where
+  type Alt SplitClosure = SplitClosure
+
+  act :: AtStage (Restr -> SplitClosure -> SplitClosure)
+  act f (SplitClosure xs t env) = SplitClosure xs t (env @ f)
+
+instance Restrictable TrIntClosure where
+  type Alt TrIntClosure = TrIntClosure
+
+  act :: AtStage (Restr -> TrIntClosure -> TrIntClosure)
+  act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flipped
+
+instance Restrictable VTel where
+  type Alt VTel = VTel
+
+  act :: AtStage (Restr -> VTel -> VTel )
+  act f (VTel ts rho) = VTel ts (rho @ f)
 
 instance Restrictable Env where
   type Alt Env = Env
 
-  act :: Restr -> Env -> Env
+  act :: AtStage (Restr -> Env -> Env)
   act f = \case
     EmptyEnv          -> EmptyEnv
     EnvFib env x v    -> EnvFib (env @ f) x (v @ f)
     EnvDef env x t ty -> EnvDef (env @ f) x t ty 
     EnvInt env i r    -> EnvInt (env @ f) i (r @ f)
+
+instance Restrictable a => Restrictable [a] where
+  type Alt [a] = [Alt a]
+
+  act :: AtStage (Restr -> [a] -> [Alt a])
+  act f = map (@ f)
+
+instance (Restrictable a, Restrictable b, Restrictable c) => Restrictable (a, b, c) where
+  type Alt (a, b, c) = (Alt a, Alt b, Alt c)
+
+  act :: AtStage (Restr -> (a, b, c) -> (Alt a, Alt b, Alt c))
+  act f (x, y, z) = (x @ f, y @ f, z @ f)
