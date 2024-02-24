@@ -279,7 +279,6 @@ doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Va
 doCoeExt = error "TODO: copy"
 
 
-
 --------------------------------------------------------------------------------
 ---- HComp
 
@@ -297,5 +296,53 @@ doHComp = error "TODO: copy"
 instance Restrictable Val where
   type Alt Val = Val
 
-  (@) :: Val -> Restr -> Val
-  _v @ f = case _v of
+  act :: Restr -> Val -> Val
+  act f = \case
+    VU -> VU
+    
+    VPi a b -> VPi (a @ f) (b @ f)
+--  VLam :: Closure Tm -> Val
+
+--  VSigma :: Val -> Closure Ty -> Val
+--  VPair :: Val -> Val -> Val
+
+--  VPath :: Val -> Val -> Val -> Val
+--  VPLam :: IntClosure -> Val -> Val -> Val
+
+--  VCoePartial :: VI -> VI -> TrIntClosure -> Val
+
+--  VCoe :: VI -> VI -> TrIntClosure -> Val -> Val
+--  VHComp :: VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val
+
+--  VExt :: VTy -> VSys (VTy, Val, Val) -> Val
+--  VExtElm :: Val -> VSys Val -> Val
+
+--  VSum :: Val -> [VLabel] -> VTy
+--  VCon :: Name -> [Val] -> Val
+--  VSplitPartial :: Val -> [VBranch] -> Val
+
+ -- VNeu :: Neu -> Val    
+
+instance Restrictable Neu where
+  -- a neutral can get "unstuck" when restricted
+  type Alt Neu = Either Val Neu
+
+  act :: Restr -> Neu -> Either Val Neu
+  act f = \case
+
+instance Restrictable (Closure a) where
+  type Alt (Closure a) = (Closure a)
+
+  -- | ((λx.t)ρ)f = (λx.t)(ρf)
+  act :: Restr -> Closure a -> Closure a
+  act f (Closure x t env) = Closure x t (env @ f)
+
+instance Restrictable Env where
+  type Alt Env = Env
+
+  act :: Restr -> Env -> Env
+  act f = \case
+    EmptyEnv          -> EmptyEnv
+    EnvFib env x v    -> EnvFib (env @ f) x (v @ f)
+    EnvDef env x t ty -> EnvDef (env @ f) x t ty 
+    EnvInt env i r    -> EnvInt (env @ f) i (r @ f)

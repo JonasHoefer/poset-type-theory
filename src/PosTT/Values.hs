@@ -209,8 +209,11 @@ pattern IdRestr = Restr []
 
 class Restrictable a where
   type Alt a
-  infixl 7 @
-  (@) :: a -> Restr -> Alt a
+  act :: Restr -> a -> Alt a
+
+infixl 7 @
+(@) :: Restrictable a => a -> Restr -> Alt a
+a @ f = f `act` a
 
 
 --------------------------------------------------------------------------------
