@@ -223,9 +223,23 @@ tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 --------------------------------------------------------------------------------
 ---- Prelude Combinators
 
+pFunType :: Val
+pFunType = closedEval $
+  BLam "A" $ BLam "B" $ BPi (Var "A") "_" (Var "B")
+
 pId :: Val
 pId = closedEval $ Lam $ Binder "A" $ Lam $ Binder "x" $ Var "x"
 
+
+---- Abstracted version and internal combinators
+
+-- | (A B : U) : U
+funType :: AtStage (VTy -> VTy -> VTy)
+funType a b = foldl1 doApp [pFunType, a, b]
+
+-- | (A : U) : A → A
+identity :: AtStage (Val -> Val)
+identity a = foldl1 doApp [pId, a]
 
 
 --------------------------------------------------------------------------------

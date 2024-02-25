@@ -13,7 +13,7 @@ import           PosTT.Frontend.PreTerms (PTm)
 import           PosTT.Poset
 import           PosTT.Pretty
 import           PosTT.Terms
-import           PosTT.Values
+import           PosTT.Values hiding (extCof)
 
 import           Debug.Trace
 import GHC.RTS.Flags (ProfFlags(heapProfileIntervalTicks))
@@ -106,7 +106,7 @@ checkFibVar x = asks (lookup x . types) >>= \case
 
 ---- Evaluation and Quotation using context
 
-evalTC :: Tm -> TypeChecker Val
+evalTC :: Eval a => a -> TypeChecker (Sem a)
 evalTC t = withStageM (asks ((`eval` t) . env))
 
 convTC :: (SrcSpan -> Tm -> Tm -> ConvError -> TypeError) -> Val -> Val -> TypeChecker ()
@@ -256,6 +256,26 @@ infer = atArgPos $ \case
     (t', vt, tt) <- inferAndEval t
     (_, b) <- isSigma tt
     return (Pr2 t', b $$ doPr1 vt)
+  P.Coe _ r₀ r₁ (Gen . unName -> i) a -> do
+    (r'₀, vr₀) <- checkAndEvalI r₀
+    (r'₁, vr₁) <- checkAndEvalI r₁
+    (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
+    return (BCoe r'₀ r'₁ i a', (va @ (vr₀ `for` i)) `funType` (va @ (vr₁ `for` i)))
+  P.HComp ss r₀ r₁ a u₀ tb -> do
+    (a', va) <- checkAndEval a VU
+    (r'₀, vr₀) <- checkAndEvalI r₀
+    r'₁ <- checkI r₁
+    (u'₀, vu₀) <- checkAndEval u₀ va
+  
+    tb' <- checkSys tb $ \φ (Gen . unName -> i, u) -> do
+      (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)      
+      () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
+      return (TrIntBinder i u')
+    
+    vtb' <- evalTC tb'
+    () <- either (\_ -> return ()) compatible vtb'
+
+    return (HComp r'₀ r'₁ a' u'₀ tb', va)
   t -> error $ show t
 
 inferAndEval :: PTm -> TypeChecker (Tm, Val, VTy)
@@ -307,13 +327,21 @@ checkAndEvalI r = do
 
 ---- Systems
 
+checkSys :: P.Sys a -> AtStage (VCof -> a -> TypeChecker b) -> TypeChecker (Sys b)
+checkSys (P.Sys _ sys) k =
+  fmap Sys $ forM sys $ \(φ, x) -> do
+    (φ', vφ) <- checkAndEvalCof φ
+    (φ',) <$> local (extCof vφ) (withStageM (k vφ x))
 
+-- | Checks whether the system agrees on all overlaps.
+compatible :: (Restrictable a, Conv a) => VSys a -> TypeChecker ()
+compatible sys = error "TODO: re import"
 
 
 ---- Cofibrations
 
-checkAndEvalCofib :: [(P.ITm, P.ITm)] -> TypeChecker (Cof, VCof)
-checkAndEvalCofib eqs = do
+checkAndEvalCof :: [(P.ITm, P.ITm)] -> TypeChecker (Cof, VCof)
+checkAndEvalCof eqs = do
   eqs' <- forM eqs $ \(r, s) -> (,) <$> checkAndEvalI r <*> checkAndEvalI s
   let (cof, vcof) = unzip $ map (\((r, vr), (s, vs)) -> ((r, s), (vr, vs))) eqs'
   return (Cof cof, VCof vcof)

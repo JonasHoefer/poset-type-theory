@@ -62,6 +62,9 @@ pattern BSigma a x b = Sigma a (Binder x b)
 pattern BPLam :: Gen -> Tm -> Tm -> Tm -> Tm
 pattern BPLam x t a₀ a₁ = PLam (IntBinder x t) a₀ a₁
 
+pattern BCoe :: I -> I -> Gen -> Ty -> Tm
+pattern BCoe r₀ r₁ i a = Coe r₀ r₁ (TrIntBinder i a)
+
 
 ---- Data Types
 

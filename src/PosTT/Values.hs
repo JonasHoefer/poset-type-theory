@@ -10,6 +10,7 @@ import PosTT.Common
 import PosTT.Terms
 import PosTT.Errors
 
+
 -- We mirror terminology and observations by András Kovács.
 -- We have two types of binders in cubical NbE: 
 -- 1. Those which just have to be evaluated at some poitn
@@ -253,6 +254,9 @@ class Restrictable a where
 infixl 7 @
 (@) :: Restrictable a => AtStage (a -> Restr -> Alt a)
 a @ f = f `act` a
+
+re :: Restrictable a => AtStage (a -> Alt a)
+re = (@ IdRestr)
 
 
 --------------------------------------------------------------------------------

@@ -267,7 +267,7 @@ testNat : Nat = exp ten (suc zero)
 
 -- testN : Bool = transport U (id U) Bool Bool ((IterNeg (suc (suc zero)))) true
 
-testN : Bool = transport U (id U) Bool Bool (IterNeg (exp ten (suc (suc (suc zero))))) true
+testN : Bool = transport U (id U) Bool Bool (IterNeg (exp ten (suc (suc zero)))) true
 
 
 -- data Bool = true | false
