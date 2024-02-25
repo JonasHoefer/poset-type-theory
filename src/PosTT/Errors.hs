@@ -3,7 +3,11 @@ module PosTT.Errors where
 import PosTT.Common
 import PosTT.Terms
 
-data ConvError = ConvErrorTm Tm Tm | ConvErrorString String
+data ConvError where
+  ConvErrorTm :: Tm -> Tm -> ConvError 
+  ConvErrorI :: I -> I -> ConvError
+  ConvErrorCof :: Cof -> Cof -> ConvError
+  ConvErrorString :: String -> ConvError
 
 data ScopeError where
   ReboundError :: String -> ((Int, Int), (Int, Int)) -> ((Int, Int), (Int, Int)) -> ScopeError

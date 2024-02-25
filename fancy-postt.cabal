@@ -50,6 +50,7 @@ executable fancy-postt
       , PosTT.Poset
       , PosTT.Pretty
       , PosTT.Quotation
+      , PosTT.SAT
       , PosTT.Terms
       , PosTT.TypeChecker
       , PosTT.Values

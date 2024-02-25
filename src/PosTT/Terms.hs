@@ -2,7 +2,8 @@ module PosTT.Terms where
 
 import Data.String (IsString(..))
 
-import PosTT.Common
+import PosTT.Common (Name)
+import Algebra.Lattice (SupSemilattice(..), InfSemilattice(..))
 
 --------------------------------------------------------------------------------
 ---- Terms of Fibrant Types
@@ -60,10 +61,24 @@ data Branch = Branch Name SplitBinder
 --------------------------------------------------------------------------------
 ---- Base Category
 
-newtype Gen = Gen { unGen :: String } deriving (Eq, IsString)
+newtype Gen = Gen { unGen :: String } deriving (Eq, Ord, IsString)
 
 data I = IVar Gen | Sup I I | Inf I I | I0 | I1
 
 newtype Cof = Cof [(I, I)]
 
 newtype Sys a = Sys [(Cof, a)]
+
+instance SupSemilattice I where
+  (\/) :: I -> I -> I
+  (\/) = Sup
+
+  bot :: I
+  bot = I0
+
+instance InfSemilattice I where
+  (/\) :: I -> I -> I
+  (/\) = Inf
+
+  top :: I
+  top = I1

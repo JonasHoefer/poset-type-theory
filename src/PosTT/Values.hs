@@ -3,6 +3,7 @@ module PosTT.Values where
 
 import Algebra.Lattice
 
+import Data.Bifunctor
 import Data.Either (isRight)
 
 import PosTT.Common
@@ -132,40 +133,6 @@ data SplitClosure = SplitClosure [Name] Tm Env
 ---- Interval
 
 newtype VI = VI [[Gen]] -- DNF
-
-instance SupSemilattice VI where
-  (\/) :: VI -> VI -> VI
-  VI r \/ VI s = VI (r ++ s)
-
-  bot :: VI
-  bot = VI []
-
-instance InfSemilattice VI where
-  (/\) :: VI -> VI -> VI
-  VI r /\ VI s = VI [ m ++ n | m <- r, n <- s ]
-
-  top :: VI
-  top = VI [[]]
-
-instance Num VI where
-  fromInteger :: Integer -> VI
-  fromInteger 0 = bot
-  fromInteger 1 = top
-
-  (+) :: VI -> VI -> VI
-  (+) = (\/)
-
-  (*) :: VI -> VI -> VI
-  (*) = (/\)
-
-  abs :: VI -> VI
-  abs = error "Only for literals"
-  
-  signum :: VI -> VI
-  signum = error "Only for literals"
-  
-  negate :: VI -> VI
-  negate = error "Only for literals"
 
 iVar :: Gen -> VI
 iVar i = VI [[i]]
@@ -318,9 +285,30 @@ envRestr = Restr . go
 --
 -- This class is defined here, because evaluation depends on convertibility of
 -- values of pre-type I, but conversion checking for fibrant values depends on
--- evaluation. We break this cycle, by factorring out this class.
+-- evaluation. We break this cycle, by factoring out this class.
 class Conv a where
   (===) :: AtStage (a -> a -> Bool)
   x === y = isRight (x `conv` y)
 
   conv :: AtStage (a -> a -> Either ConvError ())
+
+
+--------------------------------------------------------------------------------
+---- Quotation
+
+-- | Semantic values can be read back into terms.
+class ReadBack a where
+  type Quot a
+  readBack :: AtStage (a -> Quot a)
+
+instance ReadBack VI where
+  type Quot VI = I
+
+  readBack :: AtStage (VI -> I)
+  readBack (VI dnf) = sup [ inf (map IVar cl) | cl <- dnf ]
+
+instance ReadBack VCof where
+  type Quot VCof = Cof
+
+  readBack :: AtStage (VCof -> Cof)
+  readBack (VCof eqs) = Cof (map (bimap readBack readBack) eqs)

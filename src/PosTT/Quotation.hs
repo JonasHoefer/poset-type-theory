@@ -8,10 +8,6 @@ import PosTT.Values
 --------------------------------------------------------------------------------
 ---- Read Back
 
-class ReadBack a where
-  type Quot a
-  readBack :: AtStage (a -> Quot a)
-
 instance ReadBack Val where
   type Quot Val = Tm
 
