@@ -7,5 +7,5 @@ import PosTT.Quotation
 import PosTT.Pretty
 
 main :: IO ()
-main = print $ bindStage terminalStage $ readBack $ eval EmptyEnv $ Lam $ Binder "A" $ Lam $ Binder "B" $ Sigma (Var "A") (Binder "x" (Var "B"))
+main = putStrLn $ pretty $ bindStage terminalStage $ readBack $ eval EmptyEnv $ Lam $ Binder "A" $ Lam $ Binder "B" $ Sigma (Var "A") (Binder "x" (Var "B"))
 

@@ -9,7 +9,6 @@ import PosTT.Values
 import PosTT.Errors (ConvError)
 
 
-
 comp :: Restr -> Restr -> Restr
 comp (Restr α) (Restr β) = Restr $ [ (z, r) | (z, r) <- α, z `notElem` map fst β ] ++ [ (x, r `subst` Restr α) | (x, r) <- β ]
 
@@ -28,6 +27,8 @@ instance Conv VI where
   conv = error "TODO: copy"
 
 instance Conv VCof where
+  conv :: AtStage (VCof -> VCof -> Either ConvError ())
+  conv = error "TODO: copy"
 
 simplifySys :: VSys a -> Either a (VSys a)
 simplifySys = error "TODO: copy"
