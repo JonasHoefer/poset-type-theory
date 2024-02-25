@@ -5,6 +5,7 @@ import Algebra.Lattice
 
 import Data.Either (isRight)
 
+import PosTT.Common
 import PosTT.Terms
 import PosTT.Errors
 

@@ -5,6 +5,7 @@ import Algebra.Lattice
 
 import Data.Tuple.Extra (fst3)
 
+import PosTT.Common
 import PosTT.Terms
 import PosTT.Values
 import PosTT.Poset

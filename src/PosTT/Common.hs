@@ -3,7 +3,7 @@ module PosTT.Common where
 import Data.String (IsString(..))
 
 
-newtype Name = Name { unName :: String } deriving (Eq, IsString)
+newtype Name = Name { unName :: String } deriving (Eq, Ord, IsString, Show)
 
 type SrcSpan = Maybe ((Int, Int), (Int, Int))
 

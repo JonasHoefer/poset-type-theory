@@ -1,0 +1,9 @@
+source-repository-package
+  type: git
+  location: https://github.com/JonasHoefer/bnfc.git
+  tag: 85232841a6db9475bf89cb7af4e5d9eb39d223e5
+  subdir: source
+
+optimization: 2
+
+packages: ./fancy-postt.cabal

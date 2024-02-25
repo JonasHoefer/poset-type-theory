@@ -1,0 +1,97 @@
+entrypoints Module, Exp ;
+
+comment "--" ;
+comment "{-" "-}" ;
+
+layout "where", "let", "split" ;
+layout stop "in" ;
+-- Do not use layout toplevel as it makes pExp fail!
+
+Module.   Module ::= "module" AIdent "where" "{" [Imp] [Decl] "}" ;
+
+Import.   Imp ::= "import" AIdent ;
+separator Imp ";" ;
+
+DeclDef.   Decl ::= AIdent [Tele] ":" Exp "=" Body ;
+DeclData.  Decl ::= "data" AIdent [Tele] ":" "U" "=" [Label] ;
+separator  Decl ";" ;
+
+NoSplit. Body ::= ExpWhere ;
+Split.   Body ::= "split" "{" [Branch] "}" ;
+
+Where.    ExpWhere ::= Exp "where" "{" [Decl] "}" ;
+NoWhere.  ExpWhere ::= Exp ;
+
+Let.      Exp  ::= "let" "{" [Decl] "}" "in" Exp ;
+Lam.      Exp  ::= "\\" [AIdent] "." Exp ;
+ALam.     Exp  ::= "\\" [PTele] "." Exp ;
+PLam.     Exp  ::= "\\" AIdent "@" "[" "," "]" "." Exp ;
+Fun.      Exp1 ::= Exp2 "->" Exp1 ;
+Pi.       Exp1 ::= [PTele] "->" Exp1 ;
+Sigma.    Exp1 ::= [PTele] "*" Exp1 ;
+Prod.     Exp1 ::= Exp2 "*" Exp1 ;
+Disj.     Exp2 ::= Exp2 "\\/" Exp3 ;
+Conj.     Exp3 ::= Exp3 "/\\" Exp4 ;
+App.      Exp4 ::= Exp4 Exp5 ;
+PAppAn.   Exp4 ::= Exp4 "@" "[" Exp "," Exp "]" Exp5 ;
+ExtFun.   Exp4 ::= "extFun" Exp5 ;
+ExtElm.   Exp4 ::= "ext" Exp5 "(" [Exp] ")" ;
+Path.     Exp5 ::= "Path" Exp6 Exp6 Exp6 ;
+HComp.    Exp5 ::= "hComp" Exp6 Exp6 Exp6 Exp6 SysBinder ; -- first two are formula
+Coe.      Exp5 ::= "coe" Exp6 Exp6 "(" AIdent "." Exp ")" ; -- first two are formula
+Ext.      Exp5 ::= "Ext" Exp6 SysExt ;
+Fst.      Exp6 ::= Exp6 ".1" ;
+Snd.      Exp6 ::= Exp6 ".2" ;
+Pair.     Exp7 ::= "(" Exp "," [Exp] ")" ;
+Var.      Exp7 ::= AIdent ;
+PCon.     Exp7 ::= AIdent "{" Exp "}" ; -- c{T A B} x1 x2 @ phi
+U.        Exp7 ::= "U" ;
+I.        Exp7 ::= "I" ;
+Dir.      Exp7 ::= Dir ;
+Hole.     Exp7 ::= HoleIdent ;
+coercions Exp 7 ;
+separator nonempty Exp "," ;
+
+Dir0. Dir ::= "0" ;
+Dir1. Dir ::= "1" ;
+
+SysExt.   SysExt  ::= "[" [SideExt] "]" ;
+SideExt.  SideExt ::= [Face] "->" "(" Exp "," Exp "," Exp ")" ;
+separator SideExt "," ;
+
+SysBinder.  SysBinder  ::= "[" [SideBinder] "]" ;
+SideBinder. SideBinder ::= [Face] "->" AIdent "." Exp ;
+separator   SideBinder "," ;
+
+Sys.      Sys  ::= "[" [Side] "]" ;
+Side.     Side ::= [Face] "->" Exp ;
+separator Side "," ;
+
+
+Face.     Face ::= "(" Exp "=" Exp ")" ; -- both formulas
+separator Face "," ;
+
+-- Branches
+OBranch.   Branch ::= AIdent [AIdent] "->" ExpWhere ;
+-- TODO: better have ... @ i @ j @ k -> ... ?
+PBranch.   Branch ::= AIdent [AIdent] "@" [AIdent] "->" ExpWhere ;
+separator Branch ";" ;
+
+-- Labelled sum alternatives
+OLabel.   Label ::= AIdent [Tele] ;
+PLabel.   Label ::= AIdent [Tele] "<" [AIdent] ">" Sys ;
+separator Label "|" ;
+
+-- Telescopes
+Tele.     Tele ::= "(" AIdent [AIdent] ":" Exp ")" ;
+terminator Tele "" ;
+
+-- Nonempty telescopes with Exp:s, this is hack to avoid ambiguities
+-- in the grammar when parsing Pi
+PTele.    PTele ::= "(" Exp ":" Exp ")" ;
+terminator nonempty PTele "" ;
+
+position token AIdent ('_')|(letter)(letter|digit|'\''|'_'|'-')*|('!')(digit)* ;
+separator AIdent "" ;
+
+position token HoleIdent '?' ;

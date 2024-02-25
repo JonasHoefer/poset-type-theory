@@ -42,7 +42,7 @@ data PTm where
   -- ^ coeʳ⃗ˢ (i.A)
   HComp :: SrcSpan -> ITm -> ITm -> PTy -> PTm -> Sys (Name, PTm) -> PTm
   -- ^ hcompʳ⃗ˢ A a₀ [ψᵢ ↪ j.uᵢ]
-  
+
   Ext :: SrcSpan -> PTy -> Sys (PTy, PTm, PTm) -> PTm
   -- ^ Ext A [ψᵢ ↪ (Bᵢ, eᵢ, pᵢ)]
   ExtElm :: SrcSpan -> PTm -> [PTm] -> PTm
@@ -54,8 +54,12 @@ data PTm where
   Sum :: SrcSpan -> Name -> [Label] -> PTm
   -- ^ A (recursive) labeled sum type
   Con :: SrcSpan -> Name -> [PTm] -> PTm
-  -- ^ A constructorfor a (recursive) labeled sum type with al its arguments
+  -- ^ A constructorfor a (recursive) labeled sum type with all its arguments
   Split :: SrcSpan -> Name -> [Branch] -> PTm
+
+
+  HSum :: SrcSpan -> Name -> [HLabel] -> PTm
+  HCon :: SrcSpan -> Name -> [PTm] -> PTm
 deriving instance Show PTm
 
 type PTy = PTm
@@ -67,6 +71,11 @@ type Tel = [(SrcSpan, Name, PTy)]
 -- | An alternative in a labeled sum, i.e.,
 --   a named constructor and its arguments.
 data Label = Label SrcSpan Name Tel deriving Show
+
+-- | An alternative in a higher labeled sum, i.e.,
+--   a named HIT constructor and its arguments.
+data HLabel = HLabel SrcSpan Name Tel [Name] (Sys PTm) deriving Show
+
 
 labelName :: Label -> Name
 labelName (Label _ c _) = c

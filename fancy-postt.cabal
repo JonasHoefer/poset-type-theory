@@ -16,8 +16,17 @@ maintainer:         hoferj@chalmers.se
 
 -- A copyright notice.
 -- copyright:
--- category:
-extra-source-files: CHANGELOG.md
+
+category:           Dependent Types
+build-type:         Custom
+
+extra-source-files: CHANGELOG.md, src/PosTT/Frontend/Exp.cf
+
+custom-setup
+  setup-depends:
+    base,
+    Cabal,
+    process
 
 executable fancy-postt
     main-is:          Main.hs
@@ -29,7 +38,15 @@ executable fancy-postt
       , PosTT.Conversion
       , PosTT.Errors
       , PosTT.Eval
+      , PosTT.Frontend.Exp.Abs
+      , PosTT.Frontend.Exp.ErrM
+      , PosTT.Frontend.Exp.Layout
+      , PosTT.Frontend.Exp.Lex
+      , PosTT.Frontend.Exp.Par
+      , PosTT.Frontend.Exp.Print
+      , PosTT.Frontend.Exp.Skel
       , PosTT.Frontend.PreTerms
+      , PosTT.Frontend.ScopeChecker
       , PosTT.Poset
       , PosTT.Pretty
       , PosTT.Quotation
@@ -48,9 +65,14 @@ executable fancy-postt
       , StrictData
     build-depends:    
         base ^>=4.17.2.1
+      , array
       , mtl
       , extra
       , containers
       , prettyprinter
+    build-tool-depends:
+        alex:alex
+      , happy:happy
+      , BNFC:bnfc
     hs-source-dirs:   src
     default-language: GHC2021

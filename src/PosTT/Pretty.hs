@@ -5,6 +5,7 @@ import Data.String (IsString(..))
 import Prettyprinter (Pretty(..), (<+>), defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.String (renderShowS)
 
+import PosTT.Common
 import PosTT.Terms
 
 --------------------------------------------------------------------------------

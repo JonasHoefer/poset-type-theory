@@ -23,7 +23,7 @@ cabal.project.local~
 .ghc.environment.*
 
 # BNFC generated files
-lib/PosTT/Exp/
+src/PosTT/Frontend/Exp/
 
 # PosTT repl history file
 .postt_history
