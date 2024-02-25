@@ -47,6 +47,7 @@ executable fancy-postt
       , PosTT.Frontend.Exp.Skel
       , PosTT.Frontend.PreTerms
       , PosTT.Frontend.ScopeChecker
+      , PosTT.HeadLinearReduction
       , PosTT.Poset
       , PosTT.Pretty
       , PosTT.Quotation
@@ -65,11 +66,15 @@ executable fancy-postt
       , UndecidableInstances
       , StrictData
     build-depends:    
-        base ^>=4.17.2.1
-      , array
-      , mtl
-      , extra
+        array
+      , base ^>=4.17.2.1
       , containers
+      , directory
+      , extra
+      , filepath
+      , haskeline
+      , mtl
+      , optparse-applicative
       , prettyprinter
     build-tool-depends:
         alex:alex

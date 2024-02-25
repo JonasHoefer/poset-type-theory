@@ -6,6 +6,9 @@ import PosTT.Terms
 import PosTT.Values
 
 
+nf :: AtStage (Env -> Tm -> Tm)
+nf ρ = readBack . eval ρ
+
 --------------------------------------------------------------------------------
 ---- Read Back
 

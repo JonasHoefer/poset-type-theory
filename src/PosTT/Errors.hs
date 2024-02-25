@@ -15,3 +15,6 @@ data ScopeError where
   CyclicDependency :: [String] -> ScopeError
   DuplicateLabel :: SrcSpan -> Name -> ScopeError
 deriving instance Show ScopeError
+
+data Error where
+deriving instance Show Error

@@ -111,21 +111,7 @@ checkFace :: Face -> ScopeChecker (P.ITm, P.ITm)
 checkFace (Face _ r s) = (,) <$> checkExp r <*> checkExp s
 
 checkExp :: Exp -> ScopeChecker PTm
-
--- temporary hack for build in types
--- checkExp (Var ss (AIdent (_, "Bool")))          = return $ P.B ss
--- checkExp (Var ss (AIdent (_, "true")))          = return $ P.T ss
--- checkExp (Var ss (AIdent (_, "false")))         = return $ P.F ss
--- checkExp (App ss (App _ (App _ (App _ (Var _ (AIdent (_, "elimB"))) m) z) s) u) =
---   P.ElimB ss <$> checkExp m <*> checkExp z <*> checkExp s <*> checkExp u
---
--- checkExp (Var ss (AIdent (_, "Nat")))           = return $ P.N ss
--- checkExp (Var ss (AIdent (_, "zero")))          = return $ P.Z ss
--- checkExp (App ss (Var _ (AIdent (_, "suc"))) u) = P.S ss <$> checkExp u
--- checkExp (App ss (App _ (App _ (App _ (Var _ (AIdent (_, "elimN"))) m) z) s) u) =
---   P.ElimN ss <$> checkExp m <*> checkExp z <*> checkExp s <*> checkExp u
-
-checkExp (Var ss id)           = checkVar id -- TODO: has to produce P.Con
+checkExp (Var ss id)           = checkVar id
 checkExp (U ss)                = return $ P.U ss
 checkExp (Let _ ds u)          = checkLets ds u
 checkExp (Lam ss ids u)        = checkLams ss ids u

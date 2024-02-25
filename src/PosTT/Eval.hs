@@ -48,7 +48,7 @@ instance Eval Tm where
   eval rho = \case
     U            -> VU
     Var x        -> rho `lookupFib` x
-    Let d t ty s -> extName d $ eval (EnvDef rho d t ty) s
+    Let d t ty s -> eval (EnvDef rho d t ty) s -- TODO: do we need this extName? extName d $
 
     Pi a b  -> VPi (eval rho a) (eval rho b)
     Lam t   -> VLam (eval rho t)
