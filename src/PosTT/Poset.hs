@@ -9,8 +9,12 @@ import PosTT.Values
 import PosTT.Errors (ConvError)
 
 
+--------------------------------------------------------------------------------
+---- Restriction Maps
+
 comp :: Restr -> Restr -> Restr
-comp (Restr α) (Restr β) = Restr $ [ (z, r) | (z, r) <- α, z `notElem` map fst β ] ++ [ (x, r `subst` Restr α) | (x, r) <- β ]
+comp (Restr α) (Restr β) = 
+  Restr $ [ (z, r) | (z, r) <- α, z `notElem` map fst β ] ++ [ (x, r `subst` Restr α) | (x, r) <- β ]
 
 subst :: VI -> Restr -> VI
 subst r     IdRestr    = r
@@ -21,6 +25,10 @@ instance Restrictable VI where
 
   act :: AtStage (Restr -> VI -> VI)
   act = flip subst
+
+
+--------------------------------------------------------------------------------
+---- Conversion
 
 instance Conv VI where
   conv :: AtStage (VI -> VI -> Either ConvError ())

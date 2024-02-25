@@ -147,7 +147,25 @@ instance InfSemilattice VI where
   top :: VI
   top = VI [[]]
 
-instance Num VI where fromInteger 0 = bot ; fromInteger 1 = top
+instance Num VI where
+  fromInteger :: Integer -> VI
+  fromInteger 0 = bot
+  fromInteger 1 = top
+
+  (+) :: VI -> VI -> VI
+  (+) = (\/)
+
+  (*) :: VI -> VI -> VI
+  (*) = (/\)
+
+  abs :: VI -> VI
+  abs = error "Only for literals"
+  
+  signum :: VI -> VI
+  signum = error "Only for literals"
+  
+  negate :: VI -> VI
+  negate = error "Only for literals"
 
 iVar :: Gen -> VI
 iVar i = VI [[i]]
@@ -296,7 +314,7 @@ envRestr = Restr . go
 --------------------------------------------------------------------------------
 ---- Convertibility  
 
--- | Our notion of equality for semantic values is convertibility .
+-- | Our notion of equality for semantic values is convertibility.
 --
 -- This class is defined here, because evaluation depends on convertibility of
 -- values of pre-type I, but conversion checking for fibrant values depends on

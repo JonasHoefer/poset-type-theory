@@ -50,13 +50,11 @@ data PTm where
   ExtFun :: SrcSpan -> PTm -> PTm
   -- ^ ExtFun [ψᵢ ↪ e] u
 
-
   Sum :: SrcSpan -> Name -> [Label] -> PTm
   -- ^ A (recursive) labeled sum type
   Con :: SrcSpan -> Name -> [PTm] -> PTm
   -- ^ A constructorfor a (recursive) labeled sum type with all its arguments
   Split :: SrcSpan -> Name -> [Branch] -> PTm
-
 
   HSum :: SrcSpan -> Name -> [HLabel] -> PTm
   HCon :: SrcSpan -> Name -> [PTm] -> PTm
