@@ -13,11 +13,11 @@ import PosTT.Poset
 --------------------------------------------------------------------------------
 ---- Utilities 
 
--- | Looks up firbant value in environment. If it is a definition, then it is
+-- | Looks up fibrant value in environment. If it is a definition, then it is
 --   evaluated. Thus, the current stage is required.
 lookupFib :: AtStage (Env -> Name -> Val)
 lookupFib (EnvFib _ y v)       x | y == x = v
-lookupFib rho@(EnvDef _ y t _) x | y == x = eval rho t
+lookupFib rho@(EnvDef _ y t _) x | y == x = eval rho t -- recursive definition
 lookupFib (ConsEnv rho)        x = rho `lookupFib` x
 
 lookupInt :: Env -> Gen -> VI
@@ -28,6 +28,7 @@ reAppDef :: AtStage (Name -> Env -> Val)
 reAppDef d (EnvFib rho x v) 
   | x == d = VVar d
   | x /= d = reAppDef d rho `doApp` v
+
 
 --------------------------------------------------------------------------------
 ---- Eval
@@ -166,6 +167,7 @@ class Apply c where
   type ArgType c
   type ResType c
 
+  infixr 0 $$ 
   ($$) :: AtStage (c -> ArgType c -> ResType c)
 
 instance Eval a => Apply (Closure a) where
@@ -288,7 +290,7 @@ vCoePartial r0 r1 = go False
 
 doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
 doCoe r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
-  TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) fully restr (including no new equations!)
+  TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) restr (incl. eqs)
   TrIntClosure z (VSum _ _)  _       -> error "TODO: copy + simplify"
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
@@ -332,8 +334,6 @@ doHCompU = error "TODO: copy"
 ---- Restriction Operations
 
 instance Restrictable Val where
-  type Alt Val = Val
-
   act :: AtStage (Restr -> Val -> Val)
   act f = \case
     VU -> VU
@@ -375,52 +375,36 @@ instance Restrictable a => Restrictable (VSys a) where
   act f = error "TODO"
 
 instance Restrictable VLabel where
-  type Alt VLabel = VLabel
-
   act :: AtStage (Restr -> VLabel -> VLabel)
   act f = fmap (@ f) 
 
 instance Restrictable VBranch where
-  type Alt VBranch = VBranch
-
   act :: AtStage (Restr -> VBranch -> VBranch)
   act f = fmap (@ f)
 
 instance Restrictable (Closure a) where
-  type Alt (Closure a) = (Closure a)
-
   -- | ((λx.t)ρ)f = (λx.t)(ρf)
   act :: AtStage (Restr -> Closure a -> Closure a)
   act f (Closure x t env) = Closure x t (env @ f)
 
 instance Restrictable IntClosure where
-  type Alt IntClosure = IntClosure
-
   -- | ((λi.t)ρ)f = (λi.t)(ρf)
   act :: AtStage (Restr -> IntClosure -> IntClosure)
   act f (IntClosure x t env) = IntClosure x t (env @ f)
 
 instance Restrictable SplitClosure where
-  type Alt SplitClosure = SplitClosure
-
   act :: AtStage (Restr -> SplitClosure -> SplitClosure)
   act f (SplitClosure xs t env) = SplitClosure xs t (env @ f)
 
 instance Restrictable TrIntClosure where
-  type Alt TrIntClosure = TrIntClosure
-
   act :: AtStage (Restr -> TrIntClosure -> TrIntClosure)
   act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flipped
 
 instance Restrictable VTel where
-  type Alt VTel = VTel
-
   act :: AtStage (Restr -> VTel -> VTel )
   act f (VTel ts rho) = VTel ts (rho @ f)
 
 instance Restrictable Env where
-  type Alt Env = Env
-
   act :: AtStage (Restr -> Env -> Env)
   act f = \case
     EmptyEnv          -> EmptyEnv

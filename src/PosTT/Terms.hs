@@ -29,8 +29,8 @@ data Tm where
   HComp :: I -> I -> Ty -> Tm -> Sys (TrIntBinder Tm) -> Tm
 
   Ext :: Ty -> (Sys (Ty, Tm, Tm)) -> Tm
-  ExtElm :: Tm -> (Sys Tm) -> Tm
-  ExtFun :: Sys Tm -> Tm -> Tm
+  ExtElm :: Tm -> ~(Sys Tm) -> Tm
+  ExtFun :: ~(Sys Tm) -> Tm -> Tm
 
   Sum :: Name -> [Label] -> Tm
   Con :: Name -> [Tm] -> Tm
@@ -47,6 +47,7 @@ data TrIntBinder a = TrIntBinder Gen a
 
 data SplitBinder = SplitBinder [Name] Tm
 
+
 ---- Data Types
 
 newtype Tel = Tel [(Name, Ty)]
@@ -59,7 +60,7 @@ data Branch = Branch Name SplitBinder
 --------------------------------------------------------------------------------
 ---- Base Category
 
-newtype Gen = Gen { unGen :: String } deriving Eq
+newtype Gen = Gen { unGen :: String } deriving (Eq, IsString)
 
 data I = IVar Gen | Sup I I | Inf I I | I0 | I1
 

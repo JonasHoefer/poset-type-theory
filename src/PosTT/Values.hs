@@ -3,6 +3,8 @@ module PosTT.Values where
 
 import Algebra.Lattice
 
+import Data.Either (isRight)
+
 import PosTT.Terms
 
 -- We mirror terminology and observations by András Kovács.
@@ -43,6 +45,7 @@ data Val where
   VNeu :: Neu -> Val
 type VTy = Val
 
+
 pattern VCoePi :: VI -> VI -> Gen -> Val -> Closure Tm -> Restr -> Val -> Val
 pattern VCoePi r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VPi a b) α)  u
 
@@ -64,6 +67,9 @@ pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
 
 
 newtype VSys a = VSys [(VCof, a)]
+
+pattern EmptySys :: VSys a
+pattern EmptySys = VSys []
 
 data Closure a = Closure Name a Env
 
@@ -207,6 +213,16 @@ extCof phi = bindStage (?s { cof = phi /\ cof ?s })
 freshName :: AtStage (AtStage (Name -> a) -> a)
 freshName = refreshName "x"
 
+freshFibVar :: AtStage (AtStage (Val -> a) -> a)
+freshFibVar k = freshName (k . VVar)
+
+freshGen :: AtStage (AtStage (Gen -> a) -> a)
+freshGen = refreshGen "i"
+
+freshIntVar :: AtStage (AtStage (VI -> a) -> a)
+freshIntVar k = freshGen (k . iVar)
+
+
 refreshName :: AtStage (Name -> AtStage (Name -> a) -> a)
 refreshName y k = extName x $ k x
   where
@@ -235,6 +251,7 @@ pattern IdRestr = Restr []
 
 class Restrictable a where
   type Alt a
+  type Alt a = a
   act :: AtStage (Restr -> a -> Alt a)
 
 infixl 7 @
@@ -282,5 +299,8 @@ envRestr = Restr . go
 -- This class is defined here, because evaluation depends on convertibility of
 -- values of pre-type I, but conversion checking for fibrant values depends on
 -- evaluation. We break this cycle, by factorring out this class.
-class Convertible a where
+class Conv a where
   (===) :: AtStage (a -> a -> Bool)
+  x === y = isRight (x `conv` y)
+
+  conv :: AtStage (a -> a -> Either String ())

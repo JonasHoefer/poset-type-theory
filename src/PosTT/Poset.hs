@@ -21,11 +21,12 @@ instance Restrictable VI where
 
   act :: AtStage (Restr -> VI -> VI)
   act = flip subst
-    
 
-instance Convertible VI where
-  (===) :: AtStage (VI -> VI -> Bool)
-  (===) = error "TODO: copy"
+instance Conv VI where
+  conv :: AtStage (VI -> VI -> Either String ())
+  conv = error "TODO: copy"
+
+instance Conv VCof where
 
 simplifySys :: VSys a -> Either a (VSys a)
 simplifySys = error "TODO: copy"
