@@ -189,7 +189,14 @@ instance Apply TrIntClosure where
   type ResType TrIntClosure = Val
 
   ($$) :: AtStage (TrIntClosure -> VI -> Val)
-  TrIntClosure i v alpha $$ r = v @ Restr [(i, r)]
+  TrIntClosure i v (Restr alpha) $$ r = v @ Restr ((i, r):alpha)
+
+instance Apply TrNeuIntClosure where
+  type ArgType TrNeuIntClosure = VI
+  type ResType TrNeuIntClosure = Val
+
+  ($$) :: AtStage (TrNeuIntClosure -> VI -> Val)
+  TrNeuIntClosure i v $$ r = either id VNeu (v @ Restr [(i, r)])
 
 instance Apply SplitClosure where
   type ArgType SplitClosure = [Val]

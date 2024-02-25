@@ -6,6 +6,7 @@ import Algebra.Lattice
 import Data.Either (isRight)
 
 import PosTT.Terms
+import PosTT.Errors
 
 -- We mirror terminology and observations by András Kovács.
 -- We have two types of binders in cubical NbE: 
@@ -303,4 +304,4 @@ class Conv a where
   (===) :: AtStage (a -> a -> Bool)
   x === y = isRight (x `conv` y)
 
-  conv :: AtStage (a -> a -> Either String ())
+  conv :: AtStage (a -> a -> Either ConvError ())

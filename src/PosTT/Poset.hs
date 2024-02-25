@@ -6,6 +6,7 @@ import Algebra.Lattice
 import Data.Maybe
 
 import PosTT.Values
+import PosTT.Errors (ConvError)
 
 
 
@@ -23,7 +24,7 @@ instance Restrictable VI where
   act = flip subst
 
 instance Conv VI where
-  conv :: AtStage (VI -> VI -> Either String ())
+  conv :: AtStage (VI -> VI -> Either ConvError ())
   conv = error "TODO: copy"
 
 instance Conv VCof where

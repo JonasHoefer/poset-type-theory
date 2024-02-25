@@ -1,9 +1,12 @@
-module PosTT.Conversion where
+module PosTT.Conversion (conv) where
 
 import Control.Monad (zipWithM_, unless)
+import Control.Monad.Except (throwError)
 
 import PosTT.Common
 import PosTT.Poset
+import PosTT.Quotation
+import PosTT.Errors
 import PosTT.Eval
 import PosTT.Terms
 import PosTT.Values
@@ -12,20 +15,20 @@ import PosTT.Values
 --------------------------------------------------------------------------------
 ---- Conversion Checking
 
-convPi :: AtStage (Val -> Val -> Either String ())
+convPi :: AtStage (Val -> Val -> Either ConvError ())
 u `convPi` v = freshFibVar (\x -> (u `doApp` x) `conv` (v `doApp` x))
 
-convSigma :: AtStage (Val -> Val -> Either String ())
+convSigma :: AtStage (Val -> Val -> Either ConvError ())
 u `convSigma` v = (doPr1 u, doPr2 u) `conv` (doPr1 v, doPr2 v)
 
-convPath :: AtStage (Val -> Val -> Val -> Val -> Either String ())
+convPath :: AtStage (Val -> Val -> Val -> Val -> Either ConvError ())
 convPath a₀ a₁ u v = freshIntVar (\i -> doPApp a₀ a₁ u i `conv` doPApp a₀ a₁ v i)
 
-convExt :: AtStage (VSys Val -> Val -> Val -> Either String ())
+convExt :: AtStage (VSys Val -> Val -> Val -> Either ConvError ())
 convExt ws u v = doExtFun ws u `conv` doExtFun ws v -- TODO: is this correct?
 
 instance Conv Val where
-  conv :: AtStage (Val -> Val -> Either String ())
+  conv :: AtStage (Val -> Val -> Either ConvError ())
   conv = curry $ \case
     (VU, VU) -> pure ()
 
@@ -65,45 +68,64 @@ instance Conv Val where
 
     (VNeu k₀, VNeu k₁) -> k₀ `conv` k₁
 
+    (u, v) -> Left $ ConvErrorTm (readBack u) (readBack v)
+
 instance Conv (Closure Tm) where
-  conv :: AtStage (Closure Tm -> Closure Tm -> Either String ())
+  conv :: AtStage (Closure Tm -> Closure Tm -> Either ConvError ())
   cl₀ `conv ` cl₁ = freshFibVar (\x -> (cl₀ $$ x) `conv` (cl₁ $$ x))
 
 instance Conv TrIntClosure where
-  conv :: AtStage (TrIntClosure -> TrIntClosure -> Either String ())
+  conv :: AtStage (TrIntClosure -> TrIntClosure -> Either ConvError ())
+  cl₀ `conv ` cl₁ = freshIntVar (\x -> (cl₀ $$ x) `conv` (cl₁ $$ x))
+
+instance Conv TrNeuIntClosure where
+  conv :: AtStage (TrNeuIntClosure -> TrNeuIntClosure -> Either ConvError ())
   cl₀ `conv ` cl₁ = freshIntVar (\x -> (cl₀ $$ x) `conv` (cl₁ $$ x))
 
 instance Conv Neu where
-  conv :: AtStage (Neu -> Neu -> Either String ())
+  conv :: AtStage (Neu -> Neu -> Either ConvError ())
   conv = curry $ \case
-    (NVar x₀, NVar x₁) -> unless (x₀ == x₁) (Left "") -- (Left $ x₀ ++ " ≠ " ++ x₁)
---    NApp :: Neu -> Val -> Neu
---    NPr1 :: Neu -> Neu
---    NPr2 :: Neu -> Neu
---    NPApp :: Neu -> Val -> Val -> VI -> Neu
---    NCoePartial :: VI -> VI -> TrNeuIntClosure -> Neu
---    NHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Neu
-    -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
---    NExtFun :: VSys Val -> Neu -> Neu
---    NSplit :: Val -> [VBranch] -> Neu -> Neu
-
+    (NVar x₀               , NVar x₁               ) | x₀ == x₁ -> pure ()
+    (NApp k₀ v₀            , NApp k₁ v₁            ) -> (k₀, v₀) `conv` (k₁, v₁)
+    (NPr1 k₀               , NPr1 k₁               ) -> k₀ `conv` k₁
+    (NPr2 k₀               , NPr2 k₁               ) -> k₀ `conv` k₁
+    (NPApp v₀ _ _ r₀       , NPApp v₁ _ _ r₁       ) -> (v₀ `conv` v₁) *> (r₀ `conv` r₁)
+    (NCoePartial r₀ s₀ c₀  , NCoePartial r₁ s₁ c₁  ) -> (r₀, s₀, c₀) `conv` (r₁, s₁, c₁)
+    (NHComp r₀ s₀ k₀ u₀ tb₀, NHComp r₁ s₁ k₁ u₁ tb₁) -> (r₀, s₀, k₀, u₀, tb₀) `conv` (r₁, s₁, k₁, u₁, tb₁)
+    -- TODO: NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
+    (NExtFun ws₀ k₀        , NExtFun ws₁ k₁        ) -> (ws₀, k₀) `conv` (ws₁, k₁)
+    (NSplit f₀ _ k₀        , NSplit f₁ _ k₁        ) -> (f₀, k₀) `conv` (f₁, k₁)
+    (k₀                    , k₁                    ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)
 
 instance Conv a => Conv (VSys a) where
-  conv :: Conv a => AtStage (VSys a -> VSys a -> Either String ())
+  conv :: Conv a => AtStage (VSys a -> VSys a -> Either ConvError ())
   conv EmptySys            EmptySys   = pure ()
   conv (VSys ((phi,a):bs)) (VSys bs') = case extractWith (===) phi bs' of
     Just (a', bs'') -> (a, VSys bs) `conv` (a', VSys bs'')
-    Nothing         -> Left "Systems have different cofibrations!"
-  conv _                   _          = Left "Systems have different size!" 
+    Nothing         -> Left $ ConvErrorString "Systems have different cofibrations!"
+  conv _                   _          = Left $ ConvErrorString "Systems have different size!" 
+
+
+---- plumbing instances
 
 instance Conv a => Conv [a] where
-  conv :: AtStage ([a] -> [a] -> Either String ())
+  conv :: AtStage ([a] -> [a] -> Either ConvError ())
   xs `conv` ys | length xs == length ys = zipWithM_ conv xs ys
 
 instance (Conv a, Conv b) => Conv (a, b) where
-  conv :: AtStage ((a, b) -> (a, b) -> Either String ())
+  conv :: AtStage ((a, b) -> (a, b) -> Either ConvError ())
   (a₀, b₀) `conv` (a₁, b₁) = (a₀ `conv` a₁) *> (b₀ `conv` b₁)
 
 instance (Conv a, Conv b, Conv c) => Conv (a, b, c) where
-  conv :: AtStage ((a, b, c) -> (a, b, c) -> Either String ())
+  conv :: AtStage ((a, b, c) -> (a, b, c) -> Either ConvError ())
   (a₀, b₀, c₀) `conv` (a₁, b₁, c₁) = ((a₀, b₀) `conv` (a₁, b₁)) *> (c₀ `conv` c₁)
+
+instance (Conv a, Conv b, Conv c, Conv d) => Conv (a, b, c, d) where
+  conv :: AtStage ((a, b, c, d) -> (a, b, c, d) -> Either ConvError ())
+  (a₀, b₀, c₀, d₀) `conv` (a₁, b₁, c₁, d₁) = 
+    ((a₀, b₀, c₀) `conv` (a₁, b₁, c₁)) *> (d₀ `conv` d₁)
+
+instance (Conv a, Conv b, Conv c, Conv d, Conv e) => Conv (a, b, c, d, e) where
+  conv :: AtStage ((a, b, c, d, e) -> (a, b, c, d, e) -> Either ConvError ())
+  (a₀, b₀, c₀, d₀, e₀) `conv` (a₁, b₁, c₁, d₁, e₁) = 
+    ((a₀, b₀, c₀, d₀) `conv` (a₁, b₁, c₁, d₁)) *> (e₀ `conv` e₁)

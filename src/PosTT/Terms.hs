@@ -2,10 +2,10 @@ module PosTT.Terms where
 
 import Data.String (IsString(..))
 
+import PosTT.Common
+
 --------------------------------------------------------------------------------
 ---- Terms of Fibrant Types
-
-newtype Name = Name { unName :: String } deriving (Eq, IsString)
 
 data Tm where
   U :: Ty

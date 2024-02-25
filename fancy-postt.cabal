@@ -27,7 +27,9 @@ executable fancy-postt
         Algebra.Lattice
       , PosTT.Common
       , PosTT.Conversion
+      , PosTT.Errors
       , PosTT.Eval
+      , PosTT.Frontend.PreTerms
       , PosTT.Poset
       , PosTT.Pretty
       , PosTT.Quotation
