@@ -22,10 +22,10 @@ import PosTT.Errors
 
 data Val where
   VU :: Val
-  VPi :: Val -> Closure Ty -> Val
-  VLam :: Closure Tm -> Val
+  VPi :: Val -> Closure -> Val
+  VLam :: Closure -> Val
 
-  VSigma :: Val -> Closure Ty -> Val
+  VSigma :: Val -> Closure -> Val
   VPair :: Val -> Val -> Val
 
   VPath :: Val -> Val -> Val -> Val
@@ -48,20 +48,20 @@ data Val where
 type VTy = Val
 
 
-pattern VCoePi :: VI -> VI -> Gen -> Val -> Closure Tm -> Restr -> Val -> Val
+pattern VCoePi :: VI -> VI -> Gen -> Val -> Closure -> Restr -> Val -> Val
 pattern VCoePi r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VPi a b) α)  u
 
-pattern VCoeSigma :: VI -> VI -> Gen -> Val -> Closure Tm -> Restr -> Val -> Val
+pattern VCoeSigma :: VI -> VI -> Gen -> Val -> Closure -> Restr -> Val -> Val
 pattern VCoeSigma r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VSigma a b) α)  u
 
 pattern VCoePath :: VI -> VI -> Gen -> Val -> Val -> Val -> Restr -> Val -> Val
 pattern VCoePath r₀ r₁ i a a₀ a₁ α u = VCoe r₀ r₁ (TrIntClosure i (VPath a a₀ a₁) α)  u
 
 
-pattern VHCompPi :: VI -> VI -> Val -> Closure Tm -> Val -> VSys TrIntClosure -> Val
+pattern VHCompPi :: VI -> VI -> Val -> Closure -> Val -> VSys TrIntClosure -> Val
 pattern VHCompPi r r' a b a0 sys = VHComp r r' (VPi a b) a0 sys
 
-pattern VHCompSigma :: VI -> VI -> Val -> Closure Tm -> Val -> VSys TrIntClosure -> Val
+pattern VHCompSigma :: VI -> VI -> Val -> Closure -> Val -> VSys TrIntClosure -> Val
 pattern VHCompSigma r r' a b a0 sys = VHComp r r' (VSigma a b) a0 sys
 
 pattern VHCompPath :: VI -> VI -> Val -> Val -> Val -> Val -> VSys TrIntClosure -> Val
@@ -73,7 +73,7 @@ newtype VSys a = VSys [(VCof, a)]
 pattern EmptySys :: VSys a
 pattern EmptySys = VSys []
 
-data Closure a = Closure Name a Env
+data Closure = Closure Name Tm Env
 
 data Neu where
   NVar :: Name -> Neu

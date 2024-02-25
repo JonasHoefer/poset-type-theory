@@ -99,9 +99,9 @@ instance Eval a => Eval (Sys a) where
     where bs' = [ (phi', extCof phi' (eval rho a)) | (phi, a) <- bs, let phi' = eval rho phi ]
 
 instance Eval (Binder Tm) where
-  type Sem (Binder Tm) = Closure Tm
+  type Sem (Binder Tm) = Closure
 
-  eval :: AtStage (Env -> Binder Tm -> Closure Tm)
+  eval :: AtStage (Env -> Binder Tm -> Closure)
   eval rho (Binder x t) = Closure x t rho
 
 instance Eval (IntBinder Tm) where
@@ -171,11 +171,11 @@ class Apply c where
   infixr 0 $$ 
   ($$) :: AtStage (c -> ArgType c -> ResType c)
 
-instance Eval a => Apply (Closure a) where
-  type ArgType (Closure a) = Val
-  type ResType (Closure a) = Sem a
+instance Apply Closure where
+  type ArgType Closure = Val
+  type ResType Closure = Val
 
-  ($$) :: AtStage (Closure a -> Val -> Sem a)
+  ($$) :: AtStage (Closure -> Val -> Val)
   Closure x t rho $$ v = eval (EnvFib rho x v) t
 
 instance Apply IntClosure where
@@ -390,9 +390,9 @@ instance Restrictable VBranch where
   act :: AtStage (Restr -> VBranch -> VBranch)
   act f = fmap (@ f)
 
-instance Restrictable (Closure a) where
+instance Restrictable Closure where
   -- | ((λx.t)ρ)f = (λx.t)(ρf)
-  act :: AtStage (Restr -> Closure a -> Closure a)
+  act :: AtStage (Restr -> Closure -> Closure)
   act f (Closure x t env) = Closure x t (env @ f)
 
 instance Restrictable IntClosure where

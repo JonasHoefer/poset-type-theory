@@ -70,8 +70,8 @@ instance Conv Val where
 
     (u, v) -> Left $ ConvErrorTm (readBack u) (readBack v)
 
-instance Conv (Closure Tm) where
-  conv :: AtStage (Closure Tm -> Closure Tm -> Either ConvError ())
+instance Conv Closure where
+  conv :: AtStage (Closure -> Closure -> Either ConvError ())
   cl₀ `conv ` cl₁ = freshFibVar (\x -> (cl₀ $$ x) `conv` (cl₁ $$ x))
 
 instance Conv TrIntClosure where

@@ -27,10 +27,10 @@ instance ReadBack Val where
 
     VNeu k -> readBack k
 
-instance (Eval a, ReadBack (ResType (Closure a)), Quot (ResType (Closure a)) ~ a) => ReadBack (Closure a) where
-  type Quot (Closure a) = Binder a
+instance ReadBack Closure where
+  type Quot Closure = Binder Tm
 
-  readBack :: AtStage (Closure a -> Binder a)
+  readBack :: AtStage (Closure -> Binder Tm)
   readBack cl@(Closure y _ _)  = refreshName y $ \x -> Binder x $ readBack $ cl $$ VVar x
 
 instance ReadBack Neu where
