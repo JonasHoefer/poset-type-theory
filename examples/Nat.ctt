@@ -1,0 +1,34 @@
+module Nat where
+
+data Nat : U = zero | suc (n : Nat)
+
+elimNat (P : Nat -> U) (z : P zero) (s : (n : Nat) -> P n -> P (suc n)) : (n : Nat) -> P n = split
+  zero  -> z
+  suc n -> s n (elimNat P z s n)
+
+recNat (M : U) (z : M) (s : Nat -> M -> M) (n : Nat) : M
+  = elimNat (\_. M) z s n
+
+add : Nat -> Nat -> Nat = split
+  zero  -> \m. m
+  suc n -> \m. suc (add n m)
+
+mul : Nat -> Nat -> Nat = split
+  zero  -> \m. zero
+  suc n -> \m. add (mul n m) m
+
+exp (m n : Nat) : Nat = recNat Nat (suc zero) (\_ p. mul m p) n -- m^n
+
+ten : Nat = suc (suc (suc (suc (suc (suc (suc (suc (suc (suc zero)))))))))
+
+natExpTest : Nat = exp (suc (suc zero)) (suc zero)
+
+natMulTest : Nat = mul (suc (suc zero)) (suc (suc zero))
+
+natAddTest : Nat = add (suc (suc zero)) (suc (suc zero))
+
+one : Nat = suc zero
+
+pred : Nat -> Nat = split
+  zero  -> zero
+  suc n -> n

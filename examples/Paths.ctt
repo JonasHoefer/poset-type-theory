@@ -1,0 +1,16 @@
+module Paths where
+
+import Prelude
+
+
+doubleComp (A : U) (x y z w : A) (p : Path A y x) (q : Path A y z) (r : Path A z w) : Path A x w
+  = \i. hComp 0 1 A (q i) [ (i=0) -> j. p j , (i=1) -> j. r j]
+
+inv (A : U) (x y : A) (p : Path A y x) : Path A x y
+  = doubleComp A x y y y p (refl A y) (refl A y)
+
+tr (A : U) (P : A -> U) (x y : A) (p : Path A x y) (u : P x) : P y
+  = coe 0 1 (i. P (p i)) u
+
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y) =
+  \i. f (p i)

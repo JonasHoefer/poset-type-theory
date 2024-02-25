@@ -1,0 +1,18 @@
+module Torus where
+
+data Torus : U
+  = base
+  | loop1At <i>
+      [ (i=0) -> base
+      , (i=1) -> base
+      ]
+  | loop2At <j>
+      [ (j=0) -> base
+      , (j=1) -> base
+      ]
+  | surfAt <i j>
+      [ (i=0) -> loop2At j
+      , (i=1) -> loop2At j
+      , (j=0) -> loop1At i
+      , (j=1) -> loop1At i
+      ] 

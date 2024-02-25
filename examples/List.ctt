@@ -1,0 +1,9 @@
+module List where
+
+data List (A : U) : U = nil | cons (x : A) (xs : List A)
+
+singleton (A : U) (x : A) : List A = cons x nil
+
+append (A : U) : List A -> List A -> List A = split
+  nil       -> \ys. ys
+  cons x xs -> \ys. cons x (append A xs ys)

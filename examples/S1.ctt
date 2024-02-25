@@ -1,0 +1,7 @@
+module S1 where
+
+data S1 : U
+  = base
+  | loopAt <i> [ (i=0) -> base, (i=1) -> base ]
+
+loop : Path S1 base base = \i. loopAt i

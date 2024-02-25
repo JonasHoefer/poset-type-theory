@@ -1,0 +1,275 @@
+module Test where
+
+import Prelude
+
+import Bool
+import Nat
+
+Singl (A : U) (x : A) : U = (y : A) * Path A x y
+
+isContrSinglCenter (A : U) (x : A) : Singl A x = (x , refl A x)
+
+isContrSinglContr (A : U) (x : A) (s : Singl A x) : Path (Singl A x) (isContrSinglCenter A x) s
+  = \i. (s.2 i , \j. s.2 (i /\ j))
+
+isContrSingl (A : U) (x : A) : isContr (Singl A x) = (isContrSinglCenter A x , isContrSinglContr A x)
+
+
+Equiv (A B : U) : U =
+  (f : A -> B) * isEquiv A B f
+
+IdEquiv (A : U) : Equiv A A = (id A , isEquivId A)
+
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y) =
+  \i. f (p i)
+
+Homotopy (A B : U) (f g : A -> B) : U = (x : A) -> Path B (f x) (g x)
+
+funComp (A B C : U) (f : B -> C) (g : A -> B) (x : A) : C = f (g x)
+
+isHAE (A B : U) (f : A -> B) : U =
+  (g : B -> A) (linv : Homotopy A A (funComp A B A g f) (id A)) (rinv : Homotopy B B (funComp B A B f g) (id B))
+  * ((x : A) -> Path (Path B (f (g (f x))) (f x)) (ap A B f (g (f x)) x (linv x)) (rinv (f x)))
+
+funExt (A : U) (B : A -> U) (f g : (x : A) -> B x) (p : (x : A) -> Path (B x) (f x) (g x)) : Path ((x : A) -> B x) f g =
+  \i x. p x i
+
+-- we can now use paths to check some definitional equalities
+
+sigmaEta (A : U) (B : A -> U) (p : (x : A) * B x) : Path ((x : A) * B x) p (p.1, p.2)
+  = refl ((x : A) * B x) p
+
+piEta (A : U) (B : A -> U) (f : (x : A) -> B x) : Path ((x : A) -> B x) f (\x. f x)
+  = refl ((x : A) -> B x) f
+
+transport (A : U) (B : A -> U) (a0 a1 : A) (p : Path A a0 a1) (u : B a0) : B a1
+  = coe 0 1 (i. B (p i)) u
+
+transportRefl (A : U) (B : A -> U) (a : A) (u : B a) : Path (B a) (transport A B a a (refl A a) u) u
+  = \i. coe i 1 (_. B a) u
+
+PathOver (A : U) (B : A -> U) (a0 a1 : A) (p : Path A a0 a1) (b0 : B a0) (b1 : B a1) : U
+  = Path (B a1) (transport A B a0 a1 p b0) b1
+
+doubleComp (A : U) (x y z w : A) (p : Path A y x) (q : Path A y z) (r : Path A z w) : Path A x w
+  = \i. hComp 0 1 A (q i) [ (i=0) -> j. p j , (i=1) -> j. r j]
+
+inv (A : U) (x y : A) (p : Path A y x) : Path A x y
+  = doubleComp A x y y y p (refl A y) (refl A y)
+
+comp (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Path A x z = doubleComp A x x y z (refl A x) p q
+
+invComp (A : U) (x y z : A) (p : Path A y x) (q : Path A y z) : Path A x z = doubleComp A x y z z p q (refl A z)
+
+
+-- | A simple test to see that coe computes correctly on \i.A i -> B i
+coeFun (A0 A1 B0 B1 : U) (A : Path U A0 A1) (B : Path U B0 B1) (f : A0 -> B0) : A1 -> B1
+  = \a1. coe 0 1 (i. B i) (f (coe 1 0 (i. A i) a1))
+
+coeFunBeta (A0 A1 B0 B1 : U) (A : Path U A0 A1) (B : Path U B0 B1) (f : A0 -> B0)
+  : Path (A1 -> B1) (coe 0 1 (i. A i -> B i) f) (coeFun A0 A1 B0 B1 A B f)
+  = refl (A1 -> B1) (coe 0 1 (i. A i -> B i) f)
+
+-- | A simple test to see that coe computes correctly on \i.(A i * B i)
+coePair (A0 A1 B0 B1 : U) (A : Path U A0 A1) (B : Path U B0 B1) (u : A0 * B0) : A1 * B1
+  = (coe 0 1 (i. A i) u.1 , coe 0 1 (i. B i) u.2)
+
+coePairBeta (A0 A1 B0 B1 : U) (A : Path U A0 A1) (B : Path U B0 B1) (u : A0 * B0)
+  : Path (A1 * B1) (coe 0 1 (i. A i * B i) u) (coePair A0 A1 B0 B1 A B u)
+  = refl (A1 * B1) (coe 0 1 (i. A i * B i) u)
+
+-- | A simple test to see that coe computes correctly on \i.(Path A (a i) (b i))  (incomplete)
+coePath (A : U) (a00 a01 a10 a11 : A) (p : Path A a00 a01) (q : Path A a10 a11) (r : Path A a00 a10)
+  : Path A a01 a11
+  = \i. hComp 0 1 A (r i)
+          [ (i=0) -> j. p j
+          , (i=1) -> j. q j
+          ]
+
+ua (A B : U) (e : Equiv A B) : Path U A B
+  = \i. Ext B [ (i=0) -> (A, e.1, e.2) , (i=1) -> (B, id B, isEquivId B) ]
+
+uaInv (A B : U) (e : Equiv B A) : Path U A B
+  = \i. Ext A [ (i=0) -> (A, id A, isEquivId A) , (i=1) -> (B, e.1, e.2) ]
+
+J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
+  = transport (Singl A x) (\s. M s.1 s.2) (x , refl A x) (y , p) ((isContrSingl A x).2 (y , p)) m
+
+JRefl (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) (J A x M m x (refl A x)) m
+  = transportRefl (Singl A x) (\s. M s.1 s.2) (x , refl A x) m
+
+Iso (A B : U) : U =
+  (f : A -> B) (g : B -> A)
+  * Homotopy A A (\x. g (f x)) (id A)
+  * Homotopy B B (\x. f (g x)) (id B)
+
+
+
+
+
+
+
+
+isProp (A : U) : U = (x y : A) -> (Path A x y)
+
+isPropFam (A : U) (B : A -> U) : U = (x : A) -> isProp (B x)
+
+isSet (A : U) : U = (x y : A) -> isProp (Path A x y)
+
+PlusFam (A B : U) (b : Bool) : U = elimBool (\_. U) A B b
+
+Plus (A B : U) : U = (b : Bool) * PlusFam A B b
+
+inl (A B : U) (a : A) : Plus A B = (true, a)
+
+inr (A B : U) (b : B) : Plus A B = (false, b)
+
+elimPlus (A B : U) (M : Plus A B -> U) (l : (a : A) -> M (inl A B a)) (r : (b : B) -> M (inr A B b)) (p : Plus A B) : M p
+  = elimBool (\b. (q : PlusFam A B b) -> M (b , q)) l r p.1 p.2
+
+Empty : U = (A : U) -> A
+
+absurd (A : U) (e : Empty) : A = e A
+
+not (A : U) : U = A -> Empty
+
+isDec (A : U) : U = Plus A (not A)
+
+isDiscrete (A : U) (x y : A) : U = isDec (Path A x y)
+
+PointedPropIsContr (A : U) (a : A) (p : isProp A) : isContr A
+  = (a, \b. p a b)
+
+
+--------------------------------------------------------------------------------
+---- Sigma Basics
+
+SigmaPath (A : U) (B : A -> U) (u v : (a : A) * B a) : U =
+  (p : Path A u.1 v.1) * PathOver A B u.1 v.1 p u.2 v.2
+
+pairPathCurried (A : U) (B : A -> U) (a0 : A) : (a1 : A) (p : Path A a0 a1) (b0 : B a0) (b1 : B a1) (q : PathOver A B a0 a1 p b0 b1)
+  -> Path ((a : A) * B a) (a0, b0) (a1, b1)
+  = J A a0 (\a1 p. (b0 : B a0) (b1 : B a1) (q : PathOver A B a0 a1 p b0 b1) -> Path ((a : A) * B a) (a0, b0) (a1, b1))
+      (\b0 b1 q. J (B a0) b0 (\b1' _. Path ((a : A) * B a) (a0, b0) (a0, b1')) (refl ((a : A) * B a) (a0, b0)) b1
+        (invComp (B a0) b0 (coe 0 1 (i. B a0) b0) b1 (transportRefl A B a0 b0) q))
+
+pairPath (A : U) (B : A -> U) (u v : (a : A) * B a) (p : SigmaPath A B u v) : Path ((a : A) * B a) u v
+  = pairPathCurried A B u.1 v.1 p.1 u.2 v.2 p.2
+
+pairPathProp (A : U) (B : A -> U) (u v : (a : A) * B a) (p : Path A u.1 v.1) (q : isPropFam A B) : Path ((a : A) * B a) u v
+  = pairPath A B u v (p, q v.1 (coe 0 1 (i. B (p i)) u.2) v.2)
+
+
+--------------------------------------------------------------------------------
+---- Quasi Constant Maps
+
+const (A B : U) (b : B) : A -> B = \_. b
+
+quasiConst (A B : U) (f : A -> B) : U = (x y : A) -> Path B (f x) (f y)
+
+quasiConst-const (A B : U) (b : B) : quasiConst A B (const A B b) = \x y. refl B b
+
+QuasiConst (A B : U) : U = (f : A -> B) * quasiConst A B f
+
+DecToQuasiConstant (A : U) (dec : isDec A) : QuasiConst A A
+  = elimPlus A (not A) (\_. QuasiConst A A) (\a. (const A A a, quasiConst-const A A a)) (\na. (id A, \a b. absurd (Path A a b) (na a))) dec
+
+-- isStable (A : U) : U = _
+
+--------------------------------------------------------------------------------
+---- Unit
+
+Unit : U = Singl Bool true
+
+tt : Unit = (true, refl Bool true)
+
+
+--------------------------------------------------------------------------------
+---- Bool Observational Equiv
+
+BoolEq : Bool -> Bool -> U
+  = recBool (Bool -> U) (recBool U Unit Empty) (recBool U Empty Unit)
+
+BoolPathToBoolEq (x : Bool) : (y : Bool) (p : Path Bool x y) -> BoolEq x y
+  = J Bool x (\y _. BoolEq x y) (elimBool (\y. BoolEq y y) tt tt x)
+
+BoolEqToBoolPath (x y : Bool) (eq : BoolEq x y) : Path Bool x y
+  = elimBool (\x'. (y' : Bool) -> BoolEq x' y' -> Path Bool x' y')
+      (\y' eq'. elimBool (\y''. BoolEq true  y'' -> Path Bool true  y'') (\_. refl Bool true)            (absurd (Path Bool true false)) y' eq')
+      (\y' eq'. elimBool (\y''. BoolEq false y'' -> Path Bool false y'') (absurd (Path Bool false true)) (\_. refl Bool false)           y' eq')
+      x y eq
+
+TrueNeFalse : not (Path Bool true false) = BoolPathToBoolEq true false
+
+FalseNeTrue : not (Path Bool false true) = BoolPathToBoolEq false true
+
+
+--------------------------------------------------------------------------------
+---- Bool is Set
+
+lemTrue : (x y : Bool) (p : Path Bool true x) (q : Path Bool true y) -> Path Bool x y
+  = elimBool (\x. (y : Bool) (p : Path Bool true x) (q : Path Bool true y) -> Path Bool x y)
+      (elimBool (\y. (p : Path Bool true true) (q : Path Bool true y) -> Path Bool true y)
+        (\_ _. refl Bool true)
+        (\_ q. absurd (Path Bool true false) (TrueNeFalse q))
+      )
+      (\y p _. absurd (Path Bool false y) (TrueNeFalse p))
+
+lemFalse : (x y : Bool) (p : Path Bool false x) (q : Path Bool false y) -> Path Bool x y
+  = elimBool (\x. (y : Bool) (p : Path Bool false x) (q : Path Bool false y) -> Path Bool x y)
+      (\y p _. absurd (Path Bool true y) (FalseNeTrue p))
+      (elimBool (\y. (p : Path Bool false false) (q : Path Bool false y) -> Path Bool false y)
+        (\_ q. absurd (Path Bool false true) (FalseNeTrue q))
+        (\_ _. refl Bool false)
+      )
+
+isPropPathTrueTrue : isProp (Path Bool true true)
+  = \p q j i. lemTrue (p i) (q i) (\k. p (i /\ k)) (\k. q (i /\ k)) j
+
+isPropPathFalseFalse : isProp (Path Bool false false)
+  = \p q j i. lemFalse (p i) (q i) (\k. p (i /\ k)) (\k. q (i /\ k)) j
+
+isSetBool : isSet Bool
+  = elimBool2 (\x y. (p q : Path Bool x y) -> Path (Path Bool x y) p q)
+      isPropPathTrueTrue (\p q. absurd (Path (Path Bool true false) p q) (TrueNeFalse q))
+      (\p q. absurd (Path (Path Bool false true) p q) (FalseNeTrue q)) isPropPathFalseFalse
+
+
+--------------------------------------------------------------------------------
+---- Neg Is Equiv
+
+isInvolutive-neg (b : Bool) : Path Bool (neg (neg b)) b
+  = elimBool (\x. Path Bool (neg (neg x)) x) (refl Bool true) (refl Bool false) b
+
+NegIso : Iso Bool Bool = (neg, neg, isInvolutive-neg, isInvolutive-neg)
+
+isEquiv-neg : isEquiv Bool Bool neg
+  = \b. PointedPropIsContr (fiber Bool Bool neg b)
+      (neg b, inv Bool b (neg (neg b)) (isInvolutive-neg b))
+      (\f0 f1. pairPathProp Bool (\x. Path Bool b (neg x)) f0 f1
+        (doubleComp Bool f0.1 (neg (neg f0.1)) (neg (neg f1.1)) f1.1
+          (isInvolutive-neg f0.1)
+          (\i. neg (invComp Bool (neg f0.1) b (neg f1.1) f0.2 f1.2 i))
+          (isInvolutive-neg f1.1))
+        (\x. isSetBool b (neg x)))
+
+NegEquiv : Equiv Bool Bool = (neg, isEquiv-neg)
+
+NegPath : Path U Bool Bool = ua Bool Bool NegEquiv
+
+IterNeg : Nat -> Path U Bool Bool = recNat (Path U Bool Bool) (refl U Bool) (\_ e. comp U Bool Bool Bool e NegPath)
+
+
+--------------------------------------------------------------------------------
+---- Test
+
+testNat : Nat = exp ten (suc zero)
+
+-- testN : Bool = transport U (id U) Bool Bool ((IterNeg (suc (suc zero)))) true
+
+testN : Bool = transport U (id U) Bool Bool (IterNeg (exp ten (suc (suc (suc zero))))) true
+
+
+-- data Bool = true | false
+--
+-- data Nat = zero | suc (n : Nat)

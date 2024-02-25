@@ -1,0 +1,19 @@
+module Bool where
+
+data Bool : U = true | false
+
+--------------------------------------------------------------------------------
+---- Bool Basics
+
+elimBool (P : Bool -> U) (t : P true) (f : P false) : (b : Bool) -> P b = split
+  true  -> t
+  false -> f
+
+elimBool2 (M : Bool -> Bool -> U) (tt : M true true) (tf : M true false) (ft : M false true) (ff : M false false) : (b0 b1 : Bool) -> M b0 b1
+  = elimBool (\b0. (b1 : Bool) -> M b0 b1) (elimBool (M true) tt tf) (elimBool (M false) ft ff)
+
+recBool (M : U) (t : M) (f : M) (b : Bool) : M
+  = elimBool (\_. M) t f b
+
+neg (b : Bool) : Bool = elimBool (\_. Bool) false true b
+

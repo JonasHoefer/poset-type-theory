@@ -1,0 +1,55 @@
+module Equivariant where
+
+Line (A : U) : U = (a0 a1 : A) * Path A a0 a1
+
+degenPoint (A : U) (a : A) : Line A = (a, a, \i. a)
+
+Square (A : U) : U = (l0 l1 : Line A) * Path (Line A) l0 l1
+
+corner00 (A : U) (s : Square A) : A = s.1.1
+
+degenLine1 (A : U) (l : Line A) : Square A = (l, l, \i. l)
+
+constSquare (A : U) (a : A) : Square A = degenLine1 A (degenPoint A a)
+
+flip (A : U) (s : Square A) : Square A =
+  let l0 : Line A = s.1
+      l1 : Line A = s.2.1
+      sq : Path (Line A) l0 l1 = s.2.2
+
+      l0' : Line A = (l0.1, l1.1, \i. (sq i).2.2 0)
+      l1' : Line A = (l0.2.1, l1.2.1, \i. (sq i).2.2 1)
+      sq' : Path (Line A) l0' l1' = \i. (l0.2.2 i, l1.2.2 i, \j. (sq j).2.2 i)
+  in  (l0', l1', sq')
+
+equiv (A : U) (s : Square A) : Path (Square A) (constSquare A (corner00 A s)) s = \i.
+  let l0 : Line A = s.1
+      li : Line A = s.2.2 i
+
+      a00 : A = corner00 A s
+      ai0 : A = l0.2.2 i
+      a0i : A = li.1
+      aii : A = li.2.2 i
+
+      p0' : Path A a00 ai0 = \j. l0.2.2 (i /\ j)
+      l0' : Line A = (a00, ai0, p0')
+
+      pi' : Path A a0i aii = \j. li.2.2 (i /\ j)
+      li' : Line A = (a0i, aii, pi')
+
+      sq' : Path (Line A) l0' li' =
+        \j. ( (s.2.2 (j /\ i)).2.2 (0 /\ i)
+            , (s.2.2 (j /\ i)).2.2 (1 /\ i)
+            , \k. (s.2.2 (j /\ i)).2.2 (k /\ i)
+            )
+  in  (l0', li', sq')
+
+flipConstTest (A : U) (a : A) : Path (Square A) (constSquare A a) (flip A (constSquare A a))
+  = \i. constSquare A a
+
+testEquiv (A : U) (s : Square A) : Path (Path (Square A) (constSquare A (corner00 A s)) (flip A s))
+  (equiv A (flip A s)) (\i. flip A (equiv A s i)) = \_. equiv A (flip A s)
+
+
+-- coe2 (S00 S01 S10 S11 : U) (S : Path U (Path U S00 S01) (Path U S10 S11)) (u : S00) : S11
+--   = coe 0 1 (i. S (1 /\ i) (1 /\ i)) (coe 0 1 (i. S (0 /\ i) (0 /\ i)) u)
