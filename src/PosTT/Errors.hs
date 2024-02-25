@@ -16,5 +16,9 @@ data ScopeError where
   DuplicateLabel :: SrcSpan -> Name -> ScopeError
 deriving instance Show ScopeError
 
-data Error where
-deriving instance Show Error
+data TypeError where
+  TypeErrorMsg :: SrcSpan -> String -> TypeError
+  TypeErrorConv :: SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+  TypeErrorEndpoint :: I -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+  TypeErrorMissingCon :: SrcSpan -> Name -> Tm -> TypeError
+  TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError

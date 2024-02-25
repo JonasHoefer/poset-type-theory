@@ -185,14 +185,23 @@ type AtStage a = (?s :: Stage) => a
 bindStage :: Stage -> AtStage a -> a
 bindStage s k = let ?s = s in k
 
+sExtName :: Name -> Stage -> Stage
+sExtName n s = s { names = n : names s }
+
+sExtGen :: Gen -> Stage -> Stage
+sExtGen n s = s { gens = n : gens s }
+
+sExtCof :: VCof -> Stage -> Stage
+sExtCof φ s = s { cof = φ /\ cof s}
+
 extName :: AtStage (Name -> AtStage a -> a)
-extName n = bindStage (?s { names = n : names ?s })
+extName n = bindStage (sExtName n ?s)
 
 extGen :: AtStage (Gen -> AtStage a -> a)
 extGen n = bindStage (?s { gens = n : gens ?s })
 
 extCof :: AtStage (VCof -> AtStage a -> a)
-extCof phi = bindStage (?s { cof = phi /\ cof ?s })
+extCof φ = bindStage (sExtCof φ ?s)
 
 
 ---- Fresh Names/Generators

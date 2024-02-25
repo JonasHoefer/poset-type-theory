@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData #-}
+
 module PosTT.Terms where
 
 import Data.String (IsString(..))
@@ -48,14 +50,35 @@ data TrIntBinder a = TrIntBinder Gen a
 
 data SplitBinder = SplitBinder [Name] Tm
 
+pattern BPi :: Ty -> Name -> Ty -> Tm
+pattern BPi a x b = Pi a (Binder x b)
+
+pattern BLam :: Name -> Tm -> Tm
+pattern BLam x t = Lam (Binder x t)
+
+pattern BSigma :: Ty -> Name -> Ty -> Tm
+pattern BSigma a x b = Sigma a (Binder x b)
+
+pattern BPLam :: Gen -> Tm -> Tm -> Tm -> Tm
+pattern BPLam x t a₀ a₁ = PLam (IntBinder x t) a₀ a₁
+
 
 ---- Data Types
 
 newtype Tel = Tel [(Name, Ty)]
 
+pattern TelNil :: Tel
+pattern TelNil = Tel []
+
+telCons :: Name -> Ty -> Tel -> Tel
+telCons x a (Tel tel) = Tel ((x, a) : tel)
+
 data Label = Label Name Tel
 
 data Branch = Branch Name SplitBinder
+
+pattern BBranch :: Name -> [Name] -> Tm -> Branch
+pattern BBranch n xs t = Branch n (SplitBinder xs t)
 
 
 --------------------------------------------------------------------------------

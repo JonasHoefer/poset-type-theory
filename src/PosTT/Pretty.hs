@@ -3,6 +3,7 @@ module PosTT.Pretty where
 import           Data.List
 
 import           PosTT.Common
+import           PosTT.Errors
 import           PosTT.Terms
 import           PosTT.Values
 import           PosTT.Quotation
@@ -10,6 +11,37 @@ import           PosTT.Quotation
 import qualified PosTT.Frontend.Exp.Abs as R
 import qualified PosTT.Frontend.Exp.Print as R (printTree)
 
+
+pretty :: Tm -> String
+pretty = R.printTree . reflect
+
+prettyConstr :: [(I, I)] -> String
+prettyConstr constr = intercalate "," [ "(" ++ prettyI l ++ "=" ++ prettyI r ++ ")" | (l, r) <- constr ]
+
+prettyI :: I -> String
+prettyI = R.printTree . reflectFormula
+
+prettyVal :: AtStage (Val -> String)
+prettyVal = pretty . readBack
+
+instance Show I where
+  show :: I -> String
+  show = prettyI
+
+instance Show Cof where
+  show :: Cof -> String
+  show = error "TODO"
+
+instance Show Tm where
+  show :: Tm -> String
+  show = pretty
+
+deriving instance Show ConvError
+deriving instance Show TypeError
+
+
+--------------------------------------------------------------------------------
+---- Reflect Terms back into BNFC expressions to reuse pretty printer
 
 -- | Transforms a core term into a BNFC expression which can be printed.
 reflect :: Tm -> R.Exp' ()
@@ -66,15 +98,3 @@ reflectFormula = \case
   Inf r s -> R.Conj () (reflectFormula r) (reflectFormula s)
   I0      -> R.Dir () (R.Dir0 ())
   I1      -> R.Dir () (R.Dir1 ())
-
-pretty :: Tm -> String
-pretty = R.printTree . reflect
-
-prettyConstr :: [(I, I)] -> String
-prettyConstr constr = intercalate "," [ "(" ++ prettyI l ++ "=" ++ prettyI r ++ ")" | (l, r) <- constr ]
-
-prettyI :: I -> String
-prettyI = R.printTree . reflectFormula
-
-prettyVal :: AtStage (Val -> String)
-prettyVal = pretty . readBack

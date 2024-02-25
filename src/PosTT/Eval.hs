@@ -26,9 +26,8 @@ lookupInt (EnvInt _ y r) x | y == x = r
 lookupInt (ConsEnv rho)  x = rho `lookupInt` x
 
 reAppDef :: AtStage (Name -> Env -> Val)
-reAppDef d (EnvFib rho x v) 
-  | x == d = VVar d
-  | x /= d = reAppDef d rho `doApp` v
+reAppDef d (EnvDef _   x _ _) | x == d = VVar d 
+reAppDef d (EnvFib rho x v)   | x /= d = reAppDef d rho `doApp` v
 
 
 --------------------------------------------------------------------------------
@@ -197,7 +196,7 @@ instance Apply TrNeuIntClosure where
   type ResType TrNeuIntClosure = Val
 
   ($$) :: AtStage (TrNeuIntClosure -> VI -> Val)
-  TrNeuIntClosure i v $$ r = either id VNeu (v @ Restr [(i, r)])
+  TrNeuIntClosure i k $$ r = k @ (r `for` i)
 
 instance Apply SplitClosure where
   type ArgType SplitClosure = [Val]
@@ -209,6 +208,16 @@ instance Apply SplitClosure where
 -- | Forces the delayed restriction under the binder.
 force :: AtStage (TrIntClosure -> TrIntClosure)
 force cl@(TrIntClosure i _ _) = trIntCl i $ \j -> cl $$ iVar j
+
+
+--------------------------------------------------------------------------------
+---- Telescope Combinators
+
+headVTel :: AtStage (VTel -> VTy)
+headVTel (VTel ((_, a):_) ρ) = eval ρ a
+
+tailVTel :: VTel -> Val -> VTel
+tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
 
 --------------------------------------------------------------------------------
@@ -305,7 +314,7 @@ doCoe r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
 
 doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
-doCoeExt = error "TODO: copy"
+doCoeExt = error "TODO: copy doCoeExt"
 
 
 --------------------------------------------------------------------------------
@@ -329,13 +338,13 @@ doHComp r₀ r₁ a u₀ tb = case a of
 ---- Cases for positive types
 
 doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum = error "TODO: copy"
+doHCompSum = error "TODO: copy doHCompSum"
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
-doHCompExt = error "TODO: copy"
+doHCompExt = error "TODO: copy doHCompExt"
 
 doHCompU :: AtStage (VI -> VI -> Val -> VSys TrIntClosure -> Val)
-doHCompU = error "TODO: copy"
+doHCompU = error "TODO: copy doHCompU"
 
 
 --------------------------------------------------------------------------------
@@ -367,20 +376,33 @@ instance Restrictable Val where
     VCon c as          -> VCon c (as @ f)
     VSplitPartial v bs -> VSplitPartial (v @ f) (bs @ f)
 
-    VNeu k -> either id VNeu (k @ f)    
+    VNeu k -> k @ f
 
 instance Restrictable Neu where
   -- a neutral can get "unstuck" when restricted
-  type Alt Neu = Either Val Neu
+  type Alt Neu = Val
 
-  act :: AtStage (Restr -> Neu -> Either Val Neu)
-  act f = error "TODO: copy"
+  act :: AtStage (Restr -> Neu -> Val)
+  act f = \case
+    NVar x -> VVar x
+    
+    NApp k v -> doApp (k @ f) (v @ f)
+    
+    NPr1 k -> doPr1 (k @ f)
+    NPr2 k -> doPr2 (k @ f)
+    
+    NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
+
+    NCoePartial r₀ r₁ cl -> vCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NHComp r₀ r₁ k u₀ tb -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f) 
+    -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
+    NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
 instance Restrictable a => Restrictable (VSys a) where
   type Alt (VSys a) = Either (Alt a) (VSys (Alt a))
 
   act :: Restr -> VSys a -> Either (Alt a) (VSys (Alt a))
-  act f = error "TODO"
+  act f = error "TODO: sys action"
 
 instance Restrictable VLabel where
   act :: AtStage (Restr -> VLabel -> VLabel)
@@ -407,6 +429,12 @@ instance Restrictable SplitClosure where
 instance Restrictable TrIntClosure where
   act :: AtStage (Restr -> TrIntClosure -> TrIntClosure)
   act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flipped
+
+instance Restrictable TrNeuIntClosure where
+  type Alt TrNeuIntClosure = TrIntClosure
+
+  act :: AtStage (Restr -> TrNeuIntClosure -> TrIntClosure)
+  act f (TrNeuIntClosure i k) = TrIntClosure i (VNeu k) f
 
 instance Restrictable VTel where
   act :: AtStage (Restr -> VTel -> VTel )
