@@ -41,8 +41,8 @@ reflect = \case
 reflectSysBinder :: Sys (TrIntBinder Tm) -> R.SysBinder' ()
 reflectSysBinder (Sys bs) = R.SysBinder () (map reflectSideBinder bs)
 
-reflectSideBinder :: (Cof, (TrIntBinder Tm)) -> R.SideBinder' ()
-reflectSideBinder (Cof c, (TrIntBinder x t)) = R.SideBinder () (map reflectFace c) (reflectGen x) (reflect t)
+reflectSideBinder :: (Cof, TrIntBinder Tm) -> R.SideBinder' ()
+reflectSideBinder (Cof c, TrIntBinder x t) = R.SideBinder () (map reflectFace c) (reflectGen x) (reflect t)
 
 reflectSysExt :: Sys (Ty, Tm, Tm) -> R.SysExt' ()
 reflectSysExt (Sys bs) = R.SysExt () (map reflectSideExt bs)
@@ -61,11 +61,11 @@ reflectGen = R.AIdent . (((0, 0), (0, 0)),) . unGen
 
 reflectFormula :: I -> R.Exp' ()
 reflectFormula = \case
-  IVar i   -> R.Var () $ reflectGen i
+  IVar i  -> R.Var () $ reflectGen i
   Sup r s -> R.Disj () (reflectFormula r) (reflectFormula s)
   Inf r s -> R.Conj () (reflectFormula r) (reflectFormula s)
-  I0       -> R.Dir () (R.Dir0 ())
-  I1       -> R.Dir () (R.Dir1 ())
+  I0      -> R.Dir () (R.Dir0 ())
+  I1      -> R.Dir () (R.Dir1 ())
 
 pretty :: Tm -> String
 pretty = R.printTree . reflect
