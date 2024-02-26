@@ -189,3 +189,8 @@ singSys = consSys EmptySys
 -- | Modifies the cofibrations in the branches of a systems, but does *not* simplify.
 mapSysCof :: (VCof -> VCof) -> VSys a -> VSys a
 mapSysCof f (VSys bs) = VSys (map (first f) bs)
+
+-- | Combines the branches of a system, with a list of the same length.
+--   Does not modify the system itself. 
+zipSys :: VSys a -> [b] -> VSys (a, b)
+zipSys (VSys sys) bs = VSys [ (φ, (a, b)) | ((φ, a), b) <- sys `zip` bs ]

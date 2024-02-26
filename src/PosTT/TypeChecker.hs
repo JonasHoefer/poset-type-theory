@@ -20,6 +20,10 @@ import           PosTT.Values hiding (extCof)
 import           Debug.Trace
 
 
+-- TODO: Note the following bug: if we use mapSys or mapSysM etc. then we do not modify the stage *in* the context, only the ambient one!
+--       Should there even by a stage in the context? We can pass it around as usual and combine it with the TC code
+
+
 --------------------------------------------------------------------------------
 ---- Type Checking Monad
 
@@ -173,6 +177,10 @@ isSum t            = withStageM $ fail $ "Expected Sum-type, got " ++ prettyVal 
 -- TODO: should types be in this case? We could infer them. See MiniTT vs other CTT impls
 check :: PTm -> VTy -> TypeChecker Tm
 check = flip $ \ty -> atArgPos $ \case
+  P.Let _ x s a t -> do
+    (a', va) <- checkAndEval a VU
+    s' <- check s va
+    Let x s' a' <$> local (extDef x s' a' va) (check t ty)  
   P.U _ -> do
     () <- isU ty
     return U
@@ -208,9 +216,6 @@ check = flip $ \ty -> atArgPos $ \case
     () <- either (\_ -> return ()) compatible vsys'
 
     return $ Ext a' sys'
-
-  -- TODO: old stuff inbetween
-
   P.Lam _ x _ t ->
     isPiOrPath ty >>= \case
       Left (a, b) ->
@@ -237,6 +242,19 @@ check = flip $ \ty -> atArgPos $ \case
       $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
 
     Split f <$> zipWithM (checkBranch b) bs (map snd cs)
+--  P.ExtElm _ s ts -> do
+--    (a, bs) <- isExt ty
+--    (s', vs) <- checkAndEval s a
+--
+--    unless (length ts == length (unVSys bs)) $ fail "Shape of extElem and Ext does not agree! Did the in the type system simplify?"
+--
+--    ts' <- mapSysM (bs `zipSys` ts) $ \((b, w, _), t) -> do
+--      -- TODO: here stuff goes wrong! The checkAndEval is at the wrong stage w.r.t. the context!
+--      (t', vt) <- checkAndEval t b
+--      let vwt = w `doApp` vt
+--      return _
+--
+--    return $ ExtElm s' _
   t -> do
     (t', ty') <- infer t
     () <- convTC TypeErrorConv ty ty'

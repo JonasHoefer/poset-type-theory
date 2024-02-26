@@ -338,6 +338,7 @@ doPr2 (VNeu k)    = VPr2 k
 doPr2 (VCoeSigma r₀ r₁ z a b α u₀)  = doCoe r₀ r₁
   (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₀ (iVar z') (TrIntClosure z a α) (doPr1 u₀))
   (doPr2 u₀)
+doPr2 (VHCompSigma _ _ _ _ _ _) = error "TODO: copy HComp Sigma"
 
 doApp :: AtStage (Val -> Val -> Val)
 doApp (VLam cl)             v = cl $$ v
@@ -347,6 +348,7 @@ doApp (VCoePartial r0 r1 l) v = doCoePartialApp r0 r1 l v
 doApp (VCoePi r₀ r₁ z a b α u₀) a₁ = doCoe r₀ r₁
   (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₁ (iVar z') (TrIntClosure z a α) a₁)
   (u₀ `doApp` doCoe r₁ r₀ (TrIntClosure z a α) a₁)
+doApp (VHCompPi _ _ _ _ _ _) _ = error "TODO: copy HComp Pi"
 
 doPApp :: AtStage (Val -> Val -> Val -> VI -> Val)
 doPApp (VPLam cl _ _) _  _  r = cl $$ r
@@ -358,7 +360,7 @@ doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀)
   doComp r₀ r₁ (TrIntClosure i a α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
     singSys (VCof [(r, 0)]) (TrIntClosure i (extGen i (re a₀)) α)
       <> singSys (VCof [(r, 1)]) (TrIntClosure i (extGen i (re a₁)) α)
-doPApp (VHCompPath _ _ _ _ _ _ _) _ _ _ = error "HComp Path"
+doPApp (VHCompPath _ _ _ _ _ _ _) _ _ _ = error "TODO: copy HComp Path"
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
 doSplit f bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
