@@ -243,21 +243,28 @@ identity a = foldl1 doApp [pId, a]
 
 
 --------------------------------------------------------------------------------
----- Basic MLTT Combinators
+---- Basic MLTT Combinators + actions on delayed coe and hcomp
 
 doPr1 :: AtStage (Val -> Val)
 doPr1 (VPair s _) = s
 doPr1 (VNeu k)    = VPr1 k
+doPr1 (VCoeSigma r₀ r₁ i a _ α u₀) = doCoe r₀ r₁ (TrIntClosure i a α) (doPr1 u₀)
 
 doPr2 :: AtStage (Val -> Val)
 doPr2 (VPair _ t) = t
 doPr2 (VNeu k)    = VPr2 k
+doPr2 (VCoeSigma r₀ r₁ z a b α u₀)  = doCoe r₀ r₁
+  (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₀ (iVar z') (TrIntClosure z a α) (doPr1 u₀))
+  (doPr2 u₀)
 
 doApp :: AtStage (Val -> Val -> Val)
 doApp (VLam cl)             v = cl $$ v
 doApp (VNeu k)              v = VApp k v
 doApp (VSplitPartial f bs)  v = doSplit f bs v
-doApp (VCoePartial r0 r1 l) v = doCoe r0 r1 l v
+doApp (VCoePartial r0 r1 l) v = doCoePartialApp r0 r1 l v
+doApp (VCoePi r₀ r₁ z a b α u₀) a₁ = doCoe r₀ r₁
+  (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₁ (iVar z') (TrIntClosure z a α) a₁)
+  (u₀ `doApp` doCoe r₁ r₀ (TrIntClosure z a α) a₁)
 
 doPApp :: AtStage (Val -> Val -> Val -> VI -> Val)
 doPApp (VPLam cl _ _) _  _  r = cl $$ r
@@ -291,6 +298,9 @@ doExtFun ws (VNeu k)      = VExtFun ws k
 --------------------------------------------------------------------------------
 ---- Coercion
 
+doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
+doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
+
 -- | Smart constructor for VCoePartial
 --
 -- We maintain the following three invariants:
@@ -319,13 +329,15 @@ vCoePartial r0 r1 = go False
       VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced
       _        | not forced -> go True (force l)
 
-doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
-doCoe r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
+-- | The actual implementation of coe. Should *only* be called by doApp.
+doCoePartialApp :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
+doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) restr (incl. eqs)
   TrIntClosure z (VSum _ _)  _       -> error "TODO: copy + simplify"
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
+  l@(TrIntClosure _ (VNeu _) _) -> error "doCoe with Neu"
 
 doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
 doCoeExt = error "TODO: copy doCoeExt"
@@ -442,8 +454,7 @@ instance Restrictable SplitClosure where
 
 instance Restrictable TrIntClosure where
   act :: AtStage (Restr -> TrIntClosure -> TrIntClosure)
-  act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flipped
-
+  act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flippedVNeuCoePartial
 instance Restrictable TrNeuIntClosure where
   type Alt TrNeuIntClosure = TrIntClosure
 

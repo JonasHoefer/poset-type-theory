@@ -241,7 +241,7 @@ refreshGen j k = extGen i $ k i
 
 ---- Restrictions maps
 
-newtype Restr = Restr [(Gen, VI)]
+newtype Restr = Restr [(Gen, VI)] deriving (Semigroup, Monoid) via [(Gen, VI)]
 
 pattern IdRestr :: Restr
 pattern IdRestr = Restr []
