@@ -7,6 +7,7 @@ import           Control.Monad (unless)
 
 
 import           Data.Bifunctor
+import           Data.Either (fromRight)
 import           Data.Maybe
 import qualified Data.Graph as G
 import qualified Data.IntSet as S
@@ -159,6 +160,9 @@ simplifySys (VSys sys) = reducedRemaining  -- TODO: pick only satisfyable ones!
     pickRep :: G.SCC (node, Int, [Int]) -> node
     pickRep (G.AcyclicSCC (n, _, _))    = n
     pickRep (G.CyclicSCC ((n, _, _):_)) = n
+
+unionSys :: AtStage (VSys a -> VSys a -> VSys a)
+unionSys sys₁ sys₂ = fromRight (error "Union of non-trivial systems is trivial!") (simplifySys (sys₁ <> sys₂))
 
 sidePairs :: Restrictable a => AtStage (VSys a -> VSys (Alt a, Alt a))
 sidePairs (VSys bs) = VSys [ (φ, extCof φ (re a₀, re a₁)) | ((φ₀, a₀), (φ₁, a₁)) <- incrPairs bs, let φ = φ₀ /\ φ₁ ]

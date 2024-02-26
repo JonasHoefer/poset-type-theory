@@ -287,7 +287,10 @@ doPr2 (VNeu k)    = VPr2 k
 doPr2 (VCoeSigma r₀ r₁ z a b α u₀)  = doCoe r₀ r₁
   (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₀ (iVar z') (TrIntClosure z a α) (doPr1 u₀))
   (doPr2 u₀)
-doPr2 (VHCompSigma _ _ _ _ _ _) = error "TODO: copy HComp Sigma"
+doPr2 (VHCompSigma r₀ r₁ a b u₀ tb) = doComp r₀ r₁
+  (trIntCl' $ \z -> b $$ doHComp r₀ (iVar z) a (doPr1 u₀) (mapSys tb $ rebindI $ \_ u -> doPr1 u))
+  (doPr2 u₀)
+  (mapSys tb $ rebindI $ \_ u -> doPr2 u)
 
 doApp :: AtStage (Val -> Val -> Val)
 doApp (VLam cl)             v = cl $$ v
@@ -297,7 +300,8 @@ doApp (VCoePartial r0 r1 l) v = doCoePartialApp r0 r1 l v
 doApp (VCoePi r₀ r₁ z a b α u₀) a₁ = doCoe r₀ r₁
   (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₁ (iVar z') (TrIntClosure z a α) a₁)
   (u₀ `doApp` doCoe r₁ r₀ (TrIntClosure z a α) a₁)
-doApp (VHCompPi _ _ _ _ _ _) _ = error "TODO: copy HComp Pi"
+doApp (VHCompPi r₀ r₁ _ b u₀ tb) a = doHComp r₀ r₁ (b $$ a) (u₀ `doApp` a)
+  (mapSys tb $ rebindI $ \_ u -> u `doApp` re a)
 
 doPApp :: AtStage (Val -> Val -> Val -> VI -> Val)
 doPApp (VPLam cl _ _) _  _  r = cl $$ r
@@ -309,7 +313,9 @@ doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀)
   doComp r₀ r₁ (TrIntClosure i a α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
     singSys (VCof [(r, 0)]) (TrIntClosure i (extGen i (re a₀)) α)
       <> singSys (VCof [(r, 1)]) (TrIntClosure i (extGen i (re a₁)) α)
-doPApp (VHCompPath _ _ _ _ _ _ _) _ _ _ = error "TODO: copy HComp Path"
+doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ a (doPApp u₀ a₀ a₁ r) $ simplifySys $
+  mapSys tb (rebindI $ \_ u -> doPApp u (re a₀) (re a₁) (re r))
+    <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
 doSplit f bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
@@ -437,7 +443,16 @@ doHComp r₀ r₁ a u₀ tb = case a of
 -- Extension Types
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
-doHCompExt = error "TODO: copy doHCompExt"
+doHCompExt r₀ r₁ a bs u₀ tb =
+  let a₀ = doExtFun (mapSys bs snd3) u₀
+      -- we construct the line and the mapped version together: [ ψ ↪ (b', λᵢ.w(b'i)) ]
+      b' = mapSys bs $ \(b, w, _) ->
+             let b'' = trIntCl' $ \i -> doHComp' (re r₀) (iVar i) b (re u₀) (re tb)
+             in  (b'', trIntCl' $ \i -> w `doApp` (b'' $$ iVar i))
+      sys = mapSys tb $ rebindI $ \_ -> doExtFun' (re $ mapSys bs snd3) -- [ ψ ↪ λᵢ. extFun [φ ↪ w] (u i) ]
+      a₁ = doHComp r₀ r₁ a a₀ (sys `unionSys` mapSys b' snd) -- ... ∪ [ φ ↪ λᵢ.w(b' i) ]
+  in  VExtElm a₁ (mapSys b' (($$ re r₁) . fst))
+
 
 
 -- Universe
