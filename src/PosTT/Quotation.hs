@@ -1,7 +1,10 @@
 -- | Quotation of Semantic Values back into Terms
 module PosTT.Quotation where
 
+import Data.Bifunctor (first)
+
 import PosTT.Eval
+import PosTT.Poset
 import PosTT.Terms
 import PosTT.Values
 
@@ -53,7 +56,10 @@ instance ReadBack v => ReadBack (VSys v) where
   type Quot (VSys v) = Sys (Quot v)
 
   readBack :: AtStage (VSys v -> Sys (Quot v))
-  readBack (VSys bs) = Sys [ (readBack φ, extCof φ (readBack v)) | (φ, v) <- bs ]
+  readBack sys = readBackSysCof (mapSys sys readBack) 
+
+readBackSysCof :: AtStage (VSys a -> Sys a)
+readBackSysCof (VSys bs) = Sys (map (first readBack) bs)
 
 instance ReadBack Closure where
   type Quot Closure = Binder Tm

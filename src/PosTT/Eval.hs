@@ -73,7 +73,7 @@ eval rho = \case
   Con c args -> VCon c (map (eval rho) args)
   Split f bs -> VSplitPartial (reAppDef f rho) (map (evalBranch rho) bs)
 
-evalI :: AtStage (Env -> I -> VI)
+evalI :: Env -> I -> VI
 evalI rho = \case
   Sup r s -> evalI rho r \/ evalI rho s
   Inf r s -> evalI rho r /\ evalI rho s

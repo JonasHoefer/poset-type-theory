@@ -11,89 +11,65 @@ import           PosTT.Errors
 import           PosTT.Eval
 import qualified PosTT.Frontend.PreTerms as P
 import           PosTT.Frontend.PreTerms (PTm)
-
 import           PosTT.Poset
 import           PosTT.Pretty
+import           PosTT.Quotation
 import           PosTT.Terms
-import           PosTT.Values hiding (extCof)
+import           PosTT.Values
 
 import           Debug.Trace
-
-
--- TODO: Note the following bug: if we use mapSys or mapSysM etc. then we do not modify the stage *in* the context, only the ambient one!
---       Should there even by a stage in the context? We can pass it around as usual and combine it with the TC code
 
 
 --------------------------------------------------------------------------------
 ---- Type Checking Monad
 
 -- | Type checking context
-data Cxt = Cxt { stage :: Stage, env :: Env, types :: [(Name, VTy)], intVars :: [Gen], pos :: SrcSpan }
+data Cxt = Cxt { env :: Env, types :: [(Name, VTy)], intVars :: [Gen], pos :: SrcSpan }
 
 emptyCxt :: Cxt
-emptyCxt = Cxt terminalStage EmptyEnv [] [] Nothing
+emptyCxt = Cxt EmptyEnv [] [] Nothing
 
 newtype TypeChecker a = TypeChecker { unTypeChecker :: ReaderT Cxt (Either TypeError) a }
   deriving (Functor, Applicative, Monad, MonadReader Cxt, MonadError TypeError)
-
-runTypeChecker :: Cxt -> TypeChecker a -> Either TypeError a
-runTypeChecker cxt = flip runReaderT cxt . unTypeChecker
 
 instance MonadFail TypeChecker where
   fail :: String -> TypeChecker a
   fail s = asks pos >>= \ss -> throwError (TypeErrorMsg ss s)
 
+runTC :: Cxt -> AtStage (TypeChecker a) -> Either TypeError a
+runTC cxt ma = bindStage terminalStage (runReaderT (unTypeChecker ma) cxt)
+
 
 --------------------------------------------------------------------------------
 ---- Utility Functions
 
--- TODO: should we extend the stage here? These names to do not appear in *resulting* values.
--- OLD: sExtName x s in extDef and extFib
--- claim: this should be used when we introduce a new *free* variable
-
 -- | Extends context Γ with a definition to a context Γ,(x=t:a)
 extDef :: Name -> Tm -> Ty -> VTy -> Cxt -> Cxt
-extDef x t a va (Cxt s ρ ts is pos) = Cxt s (EnvDef ρ x t a) ((x, va):ts) is pos
+extDef x t a va (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ((x, va):ts) is pos
 
--- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)
+-- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)checkSys
 extFib :: Name -> Val -> VTy -> Cxt -> Cxt
-extFib x v a (Cxt s ρ ts is pos) = Cxt s (EnvFib ρ x v) ((x, a):ts) is pos
+extFib x v a (Cxt ρ ts is pos) = Cxt (EnvFib ρ x v) ((x, a):ts) is pos
 
 -- | Extends context Γ with a value of type I to a context Γ,(i=r:I)
 extInt :: Gen -> VI -> Cxt -> Cxt
-extInt i r (Cxt s ρ ts is pos) = Cxt s (EnvInt ρ i r) ts (i:is) pos
-
--- | Extends context Γ with a cofibration φ to a context Γ,φ
-extCof :: VCof -> Cxt -> Cxt
-extCof eqs (Cxt s ρ ts is pos) = Cxt (sExtCof eqs s) ρ ts is pos
-
--- | Modifies the stage in a context
-modStage :: (Stage -> Stage) -> (Cxt -> Cxt)
-modStage f cxt = cxt { stage = f (stage cxt) }
+extInt i r (Cxt ρ ts is pos) = Cxt (EnvInt ρ i r) ts (i:is) pos
 
 
 ---- introduction of free variables
 
 -- | Extends the context Γ with a free variable to a context Γ,(x=x:a)
-bindFibVar :: Name -> VTy -> AtStage (Val -> TypeChecker a) -> TypeChecker a
-bindFibVar x a k = local (modStage (sExtName x) . extFib x (VVar x) a) (withStageM (k (VVar x)))
+bindFibVar :: AtStage (Name -> VTy -> AtStage (Val -> TypeChecker a) -> TypeChecker a)
+bindFibVar x a k = extName x (local (extFib x (VVar x) a) (k (VVar x)))
 
-bindFibVars :: [Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> TypeChecker a
-bindFibVars []     (VTel [] _) k = withStageM (k [])
-bindFibVars (x:xs) tel         k = withStageM (bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (k . (v:))))
+bindFibVars :: AtStage ([Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> TypeChecker a)
+bindFibVars []     (VTel [] _) k = k []
+bindFibVars (x:xs) tel         k = 
+  bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (\vs -> k (v:vs)))
 
 -- | Extends the context Γ with a free variable to a context Γ,(i=i:I)
-bindIntVar :: Gen -> AtStage (VI -> TypeChecker a) -> TypeChecker a
-bindIntVar i k = local (modStage (sExtGen i) . extInt i (iVar i)) (withStageM (k (iVar i)))
-
-
----- Evaluation of computations using stage associated to context
-
-withStage :: AtStage a -> TypeChecker a
-withStage k = asks ((`bindStage` k) . stage)
-
-withStageM :: AtStage (TypeChecker a) -> TypeChecker a
-withStageM k = join $ withStage k
+bindIntVar :: AtStage (Gen -> AtStage (VI -> TypeChecker a) -> TypeChecker a)
+bindIntVar i k = extGen i (local (extInt i (iVar i)) (k (iVar i)))
 
 
 ---- lookup types in context
@@ -111,61 +87,61 @@ checkFibVar x = asks (lookup x . types) >>= \case
 
 ---- Evaluation and Quotation using context
 
-evalTC :: AtStage (Env -> a -> b) -> a -> TypeChecker b
-evalTC ev t = withStageM (asks ((`ev` t) . env))
+-- | Given one of the "evaluation functions" from PosTT.Eval 
+--   we can run it using the environment form the type checker.
+evalTC :: AtStage (AtStage (Env -> a -> b) -> a -> TypeChecker b)
+evalTC ev t = asks ((`ev` t) . env)
 
-convTC :: (ReadBack a, Conv a) => (SrcSpan -> Quot a -> Quot a -> ConvError -> TypeError) -> a -> a -> TypeChecker ()
-convTC e x y = withStageM $ case x `conv` y of
+-- | Tests two given a for conversion and produces a TypeError based on the given function.
+convTC :: (ReadBack a, Conv a) => AtStage ((SrcSpan -> Quot a -> Quot a -> ConvError -> TypeError) -> a -> a -> TypeChecker ())
+convTC e x y = case x `conv` y of
   Left err -> asks pos >>= \ss -> throwError $ e ss (readBack x) (readBack y) err
   Right () -> return ()
-
-readBackTC :: ReadBack a => a -> TypeChecker (Quot a)
-readBackTC x = withStage (readBack x)
 
 
 ---- Source Position handling and errors
 
 at :: SrcSpan -> TypeChecker a -> TypeChecker a
-at ss = local (\cxt -> cxt{pos = ss})
+at ss ma = local (\cxt -> cxt{pos = ss}) ma
 
-atArgPos :: AtStage (PTm -> TypeChecker a) -> (PTm -> TypeChecker a)
-atArgPos k t = at (P.srcSpan t) (withStageM (k t))
+atArgPos :: (PTm -> TypeChecker a) -> (PTm -> TypeChecker a)
+atArgPos k t = at (P.srcSpan t) (k t)
 
 hoistEither :: Either TypeError a -> TypeChecker a
-hoistEither = either throwError pure
+hoistEither e = either throwError pure e
 
 
 --------------------------------------------------------------------------------
 ---- Matching Types
 
-isU :: VTy -> TypeChecker ()
+isU :: AtStage (VTy -> TypeChecker ())
 isU VU = return ()
-isU t  = withStageM $ fail $ "Expected U, got " ++ prettyVal t
+isU t  = fail $ "Expected U, got " ++ prettyVal t
 
-isExt :: VTy -> TypeChecker (VTy, VSys (VTy, Val, Val))
+isExt :: AtStage (VTy -> TypeChecker (VTy, VSys (VTy, Val, Val)))
 isExt (VExt a bs) = return (a, bs)
-isExt t           = withStageM $ fail $ "Expected Ext-type, got " ++ prettyVal t
+isExt t           = fail $ "Expected Ext-type, got " ++ prettyVal t
 
-isPi :: VTy -> TypeChecker (VTy, Closure)
+isPi :: AtStage (VTy -> TypeChecker (VTy, Closure))
 isPi (VPi a b) = return (a, b)
-isPi t         = withStageM $ fail $ "Expected Π-type, got " ++ prettyVal t
+isPi t         = fail $ "Expected Π-type, got " ++ prettyVal t
 
-isPath :: VTy -> TypeChecker (VTy, Val, Val)
+isPath :: AtStage (VTy -> TypeChecker (VTy, Val, Val))
 isPath (VPath a a0 a1) = return (a, a0, a1)
-isPath t               = withStageM $ fail $ "Expected Path-type, got " ++ prettyVal t
+isPath t               = fail $ "Expected Path-type, got " ++ prettyVal t
 
-isPiOrPath :: VTy -> TypeChecker (Either (VTy, Closure) (VTy, Val, Val))
+isPiOrPath :: AtStage (VTy -> TypeChecker (Either (VTy, Closure) (VTy, Val, Val)))
 isPiOrPath (VPi a b)       = return $ Left (a, b)
 isPiOrPath (VPath a a0 a1) = return $ Right (a, a0, a1)
-isPiOrPath t               = withStageM $ fail $ "Expected Path-Type or Π-Type, got " ++ prettyVal t
+isPiOrPath t               = fail $ "Expected Path-Type or Π-Type, got " ++ prettyVal t
 
-isSigma :: VTy -> TypeChecker (VTy, Closure)
+isSigma :: AtStage (VTy -> TypeChecker (VTy, Closure))
 isSigma (VSigma a b) = return (a, b)
-isSigma t            = withStageM $ fail $ "Expected Σ-Type, got " ++ prettyVal t
+isSigma t            = fail $ "Expected Σ-Type, got " ++ prettyVal t
 
-isSum :: VTy -> TypeChecker (Val, [VLabel])
+isSum :: AtStage (VTy -> TypeChecker (Val, [VLabel]))
 isSum (VSum d lbl) = return (d, lbl)
-isSum t            = withStageM $ fail $ "Expected Sum-type, got " ++ prettyVal t
+isSum t            = fail $ "Expected Sum-type, got " ++ prettyVal t
 
 
 --------------------------------------------------------------------------------
@@ -175,7 +151,7 @@ isSum t            = withStageM $ fail $ "Expected Sum-type, got " ++ prettyVal 
 --
 -- If the term is a constructor, then it should be handled in this case.
 -- TODO: should types be in this case? We could infer them. See MiniTT vs other CTT impls
-check :: PTm -> VTy -> TypeChecker Tm
+check :: AtStage (PTm -> VTy -> TypeChecker Tm)
 check = flip $ \ty -> atArgPos $ \case
   P.Let _ x s a t -> do
     (a', va) <- checkAndEval a VU
@@ -223,9 +199,9 @@ check = flip $ \ty -> atArgPos $ \case
       Right (a, a₀, a₁) -> do
         let i = Gen x
         (t', vt) <- bindIntVar i (\_ -> checkAndEval t a)
-        () <- convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
-        () <- convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
-        BPLam i t' <$> readBackTC a₀ <*> readBackTC a₁
+        convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
+        convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
+        return $ BPLam i t' (readBack a₀) (readBack a₁)
   P.Pair _ s t -> do
     (a, b) <- isSigma ty
     (s', vs) <- checkAndEval s a
@@ -242,25 +218,27 @@ check = flip $ \ty -> atArgPos $ \case
       $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
 
     Split f <$> zipWithM (checkBranch b) bs (map snd cs)
---  P.ExtElm _ s ts -> do
---    (a, bs) <- isExt ty
---    (s', vs) <- checkAndEval s a
---
---    unless (length ts == length (unVSys bs)) $ fail "Shape of extElem and Ext does not agree! Did the in the type system simplify?"
---
---    ts' <- mapSysM (bs `zipSys` ts) $ \((b, w, _), t) -> do
---      -- TODO: here stuff goes wrong! The checkAndEval is at the wrong stage w.r.t. the context!
---      (t', vt) <- checkAndEval t b
---      let vwt = w `doApp` vt
---      return _
---
---    return $ ExtElm s' _
+  P.ExtElm _ s ts -> do
+    (a, bs) <- isExt ty
+    (s', vs) <- checkAndEval s a
+
+    unless (length ts == length (unVSys bs)) $ fail "Shape of extElem and Ext does not agree! Did the in the type system simplify?"
+
+    ts' <- mapSysM (bs `zipSys` ts) $ \((b, w, _), t) -> do
+      (t', vt) <- checkAndEval t b
+      let vwt = w `doApp` vt
+      convTC TypeErrorExtElmCompat (re vs) (vwt)
+      return (t', vwt)
+
+    compatible $ mapSys ts' snd
+
+    return $ ExtElm s' $ readBackSysCof $ mapSys ts' fst
   t -> do
     (t', ty') <- infer t
     () <- convTC TypeErrorConv ty ty'
     return t'
 
-checkAndEval :: PTm -> VTy -> TypeChecker (Tm, Val)
+checkAndEval :: AtStage (PTm -> VTy -> TypeChecker (Tm, Val))
 checkAndEval t a = do
   t' <- check t a
   (t',) <$> evalTC eval t'
@@ -269,7 +247,7 @@ checkAndEval t a = do
 -- | Tries to infer the type of the given term.
 --
 -- If the term is neutral, then it should be handled in this case.
-infer :: PTm -> TypeChecker (Tm, VTy)
+infer :: AtStage (PTm -> TypeChecker (Tm, VTy))
 infer = atArgPos $ \case
   P.Var _ x ->
     (Var x,) <$> checkFibVar x
@@ -281,7 +259,7 @@ infer = atArgPos $ \case
         return (App s' t', b $$ vt)
       Right (a, a₀, a₁) -> do
         t' <- checkI t
-        (,a) <$> (PApp s' <$> readBackTC a₀ <*> readBackTC a₁ <*> pure t')
+        return (PApp s' (readBack a₀) (readBack a₁) t' ,a)
   P.Pr1 _ t -> do
     (t', tt) <- infer t
     (a, _) <- isSigma tt
@@ -312,7 +290,7 @@ infer = atArgPos $ \case
     return (HComp r'₀ r'₁ a' u'₀ tb', va)
   t -> error $ show t
 
-inferAndEval :: PTm -> TypeChecker (Tm, Val, VTy)
+inferAndEval :: AtStage (PTm -> TypeChecker (Tm, Val, VTy))
 inferAndEval t = do
   (t', a) <- infer t
   vt <- evalTC eval t'
@@ -321,23 +299,22 @@ inferAndEval t = do
 
 ---- Data types
 
-checkLabel :: P.Label -> TypeChecker Label
+checkLabel :: AtStage (P.Label -> TypeChecker Label)
 checkLabel (P.Label _ c argTel) = Label c <$> checkTel argTel
 
-checkTel :: P.Tel -> TypeChecker Tel
+checkTel :: AtStage (P.Tel -> TypeChecker Tel)
 checkTel []              = return TelNil
 checkTel ((_, x, a):tel) = do
   (a', va) <- checkAndEval a VU
   telCons x a' <$> bindFibVar x va (\_ -> checkTel tel)
 
-checkArgs :: [PTm] -> VTel -> TypeChecker [Tm]
+checkArgs :: AtStage ([PTm] -> VTel -> TypeChecker [Tm])
 checkArgs []     (VTel [] _) = return []
 checkArgs (t:ts) tel         = do
-   (t', vt) <- withStageM (checkAndEval t (headVTel tel))
-   tel' <- withStage (tailVTel tel vt)
-   (t':) <$> checkArgs ts tel'
+   (t', vt) <- checkAndEval t (headVTel tel)
+   (t':) <$> checkArgs ts (tailVTel tel vt)
 
-checkBranch :: Closure -> P.Branch -> VTel -> TypeChecker Branch
+checkBranch :: AtStage (Closure -> P.Branch -> VTel -> TypeChecker Branch)
 checkBranch b (P.Branch ss c as t) argTys =
   BBranch c as <$> bindFibVars as argTys (\as' -> check t (b $$ VCon c as'))
 
@@ -357,21 +334,21 @@ checkI = atArgPos $ \case
 checkAndEvalI :: PTm -> TypeChecker (I, VI)
 checkAndEvalI r = do
   r' <- checkI r
-  (r',) <$> evalTC evalI r'
+  (r',) <$> asks (flip evalI r' . env) 
 
 
 ---- Systems
 
-checkSys :: P.Sys a -> AtStage (VCof -> a -> TypeChecker b) -> TypeChecker (Sys b)
+checkSys :: AtStage (P.Sys a -> AtStage (VCof -> a -> TypeChecker b) -> TypeChecker (Sys b))
 checkSys (P.Sys _ sys) k =
   fmap Sys $ forM sys $ \(φ, x) -> do
     (φ', vφ) <- checkAndEvalCof φ
-    (φ',) <$> local (extCof vφ) (withStageM (k vφ x))
+    (φ',) <$> extCof vφ (k vφ x)
 
 -- | Checks whether the system agrees on all overlaps.
-compatible :: (Restrictable a, Conv (Alt a), ReadBack (Alt a)) => VSys a -> TypeChecker ()
-compatible sys = withStageM $ do
-  let sys'  = fromRight (impossible "Given sys was not reduced!") $ simplifySys $ sidePairs sys
+compatible :: (Restrictable a, Conv (Alt a), ReadBack (Alt a)) => AtStage (VSys a -> TypeChecker ())
+compatible sys = do
+  let sys' = fromRight (impossible "Given sys was not reduced!") $ simplifySys $ sidePairs sys
   _ <- mapSysM sys' $ uncurry (convTC $ \ss _ _ -> TypeErrorSystemCompat ss)
   return ()
 
@@ -388,29 +365,27 @@ checkAndEvalCof eqs = do
 --------------------------------------------------------------------------------
 ---- Checking lists of declarations
 
--- checkDecls :: [P.Decl] -> Either Error (Cxt, Env) !?
+-- checkDecls' :: [P.Decl] -> Either TypeError (Cxt, Env)
+-- checkDecls' = error "TODO: shouldn't we yield an env?"
 
-checkDecls' :: [P.Decl] -> Either TypeError (Cxt, Env)
-checkDecls' = error "TODO: shouldn't we yield an env?"
 
-checkDecl :: P.Decl -> TypeChecker (Name, Tm, Ty, VTy)
+checkDecl :: AtStage (P.Decl -> TypeChecker (Name, Tm, Ty, VTy))
 checkDecl (P.Decl _ x b t) = do
   traceM $ "\nChecking Definition: " ++ show x
 
   (t', vt) <- checkAndEval t VU
   b' <- bindFibVar x vt $ \_ -> check b vt
 
-  () <- withStageM $ do
-    traceM $ prettyVal vt
-    traceM $ pretty b'
-    return ()
+  traceM $ prettyVal vt
+  traceM $ pretty b'
+  return ()
 
   return (x, b', t', vt)
 
 checkDecls :: [P.Decl] -> Either TypeError (Cxt, [(Name, Tm, Ty)])
-checkDecls = runTypeChecker emptyCxt . go
+checkDecls ds = runTC emptyCxt (go ds)
   where
-    go :: [P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)])
+    go :: AtStage ([P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)]))
     go []     = asks (,[])
     go (d:ds) = do
       (x, b', t', vt) <- checkDecl d

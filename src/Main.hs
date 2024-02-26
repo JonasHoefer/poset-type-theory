@@ -157,9 +157,9 @@ repl = do
             Left err -> outputStrLn err
             Right pt -> do
               cxt <- gets context
-              case runTypeChecker cxt (inferAndEval pt) of
+              case runTC cxt (inferAndEval pt) of -- TODO: recheck stages
                 Left err          -> outputStrLn $ show err
-                Right (_, val, _) -> outputStrLn $ bindStage (stage cxt) prettyVal val
+                Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
         Right (Unfold k d) -> do
           gets (find ((== fromString d) . fst3) . defs) >>= \case
