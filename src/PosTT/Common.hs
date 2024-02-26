@@ -3,18 +3,19 @@ module PosTT.Common where
 import           Data.ByteString.Char8 (unpack)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
+import           Data.Hashable
 import           Data.String (IsString(..))
 
 
-newtype Name = Name { unName :: B.ByteString } deriving (Eq, Ord, IsString)
+data Name = Name { code :: Int, unName :: B.ByteString } deriving (Eq, Ord)
 
 instance Show Name where
   show = unpack . unName
 
-newtype Gen = Gen { unGen :: B.ByteString } deriving (Eq, Ord, IsString)
+instance IsString Name where
+  fromString s = Name (hash s) (fromString s)
 
-instance Show Gen where
-  show = unpack . unGen
+newtype Gen = Gen { unGen :: Name } deriving (Eq, Ord, IsString) deriving Show via Name
 
 type SrcSpan = Maybe ((Int, Int), (Int, Int))
 

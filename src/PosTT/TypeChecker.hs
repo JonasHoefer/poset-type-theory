@@ -99,7 +99,7 @@ withStageM k = join $ withStage k
 ---- lookup types in context
 
 checkIntVar :: Name -> TypeChecker I
-checkIntVar (Gen . unName -> i) = asks (elem i . intVars) >>= \case
+checkIntVar (Gen -> i) = asks (elem i . intVars) >>= \case
   True  -> return (IVar i)
   False -> fail $ show i ++ " is not an interval variable!"
 
@@ -221,7 +221,7 @@ check = flip $ \ty -> atArgPos $ \case
       Left (a, b) ->
         BLam x <$> bindFibVar x a (\vx -> check t (b $$ vx))
       Right (a, a₀, a₁) -> do
-        let i = Gen (unName x)
+        let i = Gen x
         (t', vt) <- bindIntVar i (\_ -> checkAndEval t a)
         () <- convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
         () <- convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
@@ -290,7 +290,7 @@ infer = atArgPos $ \case
     (t', vt, tt) <- inferAndEval t
     (_, b) <- isSigma tt
     return (Pr2 t', b $$ doPr1 vt)
-  P.Coe _ r₀ r₁ (Gen . unName -> i) a -> do
+  P.Coe _ r₀ r₁ (Gen -> i) a -> do
     (r'₀, vr₀) <- checkAndEvalI r₀
     (r'₁, vr₁) <- checkAndEvalI r₁
     (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
@@ -301,7 +301,7 @@ infer = atArgPos $ \case
     r'₁ <- checkI r₁
     (u'₀, vu₀) <- checkAndEval u₀ va
   
-    tb' <- checkSys tb $ \φ (Gen . unName -> i, u) -> do
+    tb' <- checkSys tb $ \φ (Gen -> i, u) -> do
       (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)      
       () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
       return (TrIntBinder i u')

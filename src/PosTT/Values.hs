@@ -47,7 +47,7 @@ data Val where
   VCon :: Name -> [Val] -> Val
   VSplitPartial :: Val -> [VBranch] -> Val
 
-  VNeu :: Neu -> Val
+  VNeu :: {-# UNPACK #-} Neu -> Val
 type VTy = Val
 
 
@@ -185,10 +185,10 @@ instance InfSemilattice VCof where
 
 ---- Stages
 
-data Stage = Stage { gens :: [Gen], cof :: VCof, names :: [Name] }
+data Stage = Stage { gens :: [Gen], cof :: VCof, names :: [Name], nextFresh :: Int  }
 
 terminalStage :: Stage
-terminalStage = Stage [] top []
+terminalStage = Stage [] top [] 0
 
 type AtStage a = (?s :: Stage) => a
 
@@ -230,22 +230,32 @@ freshIntVar k = freshGen (k . iVar)
 
 
 refreshName :: AtStage (Name -> AtStage (Name -> a) -> a)
-refreshName y k = extName x $ k x
-  where
-    x = Name $ head
-          [ x'
-          | x' <- unName y : [ fromString ('x':show n) | n <- [1..] ]
-          , Name x' `notElem` names ?s, Gen x' `notElem` gens ?s
-          ]
+refreshName _ k = 
+  let x  = fromString ("_x" ++ show (nextFresh ?s)) 
+  in  let ?s = ?s { nextFresh = 1 + nextFresh ?s }
+      in  k x
+
+-- refreshName y k = extName x $ k x
+--  where
+--    x = Name $ head
+--          [ x'
+--          | x' <- unName y : [ fromString ('x':show n) | n <- [1..] ]
+--          , Name x' `notElem` names ?s, Gen x' `notElem` gens ?s
+--          ]
 
 refreshGen :: AtStage (Gen -> AtStage (Gen -> a) -> a)
-refreshGen j k = extGen i $ k i
-  where
-    i = Gen $ head
-          [ i'
-          | i' <- unGen j : [ fromString ('i':show n) | n <- [1..] ]
-          , Name i' `notElem` names ?s, Gen i' `notElem` gens ?s
-          ]
+refreshGen _ k = 
+  let x  = fromString ("_i" ++ show (nextFresh ?s)) 
+  in  let ?s = ?s { nextFresh = 1 + nextFresh ?s }
+      in  k x
+
+-- refreshGen j k = extGen i $ k i
+--  where
+--    i = Gen $ head
+--          [ i'
+--          | i' <- unGen j : [ fromString ('i':show n) | n <- [1..] ]
+--          , Name i' `notElem` names ?s, Gen i' `notElem` gens ?s
+--          ]
 
 
 ---- Restrictions maps

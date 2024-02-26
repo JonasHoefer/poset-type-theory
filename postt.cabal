@@ -75,6 +75,7 @@ executable postt
       , extra
       , filepath
       , haskeline
+      , hashable
       , mtl
       , optparse-applicative
       , prettyprinter

@@ -2,10 +2,12 @@
 
 module PosTT.Terms where
 
+import Algebra.Lattice (SupSemilattice(..), InfSemilattice(..))
+
 import Data.String (IsString(..))
 
 import PosTT.Common (Name, Gen)
-import Algebra.Lattice (SupSemilattice(..), InfSemilattice(..))
+
 
 --------------------------------------------------------------------------------
 ---- Terms of Fibrant Types
@@ -15,17 +17,17 @@ data Tm where
   Var :: Name -> Tm
   Let :: Name -> Tm -> Ty -> Tm -> Tm
 
-  Pi :: Ty -> Binder Ty -> Ty
-  Lam :: Binder Tm -> Tm
+  Pi :: Ty -> {-# UNPACK #-} Binder Ty -> Ty
+  Lam :: {-# UNPACK #-} Binder Tm -> Tm
   App :: Tm -> Tm -> Tm
 
-  Sigma :: Ty -> (Binder Ty) -> Ty
+  Sigma :: Ty -> {-# UNPACK #-} Binder Ty -> Ty
   Pair :: Tm -> Tm -> Tm
   Pr1 :: Tm -> Tm
   Pr2 :: Tm -> Tm
 
   Path :: Ty -> Tm -> Tm -> Tm
-  PLam :: IntBinder Tm -> ~Tm -> ~Tm -> Tm
+  PLam :: {-# UNPACK #-} IntBinder Tm -> ~Tm -> ~Tm -> Tm
   PApp :: Tm -> ~Tm -> ~Tm -> I -> Tm
 
   Coe :: I -> I -> TrIntBinder Ty -> Tm
