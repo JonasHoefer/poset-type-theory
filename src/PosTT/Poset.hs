@@ -11,9 +11,9 @@ import           Data.Maybe
 import qualified Data.Graph as G
 import qualified Data.IntSet as S
 
+import           PosTT.Common
 import           PosTT.Errors (ConvError(..))
 import           PosTT.SAT
-import           PosTT.Terms (Gen)
 import           PosTT.Values
 
 

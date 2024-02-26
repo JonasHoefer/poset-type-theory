@@ -5,6 +5,7 @@ import Algebra.Lattice
 
 import Data.Bifunctor
 import Data.Either (isRight)
+import Data.String (IsString(..))
 
 import PosTT.Common
 import PosTT.Terms
@@ -233,7 +234,7 @@ refreshName y k = extName x $ k x
   where
     x = Name $ head
           [ x'
-          | x' <- unName y : [ 'x':show n | n <- [1..] ]
+          | x' <- unName y : [ fromString ('x':show n) | n <- [1..] ]
           , Name x' `notElem` names ?s, Gen x' `notElem` gens ?s
           ]
 
@@ -242,7 +243,7 @@ refreshGen j k = extGen i $ k i
   where
     i = Gen $ head
           [ i'
-          | i' <- unGen j : [ 'i':show n | n <- [1..] ]
+          | i' <- unGen j : [ fromString ('i':show n) | n <- [1..] ]
           , Name i' `notElem` names ?s, Gen i' `notElem` gens ?s
           ]
 

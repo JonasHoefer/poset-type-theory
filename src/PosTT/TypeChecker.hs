@@ -101,12 +101,12 @@ withStageM k = join $ withStage k
 checkIntVar :: Name -> TypeChecker I
 checkIntVar (Gen . unName -> i) = asks (elem i . intVars) >>= \case
   True  -> return (IVar i)
-  False -> fail $ unGen i ++ " is not an interval variable!"
+  False -> fail $ show i ++ " is not an interval variable!"
 
 checkFibVar :: Name -> TypeChecker VTy
 checkFibVar x = asks (lookup x . types) >>= \case
   Just t  -> return t
-  Nothing -> fail $ unName x ++ " is not a fibrant variable!"
+  Nothing -> fail $ show x ++ " is not a fibrant variable!"
 
 
 ---- Evaluation and Quotation using context
@@ -395,7 +395,7 @@ checkDecls' = error "TODO: shouldn't we yield an env?"
 
 checkDecl :: P.Decl -> TypeChecker (Name, Tm, Ty, VTy)
 checkDecl (P.Decl _ x b t) = do
-  traceM $ "\nChecking Definition: " ++ unName x
+  traceM $ "\nChecking Definition: " ++ show x
 
   (t', vt) <- checkAndEval t VU
   b' <- bindFibVar x vt $ \_ -> check b vt

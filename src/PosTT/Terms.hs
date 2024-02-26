@@ -4,7 +4,7 @@ module PosTT.Terms where
 
 import Data.String (IsString(..))
 
-import PosTT.Common (Name)
+import PosTT.Common (Name, Gen)
 import Algebra.Lattice (SupSemilattice(..), InfSemilattice(..))
 
 --------------------------------------------------------------------------------
@@ -88,8 +88,6 @@ pattern BBranch n xs t = Branch n (SplitBinder xs t)
 
 --------------------------------------------------------------------------------
 ---- Base Category
-
-newtype Gen = Gen { unGen :: String } deriving (Eq, Ord, IsString)
 
 data I = IVar Gen | Sup I I | Inf I I | I0 | I1
 

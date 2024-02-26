@@ -1,5 +1,6 @@
 module PosTT.Pretty where
 
+
 import           Data.List
 
 import           PosTT.Common
@@ -86,10 +87,10 @@ reflectFace :: (I, I) -> R.Face' ()
 reflectFace (r, s) = R.Face () (reflectFormula r) (reflectFormula s)
 
 reflectName :: Name -> R.AIdent
-reflectName = R.AIdent . (((0, 0), (0, 0)),) . unName
+reflectName = R.AIdent . (((0, 0), (0, 0)),) . show
 
 reflectGen :: Gen -> R.AIdent
-reflectGen = R.AIdent . (((0, 0), (0, 0)),) . unGen
+reflectGen = R.AIdent . (((0, 0), (0, 0)),) . show
 
 reflectFormula :: I -> R.Exp' ()
 reflectFormula = \case

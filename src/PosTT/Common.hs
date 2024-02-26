@@ -1,9 +1,20 @@
 module PosTT.Common where
 
-import Data.String (IsString(..))
+import           Data.ByteString.Char8 (unpack)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Internal as B
+import           Data.String (IsString(..))
 
 
-newtype Name = Name { unName :: String } deriving (Eq, Ord, IsString, Show)
+newtype Name = Name { unName :: B.ByteString } deriving (Eq, Ord, IsString)
+
+instance Show Name where
+  show = unpack . unName
+
+newtype Gen = Gen { unGen :: B.ByteString } deriving (Eq, Ord, IsString)
+
+instance Show Gen where
+  show = unpack . unGen
 
 type SrcSpan = Maybe ((Int, Int), (Int, Int))
 

@@ -31,6 +31,8 @@ custom-setup
 executable postt
     main-is:          Main.hs
 
+    ghc-options: -rtsopts
+
     -- Modules included in this executable, other than Main.
     other-modules:
         Algebra.Lattice
@@ -76,6 +78,7 @@ executable postt
       , mtl
       , optparse-applicative
       , prettyprinter
+      , bytestring
     build-tool-depends:
         alex:alex
       , happy:happy

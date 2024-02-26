@@ -74,7 +74,7 @@ evalModule m p = do
       putStrLn $ "Head linear unfolding of " ++ pretty (snd3 $ last tms)
       putStrLn $ "Yields " ++ pretty t
       putStrLn ""
-      putStrLn $ "Unfold counts: " ++ intercalate ", " [ unName d ++ ": " ++ show c | (d, c) <- M.toList u]
+      putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
       putStrLn $ "Hence " ++ show s ++ " unfold steps"
 
 
@@ -171,7 +171,7 @@ repl = do
               modify $ \s -> s{ defs = [ if fst3 def == n then (n, t', a) else def | def <- defs s ] }
               outputStrLn $ pretty t'
               outputStrLn ""
-              outputStrLn $ "Unfold counts: " ++ intercalate ", " [ unName x ++ ": " ++ show c | (x, c) <- M.toList u]
+              outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
           repl
 
 replLoad :: FilePath -> Repl ()
