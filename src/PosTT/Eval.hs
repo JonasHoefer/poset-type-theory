@@ -10,6 +10,9 @@ import PosTT.Terms
 import PosTT.Values
 import PosTT.Poset
 
+import Debug.Trace
+import {-# SOURCE #-} PosTT.Pretty -- only for debugging
+
 
 --------------------------------------------------------------------------------
 ---- Utilities 
@@ -26,7 +29,7 @@ lookupInt (EnvInt _ y r) x | y == x = r
 lookupInt (ConsEnv rho)  x = rho `lookupInt` x
 
 reAppDef :: AtStage (Name -> Env -> Val)
-reAppDef d (EnvDef _   x _ _) | x == d = VVar d 
+reAppDef d (EnvDef _   x _ _) | x == d = VVar d
 reAppDef d (EnvFib rho x v)   | x /= d = reAppDef d rho `doApp` v
 
 
@@ -94,7 +97,7 @@ instance Eval a => Eval (Sys a) where
   type Sem (Sys a) = Either (Sem a) (VSys (Sem a))
 
   eval :: AtStage (Env -> Sys a -> Either (Sem a) (VSys (Sem a)))
-  eval rho (Sys bs) = simplifySys (VSys bs') 
+  eval rho (Sys bs) = simplifySys (VSys bs')
     where bs' = [ (phi', extCof phi' (eval rho a)) | (phi, a) <- bs, let phi' = eval rho phi ]
 
 instance Eval (Binder Tm) where
@@ -119,7 +122,7 @@ instance Eval (TrIntBinder Tm) where
 
 instance Eval SplitBinder where
   type Sem SplitBinder = SplitClosure
-  
+
   eval :: AtStage (Env -> SplitBinder -> SplitClosure)
   eval rho (SplitBinder xs t) = SplitClosure xs t rho
 
@@ -157,7 +160,7 @@ instance (Eval a, Eval b, Eval c) => Eval (a, b, c) where
   type Sem (a, b, c) = (Sem a, Sem b, Sem c)
 
   eval :: AtStage (Env -> (a, b, c) -> (Sem a, Sem b, Sem c))
-  eval rho (a, b, c) = (eval rho a, eval rho b, eval rho c) 
+  eval rho (a, b, c) = (eval rho a, eval rho b, eval rho c)
 
 
 --------------------------------------------------------------------------------
@@ -167,7 +170,7 @@ class Apply c where
   type ArgType c
   type ResType c
 
-  infixr 0 $$ 
+  infixr 0 $$
   ($$) :: AtStage (c -> ArgType c -> ResType c)
 
 instance Apply Closure where
@@ -203,7 +206,7 @@ instance Apply SplitClosure where
   type ResType SplitClosure = Val
 
   ($$) :: AtStage (SplitClosure -> [Val] -> Val)
-  SplitClosure xs t rho $$ vs = eval (rho `envFibs` (xs `zip` vs)) t 
+  SplitClosure xs t rho $$ vs = eval (rho `envFibs` (xs `zip` vs)) t
 
 -- | Forces the delayed restriction under the binder.
 force :: AtStage (TrIntClosure -> TrIntClosure)
@@ -234,7 +237,7 @@ pFib = closedEval $
 
 pIsContr :: Val
 pIsContr = closedEval $
-  BLam "A" $ BSigma ("A") "x" $ BPi ("A") "y" $ Path ("A") ("x") ("y")
+  BLam "A" $ BSigma "A" "x" $ BPi "A" "y" $ Path "A" "x" "y"
 
 pIsEquiv :: Val
 pIsEquiv = bindStage terminalStage $ eval (EnvFib (EnvFib EmptyEnv "fib" pFib) "is-contr" pIsContr) $
@@ -257,7 +260,7 @@ pIsEquivId = bindStage terminalStage $ eval (EnvFib (EnvFib EmptyEnv "id" pId) "
   in  BLam "A" $ BLam "a" $ Pair c $ BLam "v" $ BPLam "z" (Pair p0 $ BPLam "z'" p1 (Pr2 "v") rfla) c "v"
 
 
----- Abstracted versions and internal combinators
+---- Abstracted versions
 
 -- | (A B : U) : U
 funType :: AtStage (VTy -> VTy -> VTy)
@@ -292,6 +295,13 @@ idFiber :: AtStage (VTy -> Val -> Val)
 idFiber a x = VPair x (refl a x)
 
 
+---- internal combinators
+
+doComp :: AtStage (VI -> VI -> TrIntClosure -> Val -> VSys TrIntClosure -> Val)
+doComp r₀ r₁ ℓ u₀ tb = doHComp r₀ r₁ (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀)
+  $ mapSys tb $ \u -> trIntCl' $ \z -> doCoe (re r₁) (iVar z) (re ℓ) (u $$ iVar z)
+
+
 --------------------------------------------------------------------------------
 ---- Basic MLTT Combinators + actions on delayed coe and hcomp
 
@@ -322,6 +332,11 @@ doPApp (VNeu k)       p0 p1 r
   | r === 0   = p0
   | r === 1   = p1
   | otherwise = VPApp k p0 p1 r
+doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀) a₀(r₀) a₁(r₀)
+  doComp r₀ r₁ (TrIntClosure i a α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
+    singSys (VCof [(r, 0)]) (TrIntClosure i (extGen i (re a₀)) α)
+      <> singSys (VCof [(r, 1)]) (TrIntClosure i (extGen i (re a₁)) α)
+doPApp (VHCompPath _ _ _ _ _ _ _) _ _ _ = error "HComp Path"
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
 doSplit f bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
@@ -335,7 +350,7 @@ vExt :: AtStage (Val -> Either (VTy, Val, Val) (VSys (VTy, Val, Val)) -> Val)
 vExt a = either fst3 (VExt a)
 
 vExtElm :: AtStage (Val -> Either Val (VSys Val) -> Val)
-vExtElm v = either id (VExtElm v) 
+vExtElm v = either id (VExtElm v)
 
 doExtFun' :: AtStage (Either Val (VSys Val) -> Val -> Val)
 doExtFun' ws v = either (`doApp` v) (`doExtFun` v) ws
@@ -375,7 +390,7 @@ vCoePartial r0 r1 = go False
       VPi{}    -> VCoePartial r0 r1 l
       VSigma{} -> VCoePartial r0 r1 l
       VPath{}  -> VCoePartial r0 r1 l
-      VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k) 
+      VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k)
       VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced
       _        | not forced -> go True (force l)
 
@@ -430,7 +445,7 @@ instance Restrictable Val where
   act :: AtStage (Restr -> Val -> Val)
   act f = \case
     VU -> VU
-    
+
     VPi a b -> VPi (a @ f) (b @ f)
     VLam cl -> VLam (cl @ f)
 
@@ -443,7 +458,7 @@ instance Restrictable Val where
     VCoePartial r0 r1 l -> vCoePartial (r0 @ f) (r1 @ f) (l @ f)
 
     VCoe r0 r1 l u0      -> vCoePartial (r0 @ f) (r1 @ f) (l @ f) `doApp` (u0 @ f)
-    VHComp r0 r1 a u0 tb -> doHComp' (r0 @ f) (r1 @ f) (a @ f)(u0 @ f) (tb @ f)
+    VHComp r0 r1 a u0 tb -> doHComp' (r0 @ f) (r1 @ f) (a @ f) (u0 @ f) (tb @ f)
 
     VExt a bs    -> vExt (a @ f) (bs @ f)
     VExtElm v ws -> vExtElm (v @ f) (ws @ f)
@@ -461,16 +476,16 @@ instance Restrictable Neu where
   act :: AtStage (Restr -> Neu -> Val)
   act f = \case
     NVar x -> VVar x
-    
+
     NApp k v -> doApp (k @ f) (v @ f)
-    
+
     NPr1 k -> doPr1 (k @ f)
     NPr2 k -> doPr2 (k @ f)
-    
+
     NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
 
     NCoePartial r₀ r₁ cl -> vCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
-    NHComp r₀ r₁ k u₀ tb -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f) 
+    NHComp r₀ r₁ k u₀ tb -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
     -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
@@ -484,7 +499,7 @@ instance Restrictable a => Restrictable (VSys a) where
 
 instance Restrictable VLabel where
   act :: AtStage (Restr -> VLabel -> VLabel)
-  act f = fmap (@ f) 
+  act f = fmap (@ f)
 
 instance Restrictable VBranch where
   act :: AtStage (Restr -> VBranch -> VBranch)
@@ -522,7 +537,7 @@ instance Restrictable Env where
   act f = \case
     EmptyEnv          -> EmptyEnv
     EnvFib env x v    -> EnvFib (env @ f) x (v @ f)
-    EnvDef env x t ty -> EnvDef (env @ f) x t ty 
+    EnvDef env x t ty -> EnvDef (env @ f) x t ty
     EnvInt env i r    -> EnvInt (env @ f) i (r @ f)
 
 instance Restrictable a => Restrictable [a] where

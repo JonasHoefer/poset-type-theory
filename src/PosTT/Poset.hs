@@ -174,3 +174,10 @@ mapSys (VSys sys) f = VSys [ (φ, extCof φ (f a)) | (φ, a) <- sys ]
 -- | Monadic version of `mapSys` 
 mapSysM :: Monad m => AtStage (VSys a -> AtStage (a -> m b) -> m (VSys b))
 mapSysM sys f = fmap VSys $ mapM sequence $ unVSys $ mapSys sys f
+
+
+consSys :: AtStage (VSys a -> VCof -> AtStage a -> VSys a)
+consSys (VSys sys) φ a = VSys ((φ, extCof φ a) : sys)
+
+singSys :: AtStage (VCof -> AtStage a -> VSys a)
+singSys = consSys EmptySys

@@ -22,7 +22,7 @@ convSigma :: AtStage (Val -> Val -> Either ConvError ())
 u `convSigma` v = (doPr1 u, doPr2 u) `conv` (doPr1 v, doPr2 v)
 
 convPath :: AtStage (Val -> Val -> Val -> Val -> Either ConvError ())
-convPath a₀ a₁ u v = freshIntVar (\i -> doPApp a₀ a₁ u i `conv` doPApp a₀ a₁ v i)
+convPath a₀ a₁ u v = freshIntVar (\i -> doPApp u a₀ a₁ i `conv` doPApp v a₀ a₁ i)
 
 convExt :: AtStage (VSys Val -> Val -> Val -> Either ConvError ())
 convExt ws u v = doExtFun ws u `conv` doExtFun ws v -- TODO: is this correct?

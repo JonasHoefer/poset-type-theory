@@ -71,6 +71,8 @@ pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
 
 
 newtype VSys a = VSys { unVSys :: [(VCof, a)] }
+  deriving Semigroup via [(VCof, a)]
+  deriving Monoid    via [(VCof, a)]
 
 pattern EmptySys :: VSys a
 pattern EmptySys = VSys []
@@ -153,6 +155,9 @@ data TrIntClosure = TrIntClosure Gen Val Restr
 -- The continuation works at the extended stage to produce the captured value.
 trIntCl :: AtStage (Gen -> AtStage (Gen -> Val) -> TrIntClosure)
 trIntCl i k = refreshGen i $ \i' -> TrIntClosure i' (k i') IdRestr
+
+trIntCl' :: AtStage (AtStage (Gen -> Val) -> TrIntClosure)
+trIntCl' k = freshGen $ \i' -> TrIntClosure i' (k i') IdRestr
 
 -- | A "transpart" closure binding an interval variable,
 --   whose captured value is guarantied to be neutral. 
