@@ -474,6 +474,8 @@ instance Restrictable Neu where
     -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
+    NSplit g bs k -> doSplit (g @ f) (bs @ f) (k @ f)
+
 instance Restrictable a => Restrictable (VSys a) where
   type Alt (VSys a) = Either (Alt a) (VSys (Alt a))
 
