@@ -363,7 +363,7 @@ vCoePartial r0 r1 = go False
       VSigma{} -> VCoePartial r0 r1 l
       VPath{}  -> VCoePartial r0 r1 l
       VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k)
-      VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced (3)
+      VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced (3) -- REMARK: this slows "flip test" significantly
       _        | not forced -> go True (force l)
 
 -- | The actual implementation of coe. Should *only* be called by doApp.
