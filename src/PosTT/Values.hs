@@ -70,7 +70,7 @@ pattern VHCompPath :: VI -> VI -> Val -> Val -> Val -> Val -> VSys TrIntClosure 
 pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
 
 
-newtype VSys a = VSys [(VCof, a)]
+newtype VSys a = VSys { unVSys :: [(VCof, a)] }
 
 pattern EmptySys :: VSys a
 pattern EmptySys = VSys []

@@ -8,11 +8,15 @@ class InfSemilattice a where
   top :: a
 
 inf :: (InfSemilattice a, Foldable t) => t a -> a
-inf = foldr (/\) top
+inf xs 
+  | null xs   = top 
+  | otherwise = foldr1 (/\) xs
 
 class SupSemilattice a where
   (\/) :: a -> a -> a
   bot :: a
 
 sup :: (SupSemilattice a, Foldable t) => t a -> a
-sup = foldr (\/) bot
+sup xs 
+  | null xs   = bot
+  | otherwise = foldr1 (\/) xs 

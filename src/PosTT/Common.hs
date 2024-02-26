@@ -12,3 +12,7 @@ extractWith p _ []             = Nothing
 extractWith p k (e@(k', v):vs) 
   | p k k'    = Just (v, vs)
   | otherwise = fmap (fmap (e:)) (extractWith p k vs)
+
+
+impossible :: String -> a
+impossible msg = error $ "Impossible: " ++ msg

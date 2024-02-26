@@ -21,5 +21,6 @@ data TypeError where
   TypeErrorConv :: SrcSpan -> Tm -> Tm -> ConvError -> TypeError
   TypeErrorEndpoint :: I -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
   TypeErrorBoundary :: I -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+  TypeErrorSystemCompat :: SrcSpan -> ConvError -> TypeError
   TypeErrorMissingCon :: SrcSpan -> Name -> Tm -> TypeError
   TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError

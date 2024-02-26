@@ -415,8 +415,8 @@ instance Restrictable Neu where
 instance Restrictable a => Restrictable (VSys a) where
   type Alt (VSys a) = Either (Alt a) (VSys (Alt a))
 
-  act :: Restr -> VSys a -> Either (Alt a) (VSys (Alt a))
-  act f = error "TODO: sys action"
+  act :: AtStage (Restr -> VSys a -> Either (Alt a) (VSys (Alt a)))
+  act f (VSys bs) = simplifySys $ VSys [ (φ', extCof φ' (a @ f)) | (φ, a) <- bs, let φ' = φ @ f ]
 
 instance Restrictable VLabel where
   act :: AtStage (Restr -> VLabel -> VLabel)

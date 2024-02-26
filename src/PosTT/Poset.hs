@@ -159,3 +159,18 @@ simplifySys (VSys sys) = reducedRemaining  -- TODO: pick only satisfyable ones!
     pickRep :: G.SCC (node, Int, [Int]) -> node
     pickRep (G.AcyclicSCC (n, _, _))    = n
     pickRep (G.CyclicSCC ((n, _, _):_)) = n
+
+sidePairs :: Restrictable a => AtStage (VSys a -> VSys (Alt a, Alt a))
+sidePairs (VSys bs) = VSys [ (φ, extCof φ (re a₀, re a₁)) | ((φ₀, a₀), (φ₁, a₁)) <- incrPairs bs, let φ = φ₀ /\ φ₁ ]
+  where
+    incrPairs :: [a] -> [(a, a)]
+    incrPairs []     = []
+    incrPairs (x:xs) = map (x,) xs ++ incrPairs xs
+
+-- | Maps over a system, adjusting the stage.
+mapSys :: AtStage (VSys a -> AtStage (a -> b) -> VSys b)
+mapSys (VSys sys) f = VSys [ (φ, extCof φ (f a)) | (φ, a) <- sys ]
+
+-- | Monadic version of `mapSys` 
+mapSysM :: Monad m => AtStage (VSys a -> AtStage (a -> m b) -> m (VSys b))
+mapSysM sys f = fmap VSys $ mapM sequence $ unVSys $ mapSys sys f

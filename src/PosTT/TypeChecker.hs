@@ -3,6 +3,8 @@ module PosTT.TypeChecker where
 import           Control.Monad.Reader
 import           Control.Monad.Except
 
+import           Data.Either (fromRight)
+
 import           PosTT.Common
 import           PosTT.Conversion
 import           PosTT.Errors
@@ -16,7 +18,6 @@ import           PosTT.Terms
 import           PosTT.Values hiding (extCof)
 
 import           Debug.Trace
-import GHC.RTS.Flags (ProfFlags(heapProfileIntervalTicks))
 
 
 --------------------------------------------------------------------------------
@@ -109,7 +110,7 @@ checkFibVar x = asks (lookup x . types) >>= \case
 evalTC :: Eval a => a -> TypeChecker (Sem a)
 evalTC t = withStageM (asks ((`eval` t) . env))
 
-convTC :: (SrcSpan -> Tm -> Tm -> ConvError -> TypeError) -> Val -> Val -> TypeChecker ()
+convTC :: (ReadBack a, Conv a) => (SrcSpan -> Quot a -> Quot a -> ConvError -> TypeError) -> a -> a -> TypeChecker ()
 convTC e x y = withStageM $ case x `conv` y of
   Left err -> asks pos >>= \ss -> throwError $ e ss (readBack x) (readBack y) err
   Right () -> return ()
@@ -325,6 +326,7 @@ checkAndEvalI r = do
   r' <- checkI r
   (r',) <$> withStageM (asks ((`eval` r') . env))
 
+
 ---- Systems
 
 checkSys :: P.Sys a -> AtStage (VCof -> a -> TypeChecker b) -> TypeChecker (Sys b)
@@ -334,8 +336,11 @@ checkSys (P.Sys _ sys) k =
     (φ',) <$> local (extCof vφ) (withStageM (k vφ x))
 
 -- | Checks whether the system agrees on all overlaps.
-compatible :: (Restrictable a, Conv a) => VSys a -> TypeChecker ()
-compatible sys = error "TODO: re import"
+compatible :: (Restrictable a, Conv (Alt a), ReadBack (Alt a)) => VSys a -> TypeChecker ()
+compatible sys = withStageM $ do
+  let sys'  = fromRight (impossible "Given sys was not reduced!") $ simplifySys $ sidePairs sys
+  _ <- mapSysM sys' $ uncurry (convTC $ \ss _ _ -> TypeErrorSystemCompat ss)
+  return ()
 
 
 ---- Cofibrations
