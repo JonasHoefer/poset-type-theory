@@ -111,8 +111,8 @@ checkFibVar x = asks (lookup x . types) >>= \case
 
 ---- Evaluation and Quotation using context
 
-evalTC :: Eval a => a -> TypeChecker (Sem a)
-evalTC t = withStageM (asks ((`eval` t) . env))
+evalTC :: AtStage (Env -> a -> b) -> a -> TypeChecker b
+evalTC ev t = withStageM (asks ((`ev` t) . env))
 
 convTC :: (ReadBack a, Conv a) => (SrcSpan -> Quot a -> Quot a -> ConvError -> TypeError) -> a -> a -> TypeChecker ()
 convTC e x y = withStageM $ case x `conv` y of
@@ -212,7 +212,7 @@ check = flip $ \ty -> atArgPos $ \case
       p' <- check p (isEquiv vb vaη ve)
       return (b', e', p')
     
-    vsys' <- evalTC sys'
+    vsys' <- evalTC (evalSys eval3) sys'
     () <- either (\_ -> return ()) compatible vsys'
 
     return $ Ext a' sys'
@@ -263,7 +263,7 @@ check = flip $ \ty -> atArgPos $ \case
 checkAndEval :: PTm -> VTy -> TypeChecker (Tm, Val)
 checkAndEval t a = do
   t' <- check t a
-  (t',) <$> evalTC t'
+  (t',) <$> evalTC eval t'
 
 
 -- | Tries to infer the type of the given term.
@@ -306,7 +306,7 @@ infer = atArgPos $ \case
       () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
       return (TrIntBinder i u')
     
-    vtb' <- evalTC tb'
+    vtb' <- evalTC (evalSys evalTrIntBinder) tb'
     () <- either (\_ -> return ()) compatible vtb'
 
     return (HComp r'₀ r'₁ a' u'₀ tb', va)
@@ -315,7 +315,7 @@ infer = atArgPos $ \case
 inferAndEval :: PTm -> TypeChecker (Tm, Val, VTy)
 inferAndEval t = do
   (t', a) <- infer t
-  vt <- evalTC t'
+  vt <- evalTC eval t'
   return (t', vt, a)
 
 
@@ -357,7 +357,7 @@ checkI = atArgPos $ \case
 checkAndEvalI :: PTm -> TypeChecker (I, VI)
 checkAndEvalI r = do
   r' <- checkI r
-  (r',) <$> withStageM (asks ((`eval` r') . env))
+  (r',) <$> evalTC evalI r'
 
 
 ---- Systems

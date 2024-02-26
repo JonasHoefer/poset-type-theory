@@ -5,6 +5,7 @@ import Algebra.Lattice
 
 import Control.Applicative
 
+import Data.Bifunctor
 import Data.Either.Extra (fromRight')
 import Data.Tuple.Extra (fst3, snd3, thd3)
 
@@ -39,131 +40,79 @@ reAppDef d (EnvFib rho x v)   | x /= d = reAppDef d rho `doApp` v
 --------------------------------------------------------------------------------
 ---- Eval
 
-class Eval a where
-  type Sem a
-  eval :: AtStage (Env -> a -> Sem a)
-
-closedEval :: Eval a => a -> Sem a
+closedEval :: Tm -> Val
 closedEval = bindStage terminalStage $ eval EmptyEnv
 
-instance Eval Tm where
-  type Sem Tm = Val
+eval :: AtStage (Env -> Tm -> Val)
+eval rho = \case
+  U            -> VU
+  Var x        -> rho `lookupFib` x
+  Let d t ty s -> eval (EnvDef rho d t ty) s -- TODO: do we need this extName? extName d $
 
-  eval :: AtStage (Env -> Tm -> Val)
-  eval rho = \case
-    U            -> VU
-    Var x        -> rho `lookupFib` x
-    Let d t ty s -> eval (EnvDef rho d t ty) s -- TODO: do we need this extName? extName d $
+  Pi a b  -> VPi (eval rho a) (evalBinder rho b)
+  Lam t   -> VLam (evalBinder rho t)
+  App s t -> eval rho s `doApp` eval rho t
 
-    Pi a b  -> VPi (eval rho a) (eval rho b)
-    Lam t   -> VLam (eval rho t)
-    App s t -> eval rho s `doApp` eval rho t
+  Sigma a b -> VSigma (eval rho a) (evalBinder rho b)
+  Pair s t  -> VPair (eval rho s) (eval rho t)
+  Pr1 t     -> doPr1 (eval rho t)
+  Pr2 t     -> doPr2 (eval rho t)
 
-    Sigma a b -> VSigma (eval rho a) (eval rho b)
-    Pair s t  -> VPair (eval rho s) (eval rho t)
-    Pr1 t     -> doPr1 (eval rho t)
-    Pr2 t     -> doPr2 (eval rho t)
+  Path a s t     -> VPath (eval rho a) (eval rho s) (eval rho t)
+  PLam t t0 t1   -> VPLam (evalIntBinder rho t) (eval rho t0) (eval rho t1)
+  PApp t t0 t1 r -> doPApp (eval rho t) (eval rho t0) (eval rho t1) (evalI rho r)
 
-    Path a s t     -> VPath (eval rho a) (eval rho s) (eval rho t)
-    PLam t t0 t1   -> VPLam (eval rho t) (eval rho t0) (eval rho t1)
-    PApp t t0 t1 r -> doPApp (eval rho t) (eval rho t0) (eval rho t1) (eval rho r)
+  Coe r0 r1 l         -> vCoePartial (evalI rho r0) (evalI rho r1) (evalTrIntBinder rho l)
+  HComp r0 r1 a u0 tb -> doHComp' (evalI rho r0) (evalI rho r1) (eval rho a) (eval rho u0) (evalSys evalTrIntBinder rho tb)
 
-    Coe r0 r1 l         -> vCoePartial (eval rho r0) (eval rho r1) (eval rho l)
-    HComp r0 r1 a u0 tb -> doHComp' (eval rho r0) (eval rho r1) (eval rho a) (eval rho u0) (eval rho tb)
+  Ext a bs    -> vExt (eval rho a) (evalSys eval3 rho bs)
+  ExtElm s ts -> vExtElm (eval rho s) (evalSys eval rho ts)
+  ExtFun ws t -> doExtFun' (evalSys eval rho ws) (eval rho t)
 
-    Ext a bs    -> vExt (eval rho a) (eval rho bs)
-    ExtElm s ts -> vExtElm (eval rho s) (eval rho ts)
-    ExtFun ws t -> doExtFun' (eval rho ws) (eval rho t)
+  Sum d lbl  -> VSum (reAppDef d rho) (map (evalLabel rho) lbl)
+  Con c args -> VCon c (map (eval rho) args)
+  Split f bs -> VSplitPartial (reAppDef f rho) (map (evalBranch rho) bs)
 
-    Sum d lbl  -> VSum (reAppDef d rho) (eval rho lbl)
-    Con c args -> VCon c (eval rho args)
-    Split f bs -> VSplitPartial (reAppDef f rho) (eval rho bs)
+evalI :: AtStage (Env -> I -> VI)
+evalI rho = \case
+  Sup r s -> evalI rho r \/ evalI rho s
+  Inf r s -> evalI rho r /\ evalI rho s
+  I0      -> bot
+  I1      -> top
+  IVar i  -> rho `lookupInt` i
 
-instance Eval I where
-  type Sem I = VI
+eval3 :: AtStage (Env -> (Tm, Tm, Tm) -> (Val, Val, Val))
+eval3 rho (s, t, r) = (eval rho s, eval rho t, eval rho r)
 
-  eval :: AtStage (Env -> I -> VI)
-  eval rho = \case
-    Sup r s -> eval rho r \/ eval rho s
-    Inf r s -> eval rho r /\ eval rho s
-    I0      -> bot
-    I1      -> top
-    IVar i  -> rho `lookupInt` i
+evalCof :: AtStage (Env -> Cof -> VCof)
+evalCof rho (Cof eqs) = VCof (map (bimap (evalI rho) (evalI rho)) eqs)
 
-instance Eval Cof where
-  type Sem Cof = VCof
+evalSys :: AtStage (AtStage (Env -> a -> b) -> Env -> Sys a -> Either b (VSys b))
+evalSys ev rho (Sys bs) = simplifySys (VSys bs') -- TODO: do we have to restrict the env?
+  where bs' = [ (phi', extCof phi' (ev rho a)) | (phi, a) <- bs, let phi' = evalCof rho phi ]
 
-  eval :: AtStage (Env -> Cof -> VCof)
-  eval rho (Cof eqs) = VCof (map (eval rho) eqs)
+evalBinder :: AtStage (Env -> Binder Tm -> Closure)
+evalBinder rho (Binder x t) = Closure x t rho
 
-instance Eval a => Eval (Sys a) where
-  type Sem (Sys a) = Either (Sem a) (VSys (Sem a))
+evalIntBinder :: AtStage (Env -> IntBinder Tm -> IntClosure)
+evalIntBinder rho (IntBinder i t) = IntClosure i t rho
 
-  eval :: AtStage (Env -> Sys a -> Either (Sem a) (VSys (Sem a)))
-  eval rho (Sys bs) = simplifySys (VSys bs')
-    where bs' = [ (phi', extCof phi' (eval rho a)) | (phi, a) <- bs, let phi' = eval rho phi ]
+-- | We evaluate a transparent binder, by evaluating the *open* term t under
+--   the binder. (TODO: How can i be already used if the terms have no shadowing?)
+evalTrIntBinder :: AtStage (Env -> TrIntBinder Tm -> TrIntClosure)
+evalTrIntBinder rho (TrIntBinder i t) = trIntCl i $ \i' -> eval (EnvInt rho i (iVar i')) t
 
-instance Eval (Binder Tm) where
-  type Sem (Binder Tm) = Closure
+evalSplitBinder :: AtStage (Env -> SplitBinder -> SplitClosure)
+evalSplitBinder rho (SplitBinder xs t) = SplitClosure xs t rho
 
-  eval :: AtStage (Env -> Binder Tm -> Closure)
-  eval rho (Binder x t) = Closure x t rho
+evalBranch :: AtStage (Env -> Branch -> VBranch)
+evalBranch rho (Branch c t) = (c, evalSplitBinder rho t)
 
-instance Eval (IntBinder Tm) where
-  type Sem (IntBinder Tm) = IntClosure
+evalLabel :: AtStage (Env -> Label -> VLabel)
+evalLabel rho (Label c tel) = (c, evalTel rho tel)
 
-  eval :: AtStage (Env -> IntBinder Tm -> IntClosure)
-  eval rho (IntBinder i t) = IntClosure i t rho
-
-instance Eval (TrIntBinder Tm) where
-  type Sem (TrIntBinder Tm) = TrIntClosure
-
-  -- | We evaluate a transparent binder, by evaluating the *open* term t under
-  --   the binder. (TODO: How can i be already used if the terms have no shadowing?)
-  eval :: AtStage (Env -> TrIntBinder Tm -> TrIntClosure)
-  eval rho (TrIntBinder i t) = trIntCl i $ \i' -> eval (EnvInt rho i (iVar i')) t
-
-instance Eval SplitBinder where
-  type Sem SplitBinder = SplitClosure
-
-  eval :: AtStage (Env -> SplitBinder -> SplitClosure)
-  eval rho (SplitBinder xs t) = SplitClosure xs t rho
-
-instance Eval Branch where
-  type Sem Branch = VBranch
-
-  eval :: AtStage (Env -> Branch -> VBranch)
-  eval rho (Branch c t) = (c, eval rho t)
-
-instance Eval Label where
-  type Sem Label = VLabel
-
-  eval :: AtStage (Env -> Label -> VLabel)
-  eval rho (Label c tel) = (c, eval rho tel)
-
-instance Eval Tel where
-  type Sem Tel = VTel
-
-  eval :: AtStage (Env -> Tel -> VTel)
-  eval rho (Tel ts) = VTel ts rho
-
-instance Eval a => Eval [a] where
-  type Sem [a] = [Sem a]
-
-  eval :: AtStage (Env -> [a] -> [Sem a])
-  eval rho = map (eval rho)
-
-instance (Eval a, Eval b) => Eval (a, b) where
-  type Sem (a, b) = (Sem a, Sem b)
-
-  eval :: AtStage (Env -> (a, b) -> (Sem a, Sem b))
-  eval rho (a, b) = (eval rho a, eval rho b)
-
-instance (Eval a, Eval b, Eval c) => Eval (a, b, c) where
-  type Sem (a, b, c) = (Sem a, Sem b, Sem c)
-
-  eval :: AtStage (Env -> (a, b, c) -> (Sem a, Sem b, Sem c))
-  eval rho (a, b, c) = (eval rho a, eval rho b, eval rho c)
+evalTel :: AtStage (Env -> Tel -> VTel)
+evalTel rho (Tel ts) = VTel ts rho
 
 
 --------------------------------------------------------------------------------
