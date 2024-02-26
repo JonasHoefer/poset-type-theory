@@ -426,10 +426,15 @@ doHComp r₀ r₁ a u₀ tb = case a of
   VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
   VU            -> doHCompU r₀ r₁ u₀ tb
 
+
 ---- Cases for positive types
 
 doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum = error "TODO: copy doHCompSum"
+doHCompSum r₀ r₁ _ lbl (VCon c as) = error "TODO" -- VCon c 
+doHCompSum r₀ r₁ _ lbl (VNeu k)    = error "TODO: copy doHCompSum"
+
+unConSys :: AtStage (Name -> VSys IntClosure -> Maybe (VSys [IntClosure]))
+unConSys = error "TODO" -- TODO: we could selectively force here as-well!
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
 doHCompExt = error "TODO: copy doHCompExt"
@@ -521,7 +526,8 @@ instance Restrictable SplitClosure where
 
 instance Restrictable TrIntClosure where
   act :: AtStage (Restr -> TrIntClosure -> TrIntClosure)
-  act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flippedVNeuCoePartial
+  act f (TrIntClosure i v g) = TrIntClosure i v (f `comp` g) -- NOTE: original is flipped
+
 instance Restrictable TrNeuIntClosure where
   type Alt TrNeuIntClosure = TrIntClosure
 
