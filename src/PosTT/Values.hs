@@ -87,7 +87,7 @@ data Neu where
   NPApp :: Neu -> Val -> Val -> VI -> Neu
   NCoePartial :: VI -> VI -> TrNeuIntClosure -> Neu
   NHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Neu
-  -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
+  NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
   NSplit :: Val -> [VBranch] -> Neu -> Neu
 
@@ -111,6 +111,9 @@ pattern VNeuCoePartial r0 r1 cl = VNeu (NCoePartial r0 r1 cl)
 
 pattern VNeuHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Val
 pattern VNeuHComp r r' a u₀ tb = VNeu (NHComp r r' a u₀ tb)
+
+pattern VNeuHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Val
+pattern VNeuHCompSum r₀ r₁ d lbl k tb = VNeu (NHCompSum r₀ r₁ d lbl k tb)
 
 pattern VExtFun :: VSys Val -> Neu -> Val
 pattern VExtFun ws k = VNeu (NExtFun ws k)

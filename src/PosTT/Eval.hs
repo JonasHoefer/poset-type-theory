@@ -3,6 +3,8 @@ module PosTT.Eval where
 
 import Algebra.Lattice
 
+import Control.Applicative
+
 import Data.Tuple.Extra (fst3)
 
 import PosTT.Common
@@ -115,7 +117,7 @@ instance Eval (IntBinder Tm) where
 instance Eval (TrIntBinder Tm) where
   type Sem (TrIntBinder Tm) = TrIntClosure
 
-  -- | We evaluate a transparant binder, by evaluating the *open* term t under
+  -- | We evaluate a transparent binder, by evaluating the *open* term t under
   --   the binder. (TODO: How can i be already used if the terms have no shadowing?)
   eval :: AtStage (Env -> TrIntBinder Tm -> TrIntClosure)
   eval rho (TrIntBinder i t) = trIntCl i $ \i' -> eval (EnvInt rho i (iVar i')) t
@@ -295,7 +297,7 @@ idFiber :: AtStage (VTy -> Val -> Val)
 idFiber a x = VPair x (refl a x)
 
 
----- internal combinators
+---- Internal Combinators
 
 doComp :: AtStage (VI -> VI -> TrIntClosure -> Val -> VSys TrIntClosure -> Val)
 doComp r₀ r₁ ℓ u₀ tb = doHComp r₀ r₁ (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀)
@@ -371,10 +373,10 @@ doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
 -- We maintain the following three invariants:
 -- (1) At the current stage r0 != r1 (otherwise coe reduces to the identity)
 -- (2) The head constructor of the line of types is known for VCoePartial.
---     Otherwise, the coersion is neutral, and given by VNeuCoePartial.
+--     Otherwise, the coercion is neutral, and given by VNeuCoePartial.
 -- (3) In case of an Ext type, we keep the line fully forced.
 --
--- We are very careful (TODO: is this neccessary?): We peak under the closure
+-- We are very careful (TODO: is this necessary?): We peak under the closure
 -- to see the type. In the cases where we have restriction stable type formers,
 -- we can safely construct a VCoePartial value to be evaluated when applied.
 -- Otherwise, we force the delayed restriction, and check again.
@@ -429,15 +431,27 @@ doHComp r₀ r₁ a u₀ tb = case a of
 
 ---- Cases for positive types
 
-doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum r₀ r₁ _ lbl (VCon c as) = error "TODO" -- VCon c 
-doHCompSum r₀ r₁ _ lbl (VNeu k)    = error "TODO: copy doHCompSum"
+-- Sum Types
 
-unConSys :: AtStage (Name -> VSys IntClosure -> Maybe (VSys [IntClosure]))
-unConSys = error "TODO" -- TODO: we could selectively force here as-well!
+doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
+doHCompSum r₀ r₁ _ lbl (VCon c as) = error "copy doHCompSum" -- VCon c 
+doHCompSum r₀ r₁ d lbl (VNeu k)    = VNeuHCompSum r₀ r₁ d lbl k
+
+unConSys :: AtStage (Name -> VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
+unConSys c tb = go tb <|> go (mapSys tb force) -- TODO: do we want selective forcing here?
+  where
+    go :: AtStage (VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
+    go tb' = mapSysM tb' $ \case
+      
+
+
+-- Extension Types
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
 doHCompExt = error "TODO: copy doHCompExt"
+
+
+-- Universe
 
 doHCompU :: AtStage (VI -> VI -> Val -> VSys TrIntClosure -> Val)
 doHCompU = error "TODO: copy doHCompU"
@@ -489,9 +503,10 @@ instance Restrictable Neu where
 
     NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
 
-    NCoePartial r₀ r₁ cl -> vCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
-    NHComp r₀ r₁ k u₀ tb -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
-    -- NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
+    NCoePartial r₀ r₁ cl       -> vCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NHComp r₀ r₁ k u₀ tb       -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
+    NHCompSum r₀ r₁ d lbl k tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
+    
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
     NSplit g bs k -> doSplit (g @ f) (bs @ f) (k @ f)
