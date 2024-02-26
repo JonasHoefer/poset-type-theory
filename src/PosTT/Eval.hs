@@ -211,7 +211,7 @@ force cl@(TrIntClosure i _ _) = trIntCl i $ \j -> cl $$ iVar j
 
 
 --------------------------------------------------------------------------------
----- Telescope Combinators
+---- Telescope Utilities
 
 headVTel :: AtStage (VTel -> VTy)
 headVTel (VTel ((_, a):_) ρ) = eval ρ a
@@ -225,13 +225,39 @@ tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
 pFunType :: Val
 pFunType = closedEval $
-  BLam "A" $ BLam "B" $ BPi (Var "A") "_" (Var "B")
+  BLam "A" $ BLam "B" $ BPi "A" "_" "B"
+
+pFib :: Val
+pFib = closedEval $
+  BLam "A" $ BLam "B" $ BLam "f" $ BLam "y" $
+    BSigma "A" "x" (Path "B" "y" ("f" `App` "x"))
+
+pIsContr :: Val
+pIsContr = closedEval $
+  BLam "A" $ BSigma ("A") "x" $ BPi ("A") "y" $ Path ("A") ("x") ("y")
+
+pIsEquiv :: Val
+pIsEquiv = bindStage terminalStage $ eval (EnvFib (EnvFib EmptyEnv "fib" pFib) "is-contr" pIsContr) $
+  BLam "A" $ BLam "B" $ BLam "f" $ BPi "B" "y" $ Var "is-contr" `App` foldl1 App ["fib", "A", "B", "f", "y"]
 
 pId :: Val
-pId = closedEval $ Lam $ Binder "A" $ Lam $ Binder "x" $ Var "x"
+pId = closedEval $ BLam "A" $ BLam "x" "x"
+
+pRefl :: Val
+pRefl = closedEval $ BLam "A" $ BLam "x" $ BPLam "i" "x" "x" "x"
+
+-- isEquivId (A : U) : isEquiv A A (id A) =
+--   \a. ((a, refl A a), \v z. (v.2 z, \z'. v.2 (z /\ z')))
+pIsEquivId :: Val
+pIsEquivId = bindStage terminalStage $ eval (EnvFib (EnvFib EmptyEnv "id" pId) "refl" pRefl) $
+  let c    = Pair "a" rfla
+      rfla = foldl1 App ["refl", "A", "a"]
+      p0   = PApp (Pr2 "v") (Pr1 "v") "a" "z"
+      p1   = PApp (Pr2 "v") (Pr1 "v") "a" ("z" /\ "z'")
+  in  BLam "A" $ BLam "a" $ Pair c $ BLam "v" $ BPLam "z" (Pair p0 $ BPLam "z'" p1 (Pr2 "v") rfla) c "v"
 
 
----- Abstracted version and internal combinators
+---- Abstracted versions and internal combinators
 
 -- | (A B : U) : U
 funType :: AtStage (VTy -> VTy -> VTy)
@@ -240,6 +266,30 @@ funType a b = foldl1 doApp [pFunType, a, b]
 -- | (A : U) : A → A
 identity :: AtStage (Val -> Val)
 identity a = foldl1 doApp [pId, a]
+
+-- | (A : U) -> isContr A
+isContr :: AtStage (VTy -> VTy)
+isContr a = foldl1 doApp [pIsContr, a]
+
+-- | (A B : U) (f : A → B) : U
+isEquiv :: AtStage (Val -> Val -> Val -> Val)
+isEquiv a b f = foldl1 doApp [pIsEquiv, a, b, f]
+
+-- | A : isEquiv (id A)
+isEquivId :: AtStage (Val -> Val)
+isEquivId a = foldl1 doApp [pIsEquivId, a]
+
+-- | refl (A : U) (a₀ : A) : Path A a₀ a₀
+refl :: AtStage (Val -> Val -> Val)
+refl a a₀ = foldl1 doApp [pRefl, a, a₀]
+
+-- | fiber (A B : U) (f : A -> B) (y : B) : U
+fiber :: AtStage (VTy -> VTy -> Val -> Val -> Val)
+fiber a b f y = foldl1 doApp [pFib, a, b, f, y]
+
+-- | idFiber (A : U) (x : A) : fiber A A (id A) x = (x, refl A x)
+idFiber :: AtStage (VTy -> Val -> Val)
+idFiber a x = VPair x (refl a x)
 
 
 --------------------------------------------------------------------------------

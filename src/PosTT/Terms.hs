@@ -40,6 +40,8 @@ data Tm where
   Split :: Name -> [Branch] -> Tm
 type Ty = Tm
 
+instance IsString Tm where fromString = Var . fromString
+
 ---- Binder (We explicitly mark how variables are bound above)
 
 data Binder a = Binder Name a
@@ -90,6 +92,8 @@ pattern BBranch n xs t = Branch n (SplitBinder xs t)
 newtype Gen = Gen { unGen :: String } deriving (Eq, Ord, IsString)
 
 data I = IVar Gen | Sup I I | Inf I I | I0 | I1
+
+instance IsString I where fromString = IVar . fromString
 
 newtype Cof = Cof [(I, I)]
 

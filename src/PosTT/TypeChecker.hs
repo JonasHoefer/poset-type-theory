@@ -193,6 +193,21 @@ check = flip $ \ty -> atArgPos $ \case
   P.Sum _ d cs -> do
     () <- isU ty
     Sum d <$> forM cs checkLabel
+  P.Ext _ a sys -> do
+    () <- isU ty
+    (a', va) <- checkAndEval a VU
+    
+    sys' <- checkSys sys $ \_ (b, e, p) -> do
+      (b', vb) <- checkAndEval b VU
+      let vaη = re va
+      (e', ve) <- checkAndEval e (vb `funType` vaη)
+      p' <- check p (isEquiv vb vaη ve)
+      return (b', e', p')
+    
+    vsys' <- evalTC sys'
+    () <- either (\_ -> return ()) compatible vsys'
+
+    return $ Ext a' sys'
 
   -- TODO: old stuff inbetween
 

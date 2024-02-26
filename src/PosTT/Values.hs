@@ -262,8 +262,6 @@ re = (@ IdRestr)
 --------------------------------------------------------------------------------
 ---- Environment
 
-data Entry = EntryFib Val | EntryDef Tm Ty | EntryInt VI
-
 data Env
   = EmptyEnv
   | EnvFib Env Name Val
