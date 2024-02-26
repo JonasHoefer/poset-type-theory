@@ -380,14 +380,13 @@ doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
 -- to see the type. In the cases where we have restriction stable type formers,
 -- we can safely construct a VCoePartial value to be evaluated when applied.
 -- Otherwise, we force the delayed restriction, and check again.
---
--- TODO: what is with U?
 vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
 vCoePartial r0 r1 | r0 === r1 = \l -> pId `doApp` (l $$ r0)
 vCoePartial r0 r1 = go False
   where
     go :: Bool -> TrIntClosure -> Val
     go forced l@(TrIntClosure i a _) = case a of
+      VU{}     -> identity VU
       VSum{}   -> VCoePartial r0 r1 l
       VPi{}    -> VCoePartial r0 r1 l
       VSigma{} -> VCoePartial r0 r1 l
@@ -444,7 +443,6 @@ unConSys c tb = go tb <|> go (mapSys tb force) -- TODO: do we want selective for
     go tb' = mapSysM tb' $ \case
       
 
-
 -- Extension Types
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
@@ -454,7 +452,12 @@ doHCompExt = error "TODO: copy doHCompExt"
 -- Universe
 
 doHCompU :: AtStage (VI -> VI -> Val -> VSys TrIntClosure -> Val)
-doHCompU = error "TODO: copy doHCompU"
+doHCompU r₀ r₁ a₀ tb = 
+  let vs = mapSys tb $ \a ->
+             let r₀η = re r₀ ; r₁η = re r₁ ; ar₁η = a $$ r₁η
+                 ℓ = trIntCl' $ \z -> isEquiv (a $$ iVar z) (a $$ r₀η) (VCoePartial (iVar z) r₀η a)
+             in  (ar₁η, VCoePartial r₁η r₀η a, doCoe r₀η r₁η ℓ (isEquivId ar₁η))
+  in vExt a₀ $ simplifySys $ consSys vs (VCof [(r₀, r₁)]) (a₀, identity a₀, isEquivId a₀)
 
 
 --------------------------------------------------------------------------------
