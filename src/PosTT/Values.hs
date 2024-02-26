@@ -47,7 +47,7 @@ data Val where
   VCon :: Name -> [Val] -> Val
   VSplitPartial :: Val -> [VBranch] -> Val
 
-  VNeu :: {-# UNPACK #-} Neu -> Val
+  VNeu :: {-# UNPACK #-} !Neu -> Val
 type VTy = Val
 
 

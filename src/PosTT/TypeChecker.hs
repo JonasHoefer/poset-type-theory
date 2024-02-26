@@ -227,7 +227,7 @@ check = flip $ \ty -> atArgPos $ \case
     ts' <- mapSysM (bs `zipSys` ts) $ \((b, w, _), t) -> do
       (t', vt) <- checkAndEval t b
       let vwt = w `doApp` vt
-      convTC TypeErrorExtElmCompat (re vs) (vwt)
+      convTC TypeErrorExtElmCompat (re vs) vwt
       return (t', vwt)
 
     compatible $ mapSys ts' snd
@@ -273,13 +273,13 @@ infer = atArgPos $ \case
     (r'₁, vr₁) <- checkAndEvalI r₁
     (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
     return (BCoe r'₀ r'₁ i a', (va @ (vr₀ `for` i)) `funType` (va @ (vr₁ `for` i)))
-  P.HComp ss r₀ r₁ a u₀ tb -> do
+  P.HComp _ r₀ r₁ a u₀ tb -> do
     (a', va) <- checkAndEval a VU
     (r'₀, vr₀) <- checkAndEvalI r₀
     r'₁ <- checkI r₁
     (u'₀, vu₀) <- checkAndEval u₀ va
   
-    tb' <- checkSys tb $ \φ (Gen -> i, u) -> do
+    tb' <- checkSys tb $ \_ (Gen -> i, u) -> do
       (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)      
       () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
       return (TrIntBinder i u')
@@ -368,7 +368,6 @@ checkAndEvalCof eqs = do
 -- checkDecls' :: [P.Decl] -> Either TypeError (Cxt, Env)
 -- checkDecls' = error "TODO: shouldn't we yield an env?"
 
-
 checkDecl :: AtStage (P.Decl -> TypeChecker (Name, Tm, Ty, VTy))
 checkDecl (P.Decl _ x b t) = do
   traceM $ "\nChecking Definition: " ++ show x
@@ -378,12 +377,11 @@ checkDecl (P.Decl _ x b t) = do
 
   traceM $ prettyVal vt
   traceM $ pretty b'
-  return ()
 
   return (x, b', t', vt)
 
 checkDecls :: [P.Decl] -> Either TypeError (Cxt, [(Name, Tm, Ty)])
-checkDecls ds = runTC emptyCxt (go ds)
+checkDecls decls = runTC emptyCxt (go decls)
   where
     go :: AtStage ([P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)]))
     go []     = asks (,[])

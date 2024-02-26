@@ -1,4 +1,13 @@
 cradle:
-  cabal:
-    - path: "src/Main.hs"
-      component: "fancy-postt:exe:fancy-postt"
+  multi:
+    - path: ./Setup.hs
+      config:
+        cradle:
+          direct:
+            arguments:
+              - "-package Cabal"
+              - "-package base"
+    - path: ./
+      config:
+        cradle:
+          cabal:

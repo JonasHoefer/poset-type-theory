@@ -3,13 +3,14 @@ module PosTT.SAT where
 
 import           Prelude hiding (mod)
 
+import           Algebra.Lattice
+
 import           Control.Monad
 
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (isJust, isNothing)
 
-import           Algebra.Lattice
 
 
 data Form a

@@ -117,3 +117,5 @@ srcSpan = \case
   Sum ss _ _         -> ss
   Con ss _ _         -> ss
   Split ss _ _       -> ss
+  HSum ss _ _        -> ss
+  HCon ss _ _        -> ss
