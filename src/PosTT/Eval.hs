@@ -5,7 +5,8 @@ import Algebra.Lattice
 
 import Control.Applicative
 
-import Data.Tuple.Extra (fst3)
+import Data.Either.Extra (fromRight')
+import Data.Tuple.Extra (fst3, snd3, thd3)
 
 import PosTT.Common
 import PosTT.Terms
@@ -214,6 +215,9 @@ instance Apply SplitClosure where
 force :: AtStage (TrIntClosure -> TrIntClosure)
 force cl@(TrIntClosure i _ _) = trIntCl i $ \j -> cl $$ iVar j
 
+rebindI :: AtStage (AtStage (Gen -> Val -> Val) -> TrIntClosure -> TrIntClosure)
+rebindI k c@(TrIntClosure i _ _) = trIntCl i $ \j -> k j (c $$ iVar j)
+
 
 --------------------------------------------------------------------------------
 ---- Telescope Utilities
@@ -223,6 +227,9 @@ headVTel (VTel ((_, a):_) ρ) = eval ρ a
 
 tailVTel :: VTel -> Val -> VTel
 tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
+
+pattern VTelNil :: VTel 
+pattern VTelNil <- VTel [] _
 
 
 --------------------------------------------------------------------------------
@@ -299,6 +306,17 @@ idFiber a x = VPair x (refl a x)
 
 ---- Internal Combinators
 
+-- | A partial element of a contractible type can be extended to a total one
+-- wid A (a₀ , h) [ψ ↪ u] = hcomp 0 1 A [ψ ↪ h(u)] a₀
+-- where (a₀ , h) : isContr A so a₀ : A and h : const a₀ ∼ id
+wid :: AtStage (Val -> Val -> VSys Val -> Val)
+wid a isContrA sys = doHComp 0 1 a a₀ $ mapSys sys
+    $ \u -> trIntCl' $ \z -> doPApp (re h `doApp` u) (re a₀) u (iVar z)
+  where a₀ = doPr1 isContrA ; h = doPr2 isContrA
+
+wid' :: AtStage (Val -> Val -> Either Val (VSys Val) -> Val)
+wid' a isContrA = either id (wid a isContrA)
+
 doComp :: AtStage (VI -> VI -> TrIntClosure -> Val -> VSys TrIntClosure -> Val)
 doComp r₀ r₁ ℓ u₀ tb = doHComp r₀ r₁ (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀)
   $ mapSys tb $ \u -> trIntCl' $ \z -> doCoe (re r₁) (iVar z) (re ℓ) (u $$ iVar z)
@@ -311,6 +329,8 @@ doPr1 :: AtStage (Val -> Val)
 doPr1 (VPair s _) = s
 doPr1 (VNeu k)    = VPr1 k
 doPr1 (VCoeSigma r₀ r₁ i a _ α u₀) = doCoe r₀ r₁ (TrIntClosure i a α) (doPr1 u₀)
+doPr1 (VHCompSigma r₀ r₁ a _ u₀ tb) = doHComp r₀ r₁ a (doPr1 u₀)
+  (mapSys tb $ rebindI $ \_ u -> doPr1 u)
 
 doPr2 :: AtStage (Val -> Val)
 doPr2 (VPair _ t) = t
@@ -392,21 +412,54 @@ vCoePartial r0 r1 = go False
       VSigma{} -> VCoePartial r0 r1 l
       VPath{}  -> VCoePartial r0 r1 l
       VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k)
-      VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced
+      VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced (3)
       _        | not forced -> go True (force l)
 
 -- | The actual implementation of coe. Should *only* be called by doApp.
 doCoePartialApp :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
 doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) restr (incl. eqs)
-  TrIntClosure z (VSum _ _)  _       -> error "TODO: copy + simplify"
+  TrIntClosure z (VSum d lbl) f      -> doCoeSum r0 r1 z d lbl f
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
-  l@(TrIntClosure _ (VNeu _) _) -> error "doCoe with Neu"
+  l@(TrIntClosure _ (VNeu _) _)      -> impossible "doCoe with Neu"
 
+-- | Coercion for extension types. Note that the given type is assumed to be fully restricted.
 doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
-doCoeExt = error "TODO: copy doCoeExt"
+doCoeExt r₀ r₁ z a bs u₀ = -- a, bs depend on z!
+  let a₀ = doExtFun' (mapSys bs snd3 @ (r₀ `for` z)) u₀
+      a' = trIntCl z $ \z' -> doCoe r₀ (iVar z') (TrIntClosure z a IdRestr) a₀
+      b'p = mapSys (mapSysCof (forAll z) bs) $ \(b, w, _) -> -- here we could have simplification!
+              let b' = trIntCl' $ \z' -> doCoe (re r₀) (iVar z') (TrIntClosure z (extGen z (re b)) IdRestr) (re u₀)
+                  p  = doCoe (re r₀) (re r₁)
+                         (TrIntClosure z (extGen z (VPath (re a) (re a' $$ iVar z) (re w `doApp` (b' $$ iVar z)))) IdRestr)
+                         (refl (a @ (r₀ `for` z)) (re a₀))
+              in  (b', p)
+
+      -- system containing the element e of the fiber w a, as well as, w and a to allow calculation of endpoints of e.2
+      b₁p₁ = mapSys' (bs @ (r₁ `for` z)) $ \(b, w, w') ->
+               let a'r₁ = a' $$ re r₁
+               in  ( w
+                   , a'r₁
+                   , wid' (fiber b (re a) w a'r₁) (w' `doApp` a'r₁) $ simplifySys $ -- the above system is only used here and simplified
+                       consSys (mapSys b'p $ \(b', p) -> VPair (b' $$ re r₁) p)
+                         (VCof [(re r₀, re r₁)]) (idFiber (re a) (re a₀))
+                   )
+
+      -- a₁ is only needed of above system for b₁ is non-trivial
+      a₁ = doHComp' 0 1 (a @ (r₁ `for` z)) (a' $$ r₁) $ simplifySys $
+             consSys (mapSys (fromRight' b₁p₁) $ \(w, a'r₁, fib) -> trIntCl' $ \z' -> doPApp (doPr2 fib) (w `doApp` doPr1 fib) a'r₁ (iVar z'))
+               (VCof [(re r₀, re r₁)]) (trIntCl' $ \_ -> re a₀)
+  in  vExtElm a₁ (mapSys' b₁p₁ (doPr1 . thd3))
+
+-- | Coercion in a sum type. Note that the type given by (d, lbl) has to be restricted by f.
+doCoeSum :: AtStage (VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Val -> Val)
+doCoeSum r₀ r₁ i d lbl f (VCon c as) | Just tel <- lookup c lbl = VCon c (doCoeTel r₀ r₁ i tel f as)
+
+doCoeTel :: AtStage (VI -> VI -> Gen -> VTel -> Restr -> [Val] -> [Val])
+doCoeTel _ _ _ VTelNil _ [] = []
+doCoeTel _ _ _ _       _ _  = error "TODO: copy"
 
 
 --------------------------------------------------------------------------------
@@ -430,19 +483,6 @@ doHComp r₀ r₁ a u₀ tb = case a of
 
 ---- Cases for positive types
 
--- Sum Types
-
-doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum r₀ r₁ _ lbl (VCon c as) = error "copy doHCompSum" -- VCon c 
-doHCompSum r₀ r₁ d lbl (VNeu k)    = VNeuHCompSum r₀ r₁ d lbl k
-
-unConSys :: AtStage (Name -> VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
-unConSys c tb = go tb <|> go (mapSys tb force) -- TODO: do we want selective forcing here?
-  where
-    go :: AtStage (VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
-    go tb' = mapSysM tb' $ \case
-      
-
 -- Extension Types
 
 doHCompExt :: AtStage (VI -> VI -> VTy -> VSys (VTy, Val, Val) -> Val -> VSys TrIntClosure -> Val)
@@ -458,6 +498,27 @@ doHCompU r₀ r₁ a₀ tb =
                  ℓ = trIntCl' $ \z -> isEquiv (a $$ iVar z) (a $$ r₀η) (VCoePartial (iVar z) r₀η a)
              in  (ar₁η, VCoePartial r₁η r₀η a, doCoe r₀η r₁η ℓ (isEquivId ar₁η))
   in vExt a₀ $ simplifySys $ consSys vs (VCof [(r₀, r₁)]) (a₀, identity a₀, isEquivId a₀)
+
+
+-- Sum Types
+
+doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
+doHCompSum r₀ r₁ _ lbl (VCon c as) tb
+  | Just tel <- lookup c lbl, Just tb' <- unConSys c tb = VCon c (doHCompTel r₀ r₁ tel as tb')
+doHCompSum r₀ r₁ d lbl (VNeu k)    tb = VNeuHCompSum r₀ r₁ d lbl k tb
+
+unConSys :: AtStage (Name -> VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
+unConSys c tb = go tb <|> go (mapSys tb force) -- TODO: do we want selective forcing here?
+  where
+    go :: AtStage (VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
+    go tb' = mapSysM tb' $ \case
+
+
+-- Telescopes
+
+doHCompTel :: AtStage (VI -> VI -> VTel -> [Val] -> VSys [TrIntClosure] -> [Val])
+doHCompTel _ _ VTelNil [] _ = []
+doHCompTel _ _ _       _  _ = error "TODO: copy doHCompTel"
 
 
 --------------------------------------------------------------------------------

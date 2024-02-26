@@ -171,6 +171,10 @@ sidePairs (VSys bs) = VSys [ (φ, extCof φ (re a₀, re a₁)) | ((φ₀, a₀)
 mapSys :: AtStage (VSys a -> AtStage (a -> b) -> VSys b)
 mapSys (VSys sys) f = VSys [ (φ, extCof φ (f a)) | (φ, a) <- sys ]
 
+-- | Part of ' collection of functions for working on potentially simplified systems
+mapSys' :: AtStage (Either a (VSys a) -> AtStage (a -> b) -> Either b (VSys b))
+mapSys' sys f = bimap f (`mapSys` f) sys
+
 -- | Monadic version of `mapSys` 
 mapSysM :: Monad m => AtStage (VSys a -> AtStage (a -> m b) -> m (VSys b))
 mapSysM sys f = fmap VSys $ mapM sequence $ unVSys $ mapSys sys f
@@ -181,3 +185,7 @@ consSys (VSys sys) φ a = VSys ((φ, extCof φ a) : sys)
 
 singSys :: AtStage (VCof -> AtStage a -> VSys a)
 singSys = consSys EmptySys
+
+-- | Modifies the cofibrations in the branches of a systems, but does *not* simplify.
+mapSysCof :: (VCof -> VCof) -> VSys a -> VSys a
+mapSysCof f (VSys bs) = VSys (map (first f) bs)
