@@ -6,4 +6,4 @@ source-repository-package
 
 optimization: 2
 
-packages: ./fancy-postt.cabal
+packages: ./postt.cabal

@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               fancy-postt
+name:               postt
 version:            0.1.0.0
 synopsis:
 
@@ -28,7 +28,7 @@ custom-setup
     Cabal,
     process
 
-executable fancy-postt
+executable postt
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
