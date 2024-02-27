@@ -59,8 +59,7 @@ instance Conv Val where
     (VCoePartial _ _ cl₀, VCoePartial _ _ cl₁) -> cl₀ `conv` cl₁
 
     (VExt a₀ b₀      , VExt a₁ b₁      ) -> (a₀, b₀) `conv` (a₁, b₁)
-    (u@(VExtElm _ ws), v               ) -> convExt ws u v
-    (u               , v@(VExtElm _ ws)) -> convExt ws u v
+    (VExtElm a₀ _    , VExtElm a₁ _    ) -> a₀ `conv` a₁
 
     (VSum d₀ _         , VSum d₁ _         ) -> d₀ `conv` d₁
     (VCon c₀ as₀       , VCon c₁ as₁       ) | c₀ == c₁ -> as₀ `conv` as₁
