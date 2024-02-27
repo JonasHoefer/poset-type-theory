@@ -26,7 +26,7 @@ import {-# SOURCE #-} PosTT.Pretty -- only for debugging
 lookupFib :: AtStage (Env -> Name -> Val)
 lookupFib (EnvFib _ y v)       x | y == x = v
 lookupFib rho@(EnvDef _ y t _) x | y == x = eval rho t -- recursive definition
-lookupFib (ConsEnv rho)        x = rho `lookupFib` x
+lookupFib (ConsEnv rho)        x = lookupFib rho x
 
 lookupInt :: Env -> Gen -> VI
 lookupInt (EnvInt _ y r) x | y == x = r
@@ -47,7 +47,7 @@ eval :: AtStage (Env -> Tm -> Val)
 eval rho = \case
   U            -> VU
   Var x        -> rho `lookupFib` x
-  Let d t ty s -> eval (EnvDef rho d t ty) s -- TODO: do we need this extName? extName d $
+  Let d t ty s -> eval (EnvDef rho d t ty) s
 
   Pi a b  -> VPi (eval rho a) (evalBinder rho b)
   Lam t   -> VLam (evalBinder rho t)
@@ -88,8 +88,8 @@ evalCof :: AtStage (Env -> Cof -> VCof)
 evalCof rho (Cof eqs) = VCof (map (bimap (evalI rho) (evalI rho)) eqs)
 
 evalSys :: AtStage (AtStage (Env -> a -> b) -> Env -> Sys a -> Either b (VSys b))
-evalSys ev rho (Sys bs) = simplifySys (VSys bs') -- TODO: do we have to restrict the env?
-  where bs' = [ (phi', extCof phi' (ev rho a)) | (phi, a) <- bs, let phi' = evalCof rho phi ]
+evalSys ev rho (Sys bs) = simplifySys (VSys bs')
+  where bs' = [ (phi', extCof phi' (ev (re rho) a)) | (phi, a) <- bs, let phi' = evalCof rho phi ]
 
 evalBinder :: AtStage (Env -> Binder Tm -> Closure)
 evalBinder rho (Binder x t) = Closure x t rho
@@ -353,12 +353,12 @@ doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
 --     Otherwise, the coercion is neutral, and given by VNeuCoePartial.
 -- (3) In case of an Ext type, we keep the line fully forced.
 --
--- We are very careful (TODO: is this necessary?): We peak under the closure
--- to see the type. In the cases where we have restriction stable type formers,
+-- We are very careful: We peak under the closure to see the type. 
+-- In the cases where we have restriction stable type formers,
 -- we can safely construct a VCoePartial value to be evaluated when applied.
 -- Otherwise, we force the delayed restriction, and check again.
 vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
-vCoePartial r0 r1 | r0 === r1 = \l -> pId `doApp` (l $$ r0)
+vCoePartial r0 r1 | r0 === r1 = \ℓ -> pId `doApp` (ℓ $$ r0) -- could just be id closure
 vCoePartial r0 r1 = go False
   where
     go :: Bool -> TrIntClosure -> Val
@@ -452,7 +452,6 @@ doHCompExt r₀ r₁ a bs u₀ tb =
       sys = mapSys tb $ rebindI $ \_ -> doExtFun' (re $ mapSys bs snd3) -- [ ψ ↪ λᵢ. extFun [φ ↪ w] (u i) ]
       a₁ = doHComp r₀ r₁ a a₀ (sys `unionSys` mapSys b' snd) -- ... ∪ [ φ ↪ λᵢ.w(b' i) ]
   in  VExtElm a₁ (mapSys b' (($$ re r₁) . fst))
-
 
 
 -- Universe

@@ -36,7 +36,7 @@ data Val where
 
   VCoePartial :: VI -> VI -> TrIntClosure -> Val
 
-  -- In negative types, we delay coe and hcomp until elimination
+  -- In Π, Σ, Path, we delay coe and hcomp until elimination
   VCoe :: VI -> VI -> TrIntClosure -> Val -> Val
   VHComp :: VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val
 

@@ -47,7 +47,7 @@ runTC cxt ma = bindStage terminalStage (runReaderT (unTypeChecker ma) cxt)
 extDef :: Name -> Tm -> Ty -> VTy -> Cxt -> Cxt
 extDef x t a va (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ((x, va):ts) is pos
 
--- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)checkSys
+-- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)
 extFib :: Name -> Val -> VTy -> Cxt -> Cxt
 extFib x v a (Cxt ρ ts is pos) = Cxt (EnvFib ρ x v) ((x, a):ts) is pos
 
