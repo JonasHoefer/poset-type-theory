@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Hello World
+    name: Build Haskell
     runs-on: ubuntu-latest # or macOS-latest, or windows-latest
     steps:
       - uses: actions/checkout@v3

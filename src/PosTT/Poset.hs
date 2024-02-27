@@ -5,7 +5,6 @@ import           Algebra.Lattice
 
 import           Control.Monad (unless)
 
-
 import           Data.Bifunctor
 import           Data.Either (fromRight)
 import           Data.Maybe
