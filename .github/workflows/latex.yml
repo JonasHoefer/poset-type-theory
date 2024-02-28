@@ -1,0 +1,19 @@
+name: Build Documentation
+on: [push]
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v3
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v2
+        with:
+          latexmk_use_lualatex: true
+          work_in_root_file_dir: true
+          root_file: doc/poset.tex
+      - name: Upload PDF file
+        uses: actions/upload-artifact@v3
+        with:
+          name: PDF
+          path: notes.pdf
