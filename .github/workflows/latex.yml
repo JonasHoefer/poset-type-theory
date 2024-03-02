@@ -18,8 +18,17 @@ jobs:
           latexmk_use_lualatex: true
           work_in_root_file_dir: true
           root_file: doc/poset.tex
-      - name: Upload PDF file
+      - name: Copy PDFs
+        run: |
+          mkdir public
+          cp ./doc/*.pdf ./public
+      - name: Upload PDF files
         uses: actions/upload-artifact@v3
         with:
-          name: PDF
-          path: doc/poset.pdf
+          name: documentation
+          path: public/*.pdf
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
