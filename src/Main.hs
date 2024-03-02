@@ -94,7 +94,7 @@ unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
   (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1)
           <*> argument str (metavar "DEF"))
-  (progDesc "Perform head linear unfold on given definition")
+  (progDesc "Perform head linear unfolding steps on a definition in the context")
 
 replCmds :: ParserInfo ReplCmd
 replCmds = info (subparser (quitCmd <> loadCmd <> reloadCmd <> unfoldCmd)) mempty

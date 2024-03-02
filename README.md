@@ -1,13 +1,21 @@
 # Poset Type Theory
 
-Experimental Haskell implementation of a version of cubical type theory with a model in fibrant presheaves over finite, non-empty posets.
+Experimental Haskell implementation of a version of cubical type theory with a model in presheaves over finite, non-empty posets.
 
 
-## Install
+## Setup
 
 The project is built using [cabal][software/cabal].
 To install the type checker and evaluator, clone the repository and run `cabal install --overwrite-policy=alway`.
 This will install an executable called `postt` in `~/.cabal/bin/` (and potentially remove old versions).
+
+
+## Usage
+
+To see all options use `postt --help`.
+To type check all definitions in a file, and evaluate the last one use `postt eval <path>`.
+To start a read-eval-print-loop (repl) use `postt repl`.
+In the repl, use `:help` to see all available comments.
 
 
 ## Versions
