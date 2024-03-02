@@ -5,11 +5,11 @@ import qualified Data.Map as M
 import           Data.String (IsString(..))
 import           Data.Tuple.Extra (fst3, snd3)
 
+import           Control.Monad.Except
 import           Control.Monad.State.Strict
 
 import           System.Console.Haskeline
 import           System.Directory
-import           System.Exit
 import           System.FilePath
 
 import           Options.Applicative as O
@@ -54,7 +54,7 @@ options = info (optionsParser <**> helper)
 
 evalModule :: EvalMode -> FilePath -> IO ()
 evalModule m p = do
-  rawTm <- recursiveLoad p
+  rawTm <- either (error . show) id <$> runExceptT (recursiveLoad p)
   preTm <- either (error . show) (return . snd) (checkModules rawTm)
   rho   <- either (error . show) return (checkDeclsEnv preTm)
 
@@ -175,12 +175,15 @@ repl = do
 
 replLoad :: FilePath -> Repl ()
 replLoad p = do
-  ms <- liftIO $ recursiveLoad p
-  (scpEnv, ds) <- either (error . show) return $ checkModules ms
-  cxt <- either (error . show) return $ checkDeclsCxt ds
-  let rho = env cxt
-  put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
-  outputStrLn $ "Successfully checked " ++ show (length rho) ++ " definitions"
+  liftIO (runExceptT $ recursiveLoad p) >>= \case
+    Right ms -> case checkModules ms of
+      Right (scpEnv, ds) -> case checkDeclsCxt ds of
+        Right cxt -> do
+          put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
+          outputStrLn $ "Successfully checked " ++ show (length (env cxt)) ++ " definitions"
+        Left err -> outputStrLn $ show err
+      Left err -> outputStrLn $ show err
+    Left err -> outputStrLn $ show err
 
 
 --------------------------------------------------------------------------------
@@ -191,14 +194,14 @@ moduleRoot m p | takeFileName p /= moduleName m ++ ".ctt" =
   Left $ "File name " ++ takeFileName p ++ " does not match expected file name " ++ moduleName m ++ ".ctt"
 moduleRoot _ p = Right $ dropFileName p
 
-recursiveLoad :: FilePath -> IO [Module]
-recursiveLoad rp = makeAbsolute rp >>= go [] . pure
+recursiveLoad :: FilePath -> ExceptT String IO [Module]
+recursiveLoad rp = liftIO (makeAbsolute rp) >>= go [] . pure
   where
-    go :: [FilePath] -> [FilePath] -> IO [Module]
+    go :: [FilePath] -> [FilePath] -> ExceptT String IO [Module]
     go _    []     = return []
     go done (p:ps) | p `elem` done = go done ps
     go done (p:ps) = do
-      m <- either (\msg -> putStrLn (msg ++ " in " ++ p) >> exitFailure) return . parseModule =<< readFile p
+      m <- ExceptT $ parseModule <$> readFile p
       d <- either error return $ moduleRoot m p
       (m:) <$> go (p:done) (ps ++ [ d </> i -<.> "ctt" | i <- moduleImports m ])
 
