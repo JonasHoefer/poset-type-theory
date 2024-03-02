@@ -15,7 +15,7 @@ This will install an executable called `postt` in `~/.cabal/bin/` (and potential
 To see all options use `postt --help`.
 To type check all definitions in a file, and evaluate the last one use `postt eval <path>`.
 To start a read-eval-print-loop (repl) use `postt repl`.
-In the repl, use `:help` to see all available comments.
+In the repl, use `:help` to see all available commands.
 
 
 ## Versions
