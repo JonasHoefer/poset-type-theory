@@ -1,6 +1,7 @@
 # Poset Type Theory
 
 Experimental Haskell implementation of a version of cubical type theory with a model in presheaves over finite, non-empty posets.
+Some additional information can be found in the file located in [`./doc`][path/doc], a PDF version of which can be found [here][doc].
 
 
 ## Setup
@@ -23,6 +24,14 @@ In the repl, use `:help` to see all available commands.
 - [ghc 9.4.8][software/ghc]
 - [cabal 3.10.2.1][software/cabal]
 
+
+[doc]:
+  https://jonashoefer.github.io/poset-type-theory/poset.pdf
+  "Documentation PDF"
+
+[path/doc]:
+  https://github.com/JonasHoefer/poset-type-theory/tree/main/doc
+  "Poset Type Theory — Documentation"
 
 [software/ghc]:
   https://www.haskell.org/ghc/
