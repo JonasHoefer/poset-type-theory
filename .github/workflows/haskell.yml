@@ -1,4 +1,4 @@
-name: build
+name: Build Haskell
 on:
   push:
     branches: main
