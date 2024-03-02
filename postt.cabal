@@ -11,7 +11,7 @@ homepage:
 -- bug-reports:
 license:            MIT
 license-file:       LICENSE
-author:             Jonas Höfer
+author:             Thierry Coquand, Jonas Höfer
 maintainer:         hoferj@chalmers.se
 
 -- A copyright notice.
