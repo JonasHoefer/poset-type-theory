@@ -46,15 +46,17 @@ instance ReadBack Neu where
 
   readBack :: AtStage (Neu -> Tm)
   readBack = \case
-    NVar x              -> Var x
-    NApp k v            -> readBack k `App` readBack v
-    NPr1 v              -> Pr1 (readBack v)
-    NPr2 v              -> Pr2 (readBack v)
-    NPApp k a₀ a₁ r     -> PApp (readBack k) (readBack a₀) (readBack a₁) (readBack r)
-    NCoePartial r₀ r₁ c -> Coe (readBack r₀) (readBack r₁) (readBack c)
-    NHComp r₀ r₁ k u₀ s -> HComp (readBack r₀) (readBack r₁) (readBack k) (readBack u₀) (readBack s)
-    NExtFun ws k        -> ExtFun (readBack ws) (readBack k)
-    NSplit f bs k       -> readBack (VSplitPartial f bs) `App` readBack k
+    NVar x                    -> Var x
+    NApp k v                  -> readBack k `App` readBack v
+    NPr1 v                    -> Pr1 (readBack v)
+    NPr2 v                    -> Pr2 (readBack v)
+    NPApp k a₀ a₁ r           -> PApp (readBack k) (readBack a₀) (readBack a₁) (readBack r)
+    NCoePartial r₀ r₁ c       -> Coe (readBack r₀) (readBack r₁) (readBack c)
+    NCoeSum r₀ r₁ i d lbl g k -> readBack (VCoePartial r₀ r₁ (TrIntClosure i (VSum d lbl) g)) `App` readBack k
+    NHComp r₀ r₁ k u₀ tb      -> HComp (readBack r₀) (readBack r₁) (readBack k) (readBack u₀) (readBack tb)
+    NHCompSum r₀ r₁ d _ k tb  -> HComp (readBack r₀) (readBack r₁) (readBack d) (readBack k) (readBack tb)
+    NExtFun ws k              -> ExtFun (readBack ws) (readBack k)
+    NSplit f bs k             -> readBack (VSplitPartial f bs) `App` readBack k
 
 instance ReadBack v => ReadBack (VSys v) where
   type Quot (VSys v) = Sys (Quot v)

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+
 -- | Evaluation of Terms into Semantic Values
 module PosTT.Eval where
 
@@ -14,8 +16,8 @@ import PosTT.Terms
 import PosTT.Values
 import PosTT.Poset
 
-import Debug.Trace
-import {-# SOURCE #-} PosTT.Pretty -- only for debugging
+-- import Debug.Trace
+-- import {-# SOURCE #-} PosTT.Pretty -- only for debugging
 
 
 --------------------------------------------------------------------------------
@@ -380,7 +382,7 @@ doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
-  l@(TrIntClosure _ (VNeu _) _)      -> impossible "doCoe with Neu"
+  TrIntClosure _ (VNeu _) _          -> impossible "doCoe with Neu"
 
 -- | Coercion for extension types. Note that the given type is assumed to be fully restricted.
 doCoeExt :: AtStage (VI -> VI -> Gen -> VTy -> VSys (VTy, Val, Val) -> Val -> Val)
@@ -412,8 +414,8 @@ doCoeExt r₀ r₁ z a bs u₀ = -- a, bs depend on z!
 
 -- | Coercion in a sum type. Note that the type given by (d, lbl) has to be restricted by f.
 doCoeSum :: AtStage (VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Val -> Val)
-doCoeSum r₀ r₁ i d lbl f (VCon c as) | Just tel <- lookup c lbl = VCon c (doCoeTel r₀ r₁ i tel f as)
-doCoeSum _  _  _ _ _   _ (VNeu _)    = error "TODO: neutral for coe in Sum type"
+doCoeSum r₀ r₁ i _ lbl f (VCon c as) | Just tel <- lookup c lbl = VCon c (doCoeTel r₀ r₁ i tel f as)
+doCoeSum r₀ r₁ i d lbl f (VNeu k)    = VNeuCoeSum r₀ r₁ i d lbl f k
 
 doCoeTel :: AtStage (VI -> VI -> Gen -> VTel -> Restr -> [Val] -> [Val])
 doCoeTel _ _ _ VTelNil _ [] = []
@@ -429,7 +431,7 @@ doHComp' r₀ r₁ a u0 = either ($$ r₁) (doHComp r₀ r₁ a u0)
 
 doHComp :: AtStage (VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val)
 doHComp r₀ r₁ _ u₀ _ | r₀ === r₁ = u₀
-doHComp r₀ r₁ a u₀ tb = case a of
+doHComp r₀ r₁ t u₀ tb = case t of
   VNeu k        -> VNeuHComp r₀ r₁ k u₀ tb
   VPi a b       -> VHCompPi r₀ r₁ a b u₀ tb
   VSigma a b    -> VHCompSigma r₀ r₁ a b u₀ tb
@@ -533,7 +535,9 @@ instance Restrictable Neu where
 
     NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
 
-    NCoePartial r₀ r₁ cl       -> doCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NCoePartial r₀ r₁ cl      -> doCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NCoeSum r₀ r₁ i d lbl g k -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VSum d lbl) g @ f) (k @ f)
+
     NHComp r₀ r₁ k u₀ tb       -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
     NHCompSum r₀ r₁ d lbl k tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
 

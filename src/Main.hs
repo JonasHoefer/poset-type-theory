@@ -60,20 +60,20 @@ evalModule m p = do
 
   putStrLn $ "\nSuccessfully checked " ++ show (length rho) ++ " definitions"
 
-  case m of
-    Default | EnvCons _ x (EntryDef s _) <- rho -> do
-      putStrLn $ "Evaluation of " ++ pretty s
-      putStrLn $ "Yields " ++ pretty (normalize rho $ Var x)
-    HeadLinear -> do
-      error "FOO"
-      -- let defs = map (\(x, t, _) -> (x, t)) tms
-      -- let (u, s, t) = headUnfoldAll mempty defs (Var $ fst3 $ last tms)
+  case rho of
+    EnvCons _ x (EntryDef s _) -> case m of
+      Default -> do
+        putStrLn $ "Evaluation of " ++ pretty s
+        putStrLn $ "Yields " ++ pretty (normalize rho $ Var x)
+      HeadLinear -> do
+        let (u, s') = headUnfold rho s Nothing
 
-      -- putStrLn $ "Head linear unfolding of " ++ pretty (snd3 $ last tms)
-      -- putStrLn $ "Yields " ++ pretty t
-      -- putStrLn ""
-      -- putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
-      -- putStrLn $ "Hence " ++ show s ++ " unfold steps"
+        putStrLn $ "Head linear unfolding of " ++ pretty s
+        putStrLn $ "Yields " ++ pretty s'
+        putStrLn ""
+        putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
+        putStrLn $ "Hence " ++ show (sum u) ++ " unfold steps"
+    _ -> putStrLn "No definitions"
 
 
 --------------------------------------------------------------------------------
@@ -163,8 +163,6 @@ repl = do
           repl
         Right (Unfold k d) -> do
           gets (lookup (fromString d) . environment) >>= \case
-            Nothing        -> do
-              outputStrLn $ d ++ " is not defined!"
             Just (EntryDef t _) -> do
               ρ <- gets environment
               let (u, t') = headUnfold ρ t (Just k)
@@ -172,6 +170,7 @@ repl = do
               outputStrLn $ pretty t'
               outputStrLn ""
               outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
+            _ -> outputStrLn $ d ++ " is not defined!"
           repl
 
 replLoad :: FilePath -> Repl ()

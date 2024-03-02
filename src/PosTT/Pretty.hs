@@ -67,9 +67,9 @@ reflect = \case
   Ext a bs               -> R.Ext () (reflect a) (reflectSysExt bs)
   ExtElm s (Sys ts)      -> R.ExtElm () (reflect s) [ reflect t | (_, t) <- ts ]
   ExtFun _ t             -> R.ExtFun () (reflect t)
-  Sum _ _                -> R.Var () (reflectName "Sum") -- Should only occur if we print non-normalized term!
+  Sum _ _                -> R.Var () (reflectName "[Sum]") -- Should only occur if we print non-normalized term!
   Con c as               -> foldl1 (R.App ()) (R.Var () (reflectName c) : map reflect as)
-  Split f bs             -> R.Var () (reflectName f) -- TODO: CHANGE!
+  Split _ _              -> R.Var () (reflectName "[Split]") -- Should only occur if we print non-normalized term!
 
 reflectSysBinder :: Sys (TrIntBinder Tm) -> R.SysBinder' ()
 reflectSysBinder (Sys bs) = R.SysBinder () (map reflectSideBinder bs)

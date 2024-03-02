@@ -24,9 +24,6 @@ u `convSigma` v = (doPr1 u, doPr2 u) `conv` (doPr1 v, doPr2 v)
 convPath :: AtStage (Val -> Val -> Val -> Val -> Either ConvError ())
 convPath a₀ a₁ u v = freshIntVar (\i -> doPApp u a₀ a₁ i `conv` doPApp v a₀ a₁ i)
 
-convExt :: AtStage (VSys Val -> Val -> Val -> Either ConvError ())
-convExt ws u v = doExtFun ws u `conv` doExtFun ws v -- TODO: is this correct?
-
 instance Conv Val where
   conv :: AtStage (Val -> Val -> Either ConvError ())
   conv = curry $ \case
@@ -92,6 +89,7 @@ instance Conv Neu where
     (NCoePartial r₀ s₀ c₀  , NCoePartial r₁ s₁ c₁  ) -> (r₀, s₀, c₀) `conv` (r₁, s₁, c₁)
     (NHComp r₀ s₀ k₀ u₀ tb₀, NHComp r₁ s₁ k₁ u₁ tb₁) -> (r₀, s₀, k₀, u₀, tb₀) `conv` (r₁, s₁, k₁, u₁, tb₁)
     -- TODO: NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
+    -- TODO: coe in sum
     (NExtFun ws₀ k₀        , NExtFun ws₁ k₁        ) -> (ws₀, k₀) `conv` (ws₁, k₁)
     (NSplit f₀ _ k₀        , NSplit f₁ _ k₁        ) -> (f₀, k₀) `conv` (f₁, k₁)
     (k₀                    , k₁                    ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)

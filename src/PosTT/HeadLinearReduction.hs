@@ -17,9 +17,16 @@ headUnfold δ = go M.empty
     ρ  = blockedEnv δ
     -- s  = foldr sExtName terminalStage (blockedNames δ)
 
+    blockedLookup :: AtStage (Name -> Val)
+    blockedLookup x = case lookup x δ of
+      Just (EntryFib v)   -> v
+      Just (EntryDef t _) -> eval ρ t -- we evaluate in *blocked* version -- (dropWhile ((/= x) . fst) ρ) ?
+      _                   -> impossible "Lookup of non-fibrant variable"
+
     -- TODO: wrong, the stage handling seems more complicated
     unfold :: Tm -> Maybe (Name, Tm)
-    unfold t = bindStage terminalStage $ (fmap . fmap) readBack $ singleReduction δ $ eval ρ t
+    unfold t = bindStage terminalStage $ (fmap . fmap) readBack
+      $ singleReduction blockedLookup $ eval ρ t
 
     go :: M.Map Name Int -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
     go u t (Just 0) = (u, t)
@@ -31,39 +38,40 @@ headUnfold δ = go M.empty
 --------------------------------------------------------------------------------
 ---- Setup blocked environment
 
-isSplit :: Tm -> Bool
-isSplit = \case
+isSplitOrSum :: Tm -> Bool
+isSplitOrSum = \case
   Split _ _ -> True
-  BLam _ t  -> isSplit t
+  Sum _ _   -> True
+  BLam _ t  -> isSplitOrSum t
   _         -> False
 
 blockedEnv :: Env -> Env
 blockedEnv = \case
   EmptyEnv       -> EmptyEnv
   EnvFib ρ x _   -> EnvFib (blockedEnv ρ) x (VVar x)
-  EnvDef ρ x s _ | not (isSplit s) -> EnvFib (blockedEnv ρ) x (VVar x)
+  EnvDef ρ x s _ | not (isSplitOrSum s) -> EnvFib (blockedEnv ρ) x (VVar x)
   EnvCons ρ x e  -> EnvCons (blockedEnv ρ) x e
 
 blockedNames :: Env -> [Name]
 blockedNames = \case
   EmptyEnv       -> []
   EnvFib ρ x _   -> x:blockedNames ρ
-  EnvDef ρ x s _ | not (isSplit s) -> x:blockedNames ρ
+  EnvDef ρ x s _ | not (isSplitOrSum s) -> x:blockedNames ρ
   EnvCons ρ _ _  -> blockedNames ρ
 
 
 --------------------------------------------------------------------------------
 ---- Single unfold steps
 
-singleReduction :: AtStage (Env -> Val -> Maybe (Name, Val))
+singleReduction :: AtStage (AtStage (Name -> Val) -> Val -> Maybe (Name, Val))
 singleReduction δ = \case
   VNeu n     -> Just (singleReductionNeu δ n) -- a neutral always makes progess, when we unfold something
   VCon c [a] -> (fmap . fmap) (VCon c . return) (singleReduction δ a)
   _          -> Nothing
 
-singleReductionNeu :: AtStage (Env -> Neu -> (Name, Val))
+singleReductionNeu :: AtStage (AtStage (Name -> Val) -> Neu -> (Name, Val))
 singleReductionNeu δ = \case
-  NVar x                     -> (x, δ `lookupFib` x)
+  NVar x                     -> (x, δ x)
   NApp k v                   -> (`doApp` v) <$> singleReductionNeu δ k
   NPr1 k                     -> doPr1 <$> singleReductionNeu δ k
   NPr2 k                     -> doPr2 <$> singleReductionNeu δ k
@@ -71,9 +79,10 @@ singleReductionNeu δ = \case
   NCoePartial r₀ r₁ c        -> doCoePartial r₀ r₁ <$> singleReductionTrNeuIntClosure δ c
   NHComp r₀ r₁ k u₀ tb       -> (\t -> doHComp r₀ r₁ t u₀ tb) <$> singleReductionNeu δ k
   NExtFun ws k               -> doExtFun ws <$> singleReductionNeu δ k
+  NCoeSum r₀ r₁ i d lbl f k  -> doCoeSum r₀ r₁ i d lbl f <$> singleReductionNeu δ k
   NHCompSum r₀ r₁ d lbl k tb -> (\v -> doHCompSum r₀ r₁ d lbl v tb) <$> singleReductionNeu δ k
   NSplit f bs k              -> doSplit f bs <$> singleReductionNeu δ k
 
-singleReductionTrNeuIntClosure :: AtStage (Env -> TrNeuIntClosure -> (Name, TrIntClosure))
+singleReductionTrNeuIntClosure :: AtStage (AtStage (Name -> Val) -> TrNeuIntClosure -> (Name, TrIntClosure))
 singleReductionTrNeuIntClosure δ (TrNeuIntClosure i k) =
   refreshGen i $ \i' -> (\t -> TrIntClosure i' t IdRestr) <$> singleReductionNeu δ k
