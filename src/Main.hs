@@ -56,26 +56,24 @@ evalModule :: EvalMode -> FilePath -> IO ()
 evalModule m p = do
   rawTm <- recursiveLoad p
   preTm <- either (error . show) (return . snd) (checkModules rawTm)
-  tms   <- either (error . show) (return . snd) (checkDecls preTm)
+  rho   <- either (error . show) return (checkDeclsEnv preTm)
 
-  putStrLn $ "\nSuccessfully checked " ++ show (length tms) ++ " definitions"
+  putStrLn $ "\nSuccessfully checked " ++ show (length rho) ++ " definitions"
 
   case m of
-    Default    -> do
-      let s = bindStage terminalStage -- (foldr (sExtFib . fst3) terminalStage tms) -- the 
-                $ nf (foldl (\ρ (x, t, ty) -> EnvDef ρ x t ty) EmptyEnv tms) (Var $ fst3 $ last tms)
-
-      putStrLn $ "Evaluation of " ++ pretty (snd3 $ last tms)
-      putStrLn $ "Yields " ++ pretty s
+    Default | EnvCons _ x (EntryDef s _) <- rho -> do
+      putStrLn $ "Evaluation of " ++ pretty s
+      putStrLn $ "Yields " ++ pretty (normalize rho $ Var x)
     HeadLinear -> do
-      let defs = map (\(x, t, _) -> (x, t)) tms
-      let (u, s, t) = headUnfoldAll mempty defs (Var $ fst3 $ last tms)
+      error "FOO"
+      -- let defs = map (\(x, t, _) -> (x, t)) tms
+      -- let (u, s, t) = headUnfoldAll mempty defs (Var $ fst3 $ last tms)
 
-      putStrLn $ "Head linear unfolding of " ++ pretty (snd3 $ last tms)
-      putStrLn $ "Yields " ++ pretty t
-      putStrLn ""
-      putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
-      putStrLn $ "Hence " ++ show s ++ " unfold steps"
+      -- putStrLn $ "Head linear unfolding of " ++ pretty (snd3 $ last tms)
+      -- putStrLn $ "Yields " ++ pretty t
+      -- putStrLn ""
+      -- putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
+      -- putStrLn $ "Hence " ++ show s ++ " unfold steps"
 
 
 --------------------------------------------------------------------------------
@@ -119,10 +117,12 @@ instance MonadState s m => MonadState s (InputT m) where
 data ReplState = ReplState
   { currentModule :: !String
   , currentFile :: !(Maybe FilePath)
-  , defs :: ![(Name, Tm, Ty)] -- TODO: this should not be needed. Cxt is exactly this list unzipped + stage
   , scopeCheckerEnv :: !ScopingEnv
   , context :: !Cxt
   }
+
+environment :: ReplState -> Env
+environment = env . context
 
 type Repl a = InputT (StateT ReplState IO) a
 
@@ -130,7 +130,7 @@ runRepl :: Repl a -> IO a
 runRepl = flip evalStateT initialReplState . runInputT (defaultSettings { historyFile = Just ".postt_history" })
 
 initialReplState :: ReplState
-initialReplState = ReplState "" Nothing [] mempty emptyCxt
+initialReplState = ReplState "" Nothing mempty emptyCxt
 
 repl :: Repl ()
 repl = do
@@ -162,13 +162,13 @@ repl = do
                 Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
         Right (Unfold k d) -> do
-          gets (find ((== fromString d) . fst3) . defs) >>= \case
+          gets (lookup (fromString d) . environment) >>= \case
             Nothing        -> do
               outputStrLn $ d ++ " is not defined!"
-            Just (n, t, a) -> do
-              ds <- gets (map (\(x, t', _) -> (x, t')) . defs)
-              let (u, _, t') = headUnfoldN k M.empty ds t
-              modify $ \s -> s{ defs = [ if fst3 def == n then (n, t', a) else def | def <- defs s ] }
+            Just (EntryDef t _) -> do
+              ρ <- gets environment
+              let (u, t') = headUnfold ρ t (Just k)
+              modify $ \s -> s{ context = (context s) { env = modifyAt (fromString d) (\(EntryDef _ ty) -> EntryDef t' ty) (env (context s)) } }
               outputStrLn $ pretty t'
               outputStrLn ""
               outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
@@ -178,9 +178,10 @@ replLoad :: FilePath -> Repl ()
 replLoad p = do
   ms <- liftIO $ recursiveLoad p
   (scpEnv, ds) <- either (error . show) return $ checkModules ms
-  (cxt, ts) <- either (error . show) return $ checkDecls ds
-  put $ ReplState (moduleName $ head ms) (Just p) ts scpEnv cxt
-  outputStrLn $ "Successfully checked " ++ show (length ts) ++ " definitions"
+  cxt <- either (error . show) return $ checkDeclsCxt ds
+  let rho = env cxt
+  put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
+  outputStrLn $ "Successfully checked " ++ show (length rho) ++ " definitions"
 
 
 --------------------------------------------------------------------------------

@@ -12,6 +12,10 @@ import PosTT.Values
 nf :: AtStage (Env -> Tm -> Tm)
 nf ρ = readBack . eval ρ
 
+normalize :: Env -> Tm -> Tm
+normalize ρ t = bindStage terminalStage $ nf ρ t
+
+
 --------------------------------------------------------------------------------
 ---- Read Back
 
@@ -56,7 +60,7 @@ instance ReadBack v => ReadBack (VSys v) where
   type Quot (VSys v) = Sys (Quot v)
 
   readBack :: AtStage (VSys v -> Sys (Quot v))
-  readBack sys = readBackSysCof (mapSys sys readBack) 
+  readBack sys = readBackSysCof (mapSys sys readBack)
 
 readBackSysCof :: AtStage (VSys a -> Sys a)
 readBackSysCof (VSys bs) = Sys (map (first readBack) bs)

@@ -19,18 +19,18 @@ import {-# SOURCE #-} PosTT.Pretty -- only for debugging
 
 
 --------------------------------------------------------------------------------
----- Utilities 
+---- Utilities
 
 -- | Looks up fibrant value in environment. If it is a definition, then it is
 --   evaluated. Thus, the current stage is required.
 lookupFib :: AtStage (Env -> Name -> Val)
-lookupFib (EnvFib _ y v)       x | y == x = v
-lookupFib rho@(EnvDef _ y t _) x | y == x = eval rho t -- recursive definition
-lookupFib (ConsEnv rho)        x = lookupFib rho x
+lookupFib (EnvFib _ y v)     x | y == x = v
+lookupFib ρ@(EnvDef _ y t _) x | y == x = eval ρ t -- recursive definition
+lookupFib (EnvCons ρ _ _)    x = lookupFib ρ x
 
 lookupInt :: Env -> Gen -> VI
-lookupInt (EnvInt _ y r) x | y == x = r
-lookupInt (ConsEnv rho)  x = rho `lookupInt` x
+lookupInt (EnvInt _ y r)  x | y == x = r
+lookupInt (EnvCons ρ _ _) x = ρ `lookupInt` x
 
 reAppDef :: AtStage (Name -> Env -> Val)
 reAppDef d (EnvDef _   x _ _) | x == d = VVar d
@@ -62,7 +62,7 @@ eval rho = \case
   PLam t t0 t1   -> VPLam (evalIntBinder rho t) (eval rho t0) (eval rho t1)
   PApp t t0 t1 r -> doPApp (eval rho t) (eval rho t0) (eval rho t1) (evalI rho r)
 
-  Coe r0 r1 l         -> vCoePartial (evalI rho r0) (evalI rho r1) (evalTrIntBinder rho l)
+  Coe r0 r1 l         -> doCoePartial (evalI rho r0) (evalI rho r1) (evalTrIntBinder rho l)
   HComp r0 r1 a u0 tb -> doHComp' (evalI rho r0) (evalI rho r1) (eval rho a) (eval rho u0) (evalSys evalTrIntBinder rho tb)
 
   Ext a bs    -> vExt (eval rho a) (evalSys eval3 rho bs)
@@ -177,7 +177,7 @@ headVTel (VTel ((_, a):_) ρ) = eval ρ a
 tailVTel :: VTel -> Val -> VTel
 tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
-pattern VTelNil :: VTel 
+pattern VTelNil :: VTel
 pattern VTelNil <- VTel [] _
 
 
@@ -343,7 +343,7 @@ doExtFun ws (VNeu k)      = VExtFun ws k
 ---- Coercion
 
 doCoe :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
-doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
+doCoe r₀ r₁ ℓ u₀ = doCoePartial r₀ r₁ ℓ `doApp` u₀
 
 -- | Smart constructor for VCoePartial
 --
@@ -353,13 +353,13 @@ doCoe r₀ r₁ ℓ u₀ = vCoePartial r₀ r₁ ℓ `doApp` u₀
 --     Otherwise, the coercion is neutral, and given by VNeuCoePartial.
 -- (3) In case of an Ext type, we keep the line fully forced.
 --
--- We are very careful: We peak under the closure to see the type. 
+-- We are very careful: We peak under the closure to see the type.
 -- In the cases where we have restriction stable type formers,
 -- we can safely construct a VCoePartial value to be evaluated when applied.
 -- Otherwise, we force the delayed restriction, and check again.
-vCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
-vCoePartial r0 r1 | r0 === r1 = \ℓ -> pId `doApp` (ℓ $$ r0) -- could just be id closure
-vCoePartial r0 r1 = go False
+doCoePartial :: AtStage (VI -> VI -> TrIntClosure -> Val)
+doCoePartial r0 r1 | r0 === r1 = \ℓ -> pId `doApp` (ℓ $$ r0) -- could just be id closure
+doCoePartial r0 r1 = go False
   where
     go :: Bool -> TrIntClosure -> Val
     go forced l@(TrIntClosure i a _) = case a of
@@ -413,6 +413,7 @@ doCoeExt r₀ r₁ z a bs u₀ = -- a, bs depend on z!
 -- | Coercion in a sum type. Note that the type given by (d, lbl) has to be restricted by f.
 doCoeSum :: AtStage (VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Val -> Val)
 doCoeSum r₀ r₁ i d lbl f (VCon c as) | Just tel <- lookup c lbl = VCon c (doCoeTel r₀ r₁ i tel f as)
+doCoeSum _  _  _ _ _   _ (VNeu _)    = error "TODO: neutral for coe in Sum type"
 
 doCoeTel :: AtStage (VI -> VI -> Gen -> VTel -> Restr -> [Val] -> [Val])
 doCoeTel _ _ _ VTelNil _ [] = []
@@ -457,7 +458,7 @@ doHCompExt r₀ r₁ a bs u₀ tb =
 -- Universe
 
 doHCompU :: AtStage (VI -> VI -> Val -> VSys TrIntClosure -> Val)
-doHCompU r₀ r₁ a₀ tb = 
+doHCompU r₀ r₁ a₀ tb =
   let vs = mapSys tb $ \a ->
              let r₀η = re r₀ ; r₁η = re r₁ ; ar₁η = a $$ r₁η
                  ℓ = trIntCl' $ \z -> isEquiv (a $$ iVar z) (a $$ r₀η) (VCoePartial (iVar z) r₀η a)
@@ -503,9 +504,9 @@ instance Restrictable Val where
     VPath a a0 a1  -> VPath (a @ f) (a0 @ f) (a1 @ f)
     VPLam cl p0 p1 -> VPLam (cl @ f) (p0 @ f) (p1 @ f)
 
-    VCoePartial r0 r1 l -> vCoePartial (r0 @ f) (r1 @ f) (l @ f)
+    VCoePartial r0 r1 l -> doCoePartial (r0 @ f) (r1 @ f) (l @ f)
 
-    VCoe r0 r1 l u0      -> vCoePartial (r0 @ f) (r1 @ f) (l @ f) `doApp` (u0 @ f)
+    VCoe r0 r1 l u0      -> doCoePartial (r0 @ f) (r1 @ f) (l @ f) `doApp` (u0 @ f)
     VHComp r0 r1 a u0 tb -> doHComp' (r0 @ f) (r1 @ f) (a @ f) (u0 @ f) (tb @ f)
 
     VExt a bs    -> vExt (a @ f) (bs @ f)
@@ -532,10 +533,10 @@ instance Restrictable Neu where
 
     NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
 
-    NCoePartial r₀ r₁ cl       -> vCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NCoePartial r₀ r₁ cl       -> doCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
     NHComp r₀ r₁ k u₀ tb       -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
     NHCompSum r₀ r₁ d lbl k tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
-    
+
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
     NSplit g bs k -> doSplit (g @ f) (bs @ f) (k @ f)
@@ -582,13 +583,16 @@ instance Restrictable VTel where
   act :: AtStage (Restr -> VTel -> VTel )
   act f (VTel ts rho) = VTel ts (rho @ f)
 
-instance Restrictable Env where
-  act :: AtStage (Restr -> Env -> Env)
+instance Restrictable (Name, EnvEntry) where
+  act :: AtStage (Restr -> (Name, EnvEntry) -> Alt (Name, EnvEntry))
+  act f = fmap (@ f)
+
+instance Restrictable EnvEntry where
+  act :: AtStage (Restr -> EnvEntry -> EnvEntry)
   act f = \case
-    EmptyEnv          -> EmptyEnv
-    EnvFib env x v    -> EnvFib (env @ f) x (v @ f)
-    EnvDef env x t ty -> EnvDef (env @ f) x t ty
-    EnvInt env i r    -> EnvInt (env @ f) i (r @ f)
+    EntryFib v    -> EntryFib (v @ f)
+    EntryDef t ty -> EntryDef t ty
+    EntryInt r    -> EntryInt (r @ f)
 
 instance Restrictable a => Restrictable [a] where
   type Alt [a] = [Alt a]

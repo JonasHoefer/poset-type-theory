@@ -263,8 +263,5 @@ IterNeg : Nat -> Path U Bool Bool = recNat (Path U Bool Bool) (refl U Bool) (\_ 
 --------------------------------------------------------------------------------
 ---- Test
 
-testNat : Nat = exp ten (suc zero)
-
--- testN : Bool = transport U (id U) Bool Bool ((IterNeg (suc (suc zero)))) true
-
-testN : Bool = transport U (id U) Bool Bool (IterNeg (suc (exp ten (suc (suc (suc zero)))))) true
+ -- because systems restrictions are not delayed, this takes quadratic time in the number of negations
+testN : Bool = transport U (id U) Bool Bool (IterNeg (suc (exp ten (suc (suc zero))))) true

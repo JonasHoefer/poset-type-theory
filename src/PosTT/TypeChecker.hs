@@ -64,7 +64,7 @@ bindFibVar x a k = extName x (local (extFib x (VVar x) a) (k (VVar x)))
 
 bindFibVars :: AtStage ([Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> TypeChecker a)
 bindFibVars []     (VTel [] _) k = k []
-bindFibVars (x:xs) tel         k = 
+bindFibVars (x:xs) tel         k =
   bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (\vs -> k (v:vs)))
 
 -- | Extends the context Γ with a free variable to a context Γ,(i=i:I)
@@ -75,7 +75,7 @@ bindIntVar i k = extGen i (local (extInt i (iVar i)) (k (iVar i)))
 ---- lookup types in context
 
 checkIntVar :: Name -> TypeChecker I
-checkIntVar (Gen -> i) = asks (elem i . intVars) >>= \case
+checkIntVar i = asks (elem i . intVars) >>= \case
   True  -> return (IVar i)
   False -> fail $ show i ++ " is not an interval variable!"
 
@@ -87,7 +87,7 @@ checkFibVar x = asks (lookup x . types) >>= \case
 
 ---- Evaluation and Quotation using context
 
--- | Given one of the "evaluation functions" from PosTT.Eval 
+-- | Given one of the "evaluation functions" from PosTT.Eval
 --   we can run it using the environment form the type checker.
 evalTC :: AtStage (AtStage (Env -> a -> b) -> a -> TypeChecker b)
 evalTC ev t = asks ((`ev` t) . env)
@@ -156,7 +156,7 @@ check = flip $ \ty -> atArgPos $ \case
   P.Let _ x s a t -> do
     (a', va) <- checkAndEval a VU
     s' <- check s va
-    Let x s' a' <$> local (extDef x s' a' va) (check t ty)  
+    Let x s' a' <$> local (extDef x s' a' va) (check t ty)
   P.U _ -> do
     () <- isU ty
     return U
@@ -180,14 +180,14 @@ check = flip $ \ty -> atArgPos $ \case
   P.Ext _ a sys -> do
     () <- isU ty
     (a', va) <- checkAndEval a VU
-    
+
     sys' <- checkSys sys $ \_ (b, e, p) -> do
       (b', vb) <- checkAndEval b VU
       let vaη = re va
       (e', ve) <- checkAndEval e (vb `funType` vaη)
       p' <- check p (isEquiv vb vaη ve)
       return (b', e', p')
-    
+
     vsys' <- evalTC (evalSys eval3) sys'
     () <- either (\_ -> return ()) compatible vsys'
 
@@ -197,7 +197,7 @@ check = flip $ \ty -> atArgPos $ \case
       Left (a, b) ->
         BLam x <$> bindFibVar x a (\vx -> check t (b $$ vx))
       Right (a, a₀, a₁) -> do
-        let i = Gen x
+        let i = x
         (t', vt) <- bindIntVar i (\_ -> checkAndEval t a)
         convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
         convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
@@ -268,7 +268,7 @@ infer = atArgPos $ \case
     (t', vt, tt) <- inferAndEval t
     (_, b) <- isSigma tt
     return (Pr2 t', b $$ doPr1 vt)
-  P.Coe _ r₀ r₁ (Gen -> i) a -> do
+  P.Coe _ r₀ r₁ i a -> do
     (r'₀, vr₀) <- checkAndEvalI r₀
     (r'₁, vr₁) <- checkAndEvalI r₁
     (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
@@ -278,12 +278,12 @@ infer = atArgPos $ \case
     (r'₀, vr₀) <- checkAndEvalI r₀
     r'₁ <- checkI r₁
     (u'₀, vu₀) <- checkAndEval u₀ va
-  
-    tb' <- checkSys tb $ \_ (Gen -> i, u) -> do
-      (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)      
+
+    tb' <- checkSys tb $ \_ (i, u) -> do
+      (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)
       () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
       return (TrIntBinder i u')
-    
+
     vtb' <- evalTC (evalSys evalTrIntBinder) tb'
     () <- either (\_ -> return ()) compatible vtb'
 
@@ -334,7 +334,7 @@ checkI = atArgPos $ \case
 checkAndEvalI :: PTm -> TypeChecker (I, VI)
 checkAndEvalI r = do
   r' <- checkI r
-  (r',) <$> asks (flip evalI r' . env) 
+  (r',) <$> asks (flip evalI r' . env)
 
 
 ---- Systems
@@ -365,9 +365,6 @@ checkAndEvalCof eqs = do
 --------------------------------------------------------------------------------
 ---- Checking lists of declarations
 
--- checkDecls' :: [P.Decl] -> Either TypeError (Cxt, Env)
--- checkDecls' = error "TODO: shouldn't we yield an env?"
-
 checkDecl :: AtStage (P.Decl -> TypeChecker (Name, Tm, Ty, VTy))
 checkDecl (P.Decl _ x b t) = do
   traceM $ "\nChecking Definition: " ++ show x
@@ -380,12 +377,24 @@ checkDecl (P.Decl _ x b t) = do
 
   return (x, b', t', vt)
 
-checkDecls :: [P.Decl] -> Either TypeError (Cxt, [(Name, Tm, Ty)])
-checkDecls decls = runTC emptyCxt (go decls)
+checkDeclsCxt :: [P.Decl] -> Either TypeError Cxt
+checkDeclsCxt decls = runTC emptyCxt (go decls)
   where
-    go :: AtStage ([P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)]))
-    go []     = asks (,[])
+    go :: AtStage ([P.Decl] -> TypeChecker Cxt)
+    go []     = ask
     go (d:ds) = do
-      (x, b', t', vt) <- checkDecl d
-      (cxt, ds') <- local (extDef x b' t' vt) (go ds)
-      return (cxt, (x, b', t'):ds')
+      (x, b, t, vt) <- checkDecl d
+      local (extDef x b t vt) (go ds)
+
+checkDeclsEnv :: [P.Decl] -> Either TypeError Env
+checkDeclsEnv = fmap env . checkDeclsCxt
+
+-- checkDecls :: [P.Decl] -> Either TypeError (Cxt, [(Name, Tm, Ty)])
+-- checkDecls decls = runTC emptyCxt (go decls)
+--   where
+--     go :: AtStage ([P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)]))
+--     go []     = asks (,[])
+--     go (d:ds) = do
+--       (x, b', t', vt) <- checkDecl d
+--       (cxt, ds') <- local (extDef x b' t' vt) (go ds)
+--       return (cxt, (x, b', t'):ds')
