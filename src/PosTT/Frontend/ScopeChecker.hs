@@ -6,9 +6,11 @@ import           Prelude hiding (id)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 
+import           Data.Bifunctor (bimap)
 import           Data.Either.Extra (mapLeft)
 import           Data.Function (on)
-import           Data.List (isPrefixOf, sort, sortBy, group)
+import           Data.Functor.Adjunction (uncozipL)
+import           Data.List (isPrefixOf, sort, sortBy, sortOn, group)
 import           Data.String (IsString(..))
 import           Data.Tuple.Extra (uncurry3)
 import qualified Data.Graph as G
@@ -94,6 +96,12 @@ checkLets :: [Decl] -> Exp -> ScopeChecker PTm
 checkLets []     u = checkExp u
 checkLets (d:ds) u = bindDecl d $ \case
   P.Decl ss id v ty -> P.Let ss id v ty <$> checkLets ds u
+
+checkSys :: Sys -> ScopeChecker (P.Sys PTm)
+checkSys (Sys ss sys) = P.Sys ss <$> traverse checkSide sys
+
+checkSide :: Side -> ScopeChecker ([(P.ITm, P.ITm)], PTm)
+checkSide (Side _ fs e) = (,) <$> traverse checkFace fs <*> checkExp e
 
 checkSysExt :: SysExt -> ScopeChecker (P.Sys (PTy, PTm, PTm))
 checkSysExt (SysExt ss sys) = P.Sys ss <$> traverse checkSideExt sys
@@ -189,7 +197,28 @@ checkBranch :: Branch -> ScopeChecker P.Branch
 checkBranch (OBranch ss c as t) = do
   c' <- checkCon c
   bindAIdents as $ \as' -> P.Branch ss c' as' <$> checkWhereExp t
-checkBranch (PBranch{}) = error "No HITs yet"
+checkBranch (PBranch{}) = error "No HITs yet (branch)"
+
+
+unLabel :: Label -> Either (SrcSpan, AIdent, [Tele], [AIdent], Sys) (SrcSpan, AIdent, [Tele])
+unLabel = \case
+  OLabel ssLbl idC args        -> Right (ssLbl, idC, args)
+  PLabel ssLbl idC args is sys -> Left  (ssLbl, idC, args, is, sys)
+
+uniformLabel :: [Label] -> Either [(SrcSpan, AIdent, [Tele], [AIdent], Sys)] [(SrcSpan, AIdent, [Tele])]
+uniformLabel = unifyEither (\(ssLbl, idC, argsC) -> (ssLbl, idC, argsC, [], Sys ssLbl [])) . map unLabel
+
+
+checkDeclHIT :: [(SrcSpan, AIdent, [Tele], [AIdent], Sys)] -> ScopeChecker [((Name, ((Int, Int),(Int, Int))), P.HLabel)]
+checkDeclHIT []                                                   = return []
+checkDeclHIT ((ssLbl, idC@(AIdent (ssIdC, _)), args, is, sys):cs) = do
+  (args', is', sys') <- checkTeles args $ \args' -> bindAIdents is $ \is' -> (args', is',) <$> checkSys sys
+  bindAIdent idC $ \idC' -> (((idC', ssIdC), P.HLabel ssLbl idC' args' is' sys'):) <$> checkDeclHIT cs
+
+checkDeclSum :: [(SrcSpan, AIdent, [Tele])] -> ScopeChecker [((Name, ((Int, Int),(Int, Int))), P.Label)]
+checkDeclSum = mapM $ \(ssLbl, idC@(AIdent (ssIdC, idCStr)), argsC) -> do
+  label <- P.Label ssLbl <$> fmap fst (checkFreshAIdent idC) <*> checkTeles argsC return
+  return ((fromString idCStr, ssIdC), label)
 
 -- | Checks function and data definitions.
 --
@@ -205,19 +234,15 @@ checkDecl (DeclDef ss id ts ty bd) = do
 checkDecl (DeclData ss id ts cs) = do
   checkTeles ts $ \ts' ->
     bindAIdent' id $ \id' idss -> do
-      cs' <- forM cs $ \case
-        OLabel ssLbl idC@(AIdent (ssIdC, idCStr)) argsC -> do
-          label <- P.Label ssLbl <$> fmap fst (checkFreshAIdent idC) <*> checkTeles argsC return
-          return ((fromString idCStr, (ssIdC, Constructor)), label)
-        PLabel ssLbl idC args is sys -> error "No HITs yet"
+      (cs', d) <- either (fmap $ P.HSum ss id') (fmap $ P.Sum ss id' . sortOn P.labelName) . bimap unzip unzip
+        <$> uncozipL (bimap checkDeclHIT checkDeclSum (uniformLabel cs))
 
-      let cNms = map (fst . fst) cs'
-      forM_ (filter ((> 1) . length) $ group $ sort cNms) $ throwError . DuplicateLabel ss . head
+      forM_ (filter ((> 1) . length) $ group $ sort $ map fst cs') $ throwError . DuplicateLabel ss . head
 
       let ty = foldr (\(ss', x, t) -> P.Pi ss' x t) (P.U ss) ts' -- a data declaration always yields a value in U
-      let bd = foldr (\(ss', x, _) -> P.Lam ss' x Nothing)
-                 (P.Sum ss id' $ sortBy (compare `on` P.labelName) $ map snd cs') ts'
-      return ((id', (idss, Variable)):map fst cs', P.Decl ss id' bd ty)
+      let bd = foldr (\(ss', x, _) -> P.Lam ss' x Nothing) d ts'
+
+      return ((id', (idss, Variable)):[ (c, (ssC, Constructor)) | (c, ssC) <- cs' ], P.Decl ss id' bd ty)
 
 bindDecl :: Decl -> (P.Decl -> ScopeChecker a) -> ScopeChecker a
 bindDecl d k = checkDecl d >>= \(ids, d') -> local (ids ++) (k d')

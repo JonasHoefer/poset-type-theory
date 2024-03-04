@@ -4,7 +4,7 @@ import PosTT.Common
 import PosTT.Terms
 
 data ConvError where
-  ConvErrorTm :: Tm -> Tm -> ConvError 
+  ConvErrorTm :: Tm -> Tm -> ConvError
   ConvErrorI :: I -> I -> ConvError
   ConvErrorCof :: Cof -> Cof -> ConvError
   ConvErrorString :: String -> ConvError

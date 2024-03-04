@@ -100,7 +100,7 @@ instance Conv a => Conv (VSys a) where
   conv (VSys ((phi,a):bs)) (VSys bs') = case extractWith (===) phi bs' of
     Just (a', bs'') -> (a, VSys bs) `conv` (a', VSys bs'')
     Nothing         -> Left $ ConvErrorString "Systems have different cofibrations!"
-  conv _                   _          = Left $ ConvErrorString "Systems have different size!" 
+  conv _                   _          = Left $ ConvErrorString "Systems have different size!"
 
 
 ---- plumbing instances
@@ -119,10 +119,10 @@ instance (Conv a, Conv b, Conv c) => Conv (a, b, c) where
 
 instance (Conv a, Conv b, Conv c, Conv d) => Conv (a, b, c, d) where
   conv :: AtStage ((a, b, c, d) -> (a, b, c, d) -> Either ConvError ())
-  (a₀, b₀, c₀, d₀) `conv` (a₁, b₁, c₁, d₁) = 
+  (a₀, b₀, c₀, d₀) `conv` (a₁, b₁, c₁, d₁) =
     ((a₀, b₀, c₀) `conv` (a₁, b₁, c₁)) *> (d₀ `conv` d₁)
 
 instance (Conv a, Conv b, Conv c, Conv d, Conv e) => Conv (a, b, c, d, e) where
   conv :: AtStage ((a, b, c, d, e) -> (a, b, c, d, e) -> Either ConvError ())
-  (a₀, b₀, c₀, d₀, e₀) `conv` (a₁, b₁, c₁, d₁, e₁) = 
+  (a₀, b₀, c₀, d₀, e₀) `conv` (a₁, b₁, c₁, d₁, e₁) =
     ((a₀, b₀, c₀, d₀) `conv` (a₁, b₁, c₁, d₁)) *> (e₀ `conv` e₁)

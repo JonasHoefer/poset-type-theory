@@ -1,9 +1,9 @@
 module Main where
 
-import           Data.List (find, intercalate)
+import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Data.String (IsString(..))
-import           Data.Tuple.Extra (fst3, snd3)
+import           Data.Tuple.Extra (fst3)
 
 import           Control.Monad.Except
 import           Control.Monad.State.Strict

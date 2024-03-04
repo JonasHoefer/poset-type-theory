@@ -26,5 +26,8 @@ extractWith p k (e@(k', v):vs)
 modifyAt :: Eq a => a -> (b -> b) -> [(a, b)] -> [(a, b)]
 modifyAt x f = map $ \(y, u) -> if x == y then (y, f u) else (y, u)
 
+unifyEither :: (b -> a) -> [Either a b] -> Either [a] [b]
+unifyEither f xs = either (const $ Left $ map (either id f) xs) Right $ sequence xs
+
 impossible :: String -> a
 impossible msg = error $ "Impossible: " ++ msg

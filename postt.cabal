@@ -69,6 +69,7 @@ executable postt
       , DerivingVia
     build-depends:    
         array
+      , adjunctions
       , base ^>=4.17.2.1
       , containers
       , directory

@@ -1,6 +1,6 @@
 module PosTT.Frontend.PreTerms where
 
-import PosTT.Common (Name, SrcSpan)
+import PosTT.Common (Name, Gen, SrcSpan)
 
 -- | PreTerms
 --
@@ -68,12 +68,9 @@ type Tel = [(SrcSpan, Name, PTy)]
 
 -- | An alternative in a labeled sum, i.e.,
 --   a named constructor and its arguments.
+--
+-- > C (t : T)
 data Label = Label SrcSpan Name Tel deriving Show
-
--- | An alternative in a higher labeled sum, i.e.,
---   a named HIT constructor and its arguments.
-data HLabel = HLabel SrcSpan Name Tel [Name] (Sys PTm) deriving Show
-
 
 labelName :: Label -> Name
 labelName (Label _ c _) = c
@@ -82,6 +79,12 @@ data Branch = Branch SrcSpan Name [Name] PTm deriving Show
 
 branchConstructor :: Branch -> Name
 branchConstructor (Branch _ c _ _) = c
+
+-- | An alternative in a higher labeled sum, i.e.,
+--   a named HIT constructor and its arguments.
+--
+-- > C (t : T) (i₁ … iₙ : I) [ φ ↪ u ]
+data HLabel = HLabel SrcSpan Name Tel [Gen] (Sys PTm) deriving Show
 
 data Sys a = Sys SrcSpan [([(ITm, ITm)], a)] deriving Show
 

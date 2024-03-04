@@ -176,7 +176,7 @@ check = flip $ \ty -> atArgPos $ \case
     Path a' <$> check a₀ va <*> check a₁ va
   P.Sum _ d cs -> do
     () <- isU ty
-    Sum d <$> forM cs checkLabel
+    Sum d <$> mapM checkLabel cs
   P.Ext _ a sys -> do
     () <- isU ty
     (a', va) <- checkAndEval a VU
