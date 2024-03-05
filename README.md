@@ -7,7 +7,7 @@ Some additional information can be found in the file located in [`./doc`][path/d
 ## Setup
 
 The project is built using [cabal][software/cabal].
-To install the type checker and evaluator, clone the repository and run `cabal install --overwrite-policy=alway`.
+To install the type checker and evaluator, clone the repository and run `cabal install --overwrite-policy=always`.
 This will install an executable called `postt` in `~/.cabal/bin/` (and potentially remove old versions).
 
 
