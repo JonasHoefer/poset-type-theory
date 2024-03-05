@@ -320,7 +320,7 @@ doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ a (
     <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
-doSplit f bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
+doSplit _ bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
 doSplit f bs (VNeu k)    = VSplit f bs k
 
 

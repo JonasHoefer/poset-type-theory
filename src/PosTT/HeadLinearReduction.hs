@@ -14,18 +14,19 @@ import           PosTT.Values
 headUnfold :: Env -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
 headUnfold δ = go M.empty
   where
-    ρ  = blockedEnv δ
-    -- s  = foldr sExtName terminalStage (blockedNames δ)
+    ρ = blockedEnv δ
+    s = foldr sExtName terminalStage (blockedNames δ)
 
     blockedLookup :: AtStage (Name -> Val)
     blockedLookup x = case lookup x δ of
       Just (EntryFib v)   -> v
-      Just (EntryDef t _) -> eval ρ t -- we evaluate in *blocked* version -- (dropWhile ((/= x) . fst) ρ) ?
+      Just (EntryDef t _) -> eval (dropWhile ((/= x) . fst) ρ) t
       _                   -> impossible "Lookup of non-fibrant variable"
 
-    -- TODO: wrong, the stage handling seems more complicated
+    -- The stage reserves too many names.
+    -- Formally, singleReduction frees up one name, which we could remove.
     unfold :: Tm -> Maybe (Name, Tm)
-    unfold t = bindStage terminalStage $ (fmap . fmap) readBack
+    unfold t = bindStage s $ (fmap . fmap) readBack
       $ singleReduction blockedLookup $ eval ρ t
 
     go :: M.Map Name Int -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
