@@ -4,7 +4,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Except
 
 import           Data.Either (fromRight)
-
+import           Data.Tuple.Extra (uncurry3, first3, second3)
 import           PosTT.Common
 import           PosTT.Conversion
 import           PosTT.Errors
@@ -66,10 +66,15 @@ bindFibVars :: AtStage ([Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> Ty
 bindFibVars []     (VTel [] _) k = k []
 bindFibVars (x:xs) tel         k =
   bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (\vs -> k (v:vs)))
+bindFibVars _      _           _ = impossible "bindFibVars: Names and telescope do not match!"
 
 -- | Extends the context Γ with a free variable to a context Γ,(i=i:I)
 bindIntVar :: AtStage (Gen -> AtStage (VI -> TypeChecker a) -> TypeChecker a)
 bindIntVar i k = extGen i (local (extInt i (iVar i)) (k (iVar i)))
+
+bindIntVars :: AtStage ([Gen] -> AtStage ([VI] -> TypeChecker a) -> TypeChecker a)
+bindIntVars []     k = k []
+bindIntVars (i:is) k = bindIntVar i $ \i' -> bindIntVars is (k . (i':))
 
 
 ---- lookup types in context
@@ -139,9 +144,10 @@ isSigma :: AtStage (VTy -> TypeChecker (VTy, Closure))
 isSigma (VSigma a b) = return (a, b)
 isSigma t            = fail $ "Expected Σ-Type, got " ++ prettyVal t
 
-isSum :: AtStage (VTy -> TypeChecker (Val, [VLabel]))
-isSum (VSum d lbl) = return (d, lbl)
-isSum t            = fail $ "Expected Sum-type, got " ++ prettyVal t
+isSum :: AtStage (VTy -> TypeChecker (Either (Val, [VLabel]) (Val, [VHLabel])))
+isSum (VSum d lbl)  = return $ Left (d, lbl)
+isSum (VHSum d lbl) = return $ Right (d, lbl)
+isSum t             = fail $ "Expected (Higher) Sum-type, got " ++ prettyVal t
 
 
 --------------------------------------------------------------------------------
@@ -177,6 +183,10 @@ check = flip $ \ty -> atArgPos $ \case
   P.Sum _ d cs -> do
     () <- isU ty
     Sum d <$> mapM checkLabel cs
+  P.HSum _ d cs -> do
+    () <- isU ty
+    vd <- evalTC reAppDef d
+    HSum d <$> checkHLabels vd cs
   P.Ext _ a sys -> do
     () <- isU ty
     (a', va) <- checkAndEval a VU
@@ -207,17 +217,22 @@ check = flip $ \ty -> atArgPos $ \case
     (s', vs) <- checkAndEval s a
     Pair s' <$> check t (b $$ vs)
   P.Con ss c as -> do
-    (d, cs) <- isSum ty
-    asTys <- hoistEither $ maybe (Left $ TypeErrorMissingCon ss c (readBack d)) Right (c `lookup` cs)
-    Con c <$> checkArgs as asTys
+    isSum ty >>= \case
+      Left (d, cs) -> do
+        asTys <- hoistEither $ maybe (Left $ TypeErrorMissingCon ss c (readBack d)) Right (c `lookup` cs)
+        Con c <$> checkConArgs as asTys
+      Right (d, cs) -> do
+        asTys <- hoistEither $ maybe (Left $ TypeErrorMissingCon ss c (readBack d)) Right (c `lookup` cs)
+        uncurry3 (HCon c) <$> checkHConArgs as asTys
   P.Split ss f bs -> do
     (a, b) <- isPi ty
-    (d, cs) <- isSum a
-
-    unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
-      $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
-
-    Split f <$> zipWithM (checkBranch b) bs (map snd cs)
+    isSum a >>= \case
+      Left (d, cs) -> do
+        unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
+          $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
+        Split f <$> zipWithM (checkBranch b) bs (map snd cs)
+      Right (d, cs) -> do
+        error "HSplit"
   P.ExtElm _ s ts -> do
     (a, bs) <- isExt ty
     (s', vs) <- checkAndEval s a
@@ -300,23 +315,50 @@ inferAndEval t = do
 ---- Data types
 
 checkLabel :: AtStage (P.Label -> TypeChecker Label)
-checkLabel (P.Label _ c argTel) = Label c <$> checkTel argTel
+checkLabel (P.Label _ c argTel) = Label c <$> checkTel argTel return
 
-checkTel :: AtStage (P.Tel -> TypeChecker Tel)
-checkTel []              = return TelNil
-checkTel ((_, x, a):tel) = do
+checkTel :: AtStage (P.Tel -> AtStage (Tel -> TypeChecker a) -> TypeChecker a)
+checkTel []              k = k TelNil
+checkTel ((_, x, a):tel) k = do
   (a', va) <- checkAndEval a VU
-  telCons x a' <$> bindFibVar x va (\_ -> checkTel tel)
+  bindFibVar x va (\_ -> checkTel tel (k . telCons x a'))
 
-checkArgs :: AtStage ([PTm] -> VTel -> TypeChecker [Tm])
-checkArgs []     (VTel [] _) = return []
-checkArgs (t:ts) tel         = do
+checkConArgs :: AtStage ([PTm] -> VTel -> TypeChecker [Tm])
+checkConArgs []     (VTel [] _) = return []
+checkConArgs (t:ts) tel         = do
    (t', vt) <- checkAndEval t (headVTel tel)
-   (t':) <$> checkArgs ts (tailVTel tel vt)
+   (t':) <$> checkConArgs ts (tailVTel tel vt)
+checkConArgs _      _           = impossible "checkConArgs: Argument numbers do not match"
 
 checkBranch :: AtStage (Closure -> P.Branch -> VTel -> TypeChecker Branch)
-checkBranch b (P.Branch ss c as t) argTys =
+checkBranch b (P.Branch _ c as t) argTys =
   BBranch c as <$> bindFibVars as argTys (\as' -> check t (b $$ VCon c as'))
+
+
+---- Higher inductive types
+
+checkHLabels :: AtStage (VTy -> [P.HLabel] -> TypeChecker [HLabel])
+checkHLabels = go []
+  where
+    go :: AtStage ([VHLabel] -> VTy -> [P.HLabel] -> TypeChecker [HLabel])
+    go _    _ []                              = return []
+    go vlbl d ((P.HLabel _ c tel is sys):lbl) = do
+      l <- checkTel tel $ \tel' -> bindIntVars is $ \_ -> do
+        sys' <- checkSys sys $ \_ t -> check t $ VHSum d vlbl -- check against "partial" HIT; TODO: should we replace in env?
+        return $ HLabel c tel' is sys'
+      vl <- evalTC evalHLabel l
+      (l:) <$> go (vl:vlbl) d lbl
+
+checkHConArgs :: AtStage ([PTm] -> VHTel -> TypeChecker ([Tm], [I], Sys Tm))
+checkHConArgs (t:ts) tel = case headVHTel tel of
+  Just a  -> do
+    (t', vt) <- checkAndEval t a
+    first3 (t':) <$> checkHConArgs ts (tailVHTel tel (Left vt))
+  Nothing -> do
+    (t', vt) <- checkAndEvalI t
+    second3 (t':) <$> checkHConArgs ts (tailVHTel tel (Right vt))
+checkHConArgs [] (VHTelNil sys) = return ([], [], readBack sys)
+checkHConArgs _  _              = impossible "checkHConArgs: Argument numbers do not match"
 
 
 ---- Interval
@@ -334,7 +376,7 @@ checkI = atArgPos $ \case
 checkAndEvalI :: PTm -> TypeChecker (I, VI)
 checkAndEvalI r = do
   r' <- checkI r
-  (r',) <$> asks (flip evalI r' . env)
+  asks ((r',) . flip evalI r' . env)
 
 
 ---- Systems
@@ -370,7 +412,7 @@ checkDecl (P.Decl _ x b t) = do
   traceM $ "\nChecking Definition: " ++ show x
 
   (t', vt) <- checkAndEval t VU
-  b' <- bindFibVar x vt $ \_ -> check b vt
+  b' <- bindFibVar x vt $ \_ -> check b vt -- we treat every definition as recursive
 
   traceM $ prettyVal vt
   traceM $ pretty b'
@@ -388,13 +430,3 @@ checkDeclsCxt decls = runTC emptyCxt (go decls)
 
 checkDeclsEnv :: [P.Decl] -> Either TypeError Env
 checkDeclsEnv = fmap env . checkDeclsCxt
-
--- checkDecls :: [P.Decl] -> Either TypeError (Cxt, [(Name, Tm, Ty)])
--- checkDecls decls = runTC emptyCxt (go decls)
---   where
---     go :: AtStage ([P.Decl] -> TypeChecker (Cxt, [(Name, Tm, Ty)]))
---     go []     = asks (,[])
---     go (d:ds) = do
---       (x, b', t', vt) <- checkDecl d
---       (cxt, ds') <- local (extDef x b' t' vt) (go ds)
---       return (cxt, (x, b', t'):ds')

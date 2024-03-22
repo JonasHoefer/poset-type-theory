@@ -39,6 +39,8 @@ instance ReadBack Val where
    VSum d _            -> readBack d
    VCon c as           -> Con c (map readBack as)
    VSplitPartial f _   -> readBack f
+   VHSum d _           -> readBack d
+   VHCon c as is sys   -> HCon c (map readBack as) (map readBack is) (readBack sys)
    VNeu k              -> readBack k
 
 instance ReadBack Neu where

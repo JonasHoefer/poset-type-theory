@@ -31,9 +31,9 @@ headUnfold δ = go M.empty
 
     go :: M.Map Name Int -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
     go u t (Just 0) = (u, t)
-    go u t s        = case unfold t of
+    go u t steps    = case unfold t of
       Nothing      -> (u, t)
-      Just (d, t') -> go (M.alter (\e -> fmap succ e <|> Just 1) d u) t' (pred <$> s)
+      Just (d, t') -> go (M.alter (\e -> fmap succ e <|> Just 1) d u) t' (pred <$> steps)
 
 
 --------------------------------------------------------------------------------

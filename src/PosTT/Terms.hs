@@ -40,9 +40,15 @@ data Tm where
   Sum :: Name -> [Label] -> Tm
   Con :: Name -> [Tm] -> Tm
   Split :: Name -> [Branch] -> Tm
+
+  HSum :: Name -> [HLabel] -> Tm
+  HCon :: Name -> [Tm] -> [I] -> Sys Tm -> Tm
 type Ty = Tm
 
-instance IsString Tm where fromString = Var . fromString
+instance IsString Tm where 
+  fromString :: String -> Tm
+  fromString = Var . fromString
+
 
 ---- Binder (We explicitly mark how variables are bound above)
 
@@ -86,6 +92,8 @@ data Branch = Branch Name SplitBinder
 
 pattern BBranch :: Name -> [Name] -> Tm -> Branch
 pattern BBranch n xs t = Branch n (SplitBinder xs t)
+
+data HLabel = HLabel Name Tel [Gen] (Sys Tm)
 
 
 --------------------------------------------------------------------------------

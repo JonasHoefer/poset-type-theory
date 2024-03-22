@@ -1,14 +1,11 @@
 module PosTT.Conversion (conv) where
 
-import Control.Monad (zipWithM_, unless)
-import Control.Monad.Except (throwError)
+import Control.Monad (zipWithM_)
 
 import PosTT.Common
-import PosTT.Poset
-import PosTT.Quotation
+import PosTT.Quotation ()
 import PosTT.Errors
 import PosTT.Eval
-import PosTT.Terms
 import PosTT.Values
 
 
@@ -62,6 +59,11 @@ instance Conv Val where
     (VCon c₀ as₀       , VCon c₁ as₁       ) | c₀ == c₁ -> as₀ `conv` as₁
     (VSplitPartial f₀ _, VSplitPartial f₁ _) -> f₀ `conv` f₁
 
+    (VHSum d₀ _        , d₁                ) -> d₀ `conv` d₁
+    (d₀                , VHSum d₁ _        ) -> d₀ `conv` d₁
+    -- TODO: hsplit; is the above correct?
+    (VHCon c₀ as₀ is₀ _, VHCon c₁ as₁ is₁ _) | c₀ == c₁ -> (as₀, is₀) `conv` (as₁, is₁)
+    
     (VNeu k₀, VNeu k₁) -> k₀ `conv` k₁
 
     (u, v) -> Left $ ConvErrorTm (readBack u) (readBack v)

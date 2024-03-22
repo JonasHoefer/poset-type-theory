@@ -1,0 +1,5 @@
+module PropTrunc where
+
+data PropTrunc (A : U) : U
+  = eta (a : A)
+  | squash (u v : PropTrunc A) <i> [(i=0) -> u, (i=1) -> v]

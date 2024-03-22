@@ -18,7 +18,7 @@ import PosTT.Errors
 -- 1. Those which just have to be evaluated at some poitn
 -- 2. Those which have to be peeked under during the evaluation
 -- We call the semantic values associated to a binder a *closure*, and call
--- those closures associated to binders of the second type *transparant*.
+-- those closures associated to binders of the second type *transparent*.
 
 
 --------------------------------------------------------------------------------
@@ -48,7 +48,10 @@ data Val where
   VCon :: Name -> [Val] -> Val
   VSplitPartial :: Val -> [VBranch] -> Val
 
-  VNeu :: {-# UNPACK #-} !Neu -> Val
+  VHSum :: Val -> [VHLabel] -> VTy
+
+  VNeu :: !Neu -> Val
+  VHCon :: Name -> [Val] -> [VI] -> VSys Val -> Val
 type VTy = Val
 
 
@@ -139,6 +142,13 @@ type VBranch = (Name, SplitClosure)
 data SplitClosure = SplitClosure [Name] Tm Env
 
 
+---- Higher Inductive Types
+
+data VHTel = VHTel [(Name, Ty)] [Gen] (Sys Tm) Env
+
+type VHLabel = (Name, VHTel)
+
+
 --------------------------------------------------------------------------------
 ---- Values for Base Category (interval and cofibrations)
 
@@ -155,12 +165,12 @@ iVar i = VI [[i]]
 -- | A closure binding an interval variable.
 data IntClosure = IntClosure Gen Tm Env
 
--- | A "transpart" closure binding an interval variable.
+-- | A "transparent" closure binding an interval variable.
 data TrIntClosure = TrIntClosure Gen Val Restr
 
 -- | Smart constructor for a TrIntClosure.
 --
--- Abstracts a fresh variable for the current stage, prefering the given name.
+-- Abstracts a fresh variable for the current stage, preferring the given name.
 -- The continuation works at the extended stage to produce the captured value.
 trIntCl :: AtStage (Gen -> AtStage (Gen -> Val) -> TrIntClosure)
 trIntCl i k = refreshGen i $ \i' -> TrIntClosure i' (k i') IdRestr
@@ -168,7 +178,7 @@ trIntCl i k = refreshGen i $ \i' -> TrIntClosure i' (k i') IdRestr
 trIntCl' :: AtStage (AtStage (Gen -> Val) -> TrIntClosure)
 trIntCl' k = freshGen $ \i' -> TrIntClosure i' (k i') IdRestr
 
--- | A "transpart" closure binding an interval variable,
+-- | A "transparent" closure binding an interval variable,
 --   whose captured value is guarantied to be neutral.
 data TrNeuIntClosure = TrNeuIntClosure Gen Neu
 
@@ -290,6 +300,12 @@ data EnvEntry = EntryDef !Tm !Ty | EntryFib !Val | EntryInt !VI
 pattern EmptyEnv :: Env
 pattern EmptyEnv = []
 
+pattern EnvCons :: Env -> Name -> EnvEntry -> Env
+pattern EnvCons rho x e <- (uncons -> Just ((x, e), rho))
+  where EnvCons rho x e = (x,e):rho
+
+{-# COMPLETE EmptyEnv, EnvCons #-}
+
 pattern EnvFib :: Env -> Name -> Val -> Env
 pattern EnvFib rho x v   = (x, EntryFib v):rho
 
@@ -299,9 +315,6 @@ pattern EnvInt rho x i   = (x, EntryInt i):rho
 pattern EnvDef :: Env -> Name -> Tm -> Ty -> Env
 pattern EnvDef rho x s t = (x, EntryDef s t):rho
 
-pattern EnvCons :: Env -> Name -> EnvEntry -> Env
-pattern EnvCons rho x e <- (uncons -> Just ((x, e), rho))
-  where EnvCons rho x e = (x,e):rho
 
 envFibs :: Env -> [(Name, Val)] -> Env
 envFibs = foldr (\(x, v) rho' -> EnvFib rho' x v)

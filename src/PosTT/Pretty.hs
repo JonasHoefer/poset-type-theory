@@ -70,6 +70,8 @@ reflect = \case
   Sum _ _                -> R.Var () (reflectName "[Sum]") -- Should only occur if we print non-normalized term!
   Con c as               -> foldl1 (R.App ()) (R.Var () (reflectName c) : map reflect as)
   Split _ _              -> R.Var () (reflectName "[Split]") -- Should only occur if we print non-normalized term!
+  HSum _ _               -> R.Var () (reflectName "[HSum]") -- Should only occur if we print non-normalized term!
+  HCon c as is _         -> foldl1 (R.App ()) (R.Var () (reflectName c) : map reflect as ++ map reflectFormula is)
 
 reflectSysBinder :: Sys (TrIntBinder Tm) -> R.SysBinder' ()
 reflectSysBinder (Sys bs) = R.SysBinder () (map reflectSideBinder bs)

@@ -57,7 +57,7 @@ data PTm where
   Split :: SrcSpan -> Name -> [Branch] -> PTm
 
   HSum :: SrcSpan -> Name -> [HLabel] -> PTm
-  HCon :: SrcSpan -> Name -> [PTm] -> PTm
+  -- HCon :: SrcSpan -> Name -> [PTm] -> PTm -- TODO: we could omitt this
 deriving instance Show PTm
 
 type PTy = PTm
@@ -91,8 +91,9 @@ data Sys a = Sys SrcSpan [([(ITm, ITm)], a)] deriving Show
 data Decl = Decl SrcSpan Name PTm PTy
 
 app :: SrcSpan -> PTm -> PTm -> PTm
-app _  (Con ss c as) v = Con ss c (as ++ [v])
-app ss u             v = App ss u v
+app _  (Con ss c as)  v = Con ss c (as ++ [v])
+-- app _  (HCon ss c as) v = HCon ss c (as ++ [v])
+app ss u              v = App ss u v
 
 srcSpan :: PTm -> SrcSpan
 srcSpan = \case
@@ -121,4 +122,4 @@ srcSpan = \case
   Con ss _ _         -> ss
   Split ss _ _       -> ss
   HSum ss _ _        -> ss
-  HCon ss _ _        -> ss
+  -- HCon ss _ _        -> ss

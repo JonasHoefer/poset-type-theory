@@ -55,7 +55,7 @@ moduleImports (Module _ _ imps _) = [ name | Import _ (AIdent (_, name)) <- imps
 --------------------------------------------------------------------------------
 ---- Scope Checker
 
-data SymKind = Variable | Constructor deriving Eq
+data SymKind = Variable | Constructor deriving Eq -- | HigherConstructor
 
 type ScopingEnv = [(Name, (((Int, Int), (Int, Int)), SymKind))]
 
@@ -147,14 +147,15 @@ checkExp e                     = error $ "[ScopeChecker] Missing Case: " ++ prin
 
 checkVar :: AIdent -> ScopeChecker PTm
 checkVar (AIdent (ss, id)) = asks (\ids -> guard (not $ "_" `isPrefixOf` id) *> fromString id `lookup` ids) >>= \case
-  Nothing               -> throwError $ NotBoundError id ss
-  Just (_, Variable)    -> return $ P.Var (Just ss) (fromString id)
-  Just (_, Constructor) -> return $ P.Con (Just ss) (fromString id) []
+  Nothing                     -> throwError $ NotBoundError id ss
+  Just (_, Variable)          -> return $ P.Var (Just ss) (fromString id)
+  Just (_, Constructor)       -> return $ P.Con (Just ss) (fromString id) []
+--  Just (_, HigherConstructor) -> return $ P.HCon (Just ss) (fromString id) []
 
 checkCon :: AIdent -> ScopeChecker Name
 checkCon (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
   Just (_, Constructor) -> return $ fromString id
-  _                       -> throwError $ NotBoundError id ss
+  _                     -> throwError $ NotBoundError id ss
 
 checkFreshAIdent :: AIdent -> ScopeChecker (Name, ((Int, Int), (Int, Int)))
 checkFreshAIdent (AIdent (ss, "_")) = return ("_", ss)
@@ -164,6 +165,9 @@ checkFreshAIdent (AIdent (ss, id))  = asks (lookup (fromString id)) >>= \case
 
 bindAIdent' :: AIdent -> (Name -> ((Int, Int), (Int, Int)) -> ScopeChecker a) -> ScopeChecker a
 bindAIdent' id k = checkFreshAIdent id >>= \(id', ss) -> local ((id', (ss, Variable)):) (k id' ss)
+
+bindHCon :: AIdent -> (Name -> ((Int, Int), (Int, Int)) -> ScopeChecker a) -> ScopeChecker a
+bindHCon id k = checkFreshAIdent id >>= \(id', ss) -> local ((id', (ss, Constructor)):) (k id' ss)
 
 bindAIdent :: AIdent -> (Name -> ScopeChecker a) -> ScopeChecker a
 bindAIdent id k = bindAIdent' id (\id' _ -> k id')
@@ -210,10 +214,10 @@ uniformLabel = unifyEither (\(ssLbl, idC, argsC) -> (ssLbl, idC, argsC, [], Sys 
 
 
 checkDeclHIT :: [(SrcSpan, AIdent, [Tele], [AIdent], Sys)] -> ScopeChecker [((Name, ((Int, Int),(Int, Int))), P.HLabel)]
-checkDeclHIT []                                                   = return []
-checkDeclHIT ((ssLbl, idC@(AIdent (ssIdC, _)), args, is, sys):cs) = do
+checkDeclHIT []                               = return []
+checkDeclHIT ((ssLbl, idC, args, is, sys):cs) = do
   (args', is', sys') <- checkTeles args $ \args' -> bindAIdents is $ \is' -> (args', is',) <$> checkSys sys
-  bindAIdent idC $ \idC' -> (((idC', ssIdC), P.HLabel ssLbl idC' args' is' sys'):) <$> checkDeclHIT cs
+  bindHCon idC $ \idC' ss -> (((idC', ss), P.HLabel ssLbl idC' args' is' sys'):) <$> checkDeclHIT cs
 
 checkDeclSum :: [(SrcSpan, AIdent, [Tele])] -> ScopeChecker [((Name, ((Int, Int),(Int, Int))), P.Label)]
 checkDeclSum = mapM $ \(ssLbl, idC@(AIdent (ssIdC, idCStr)), argsC) -> do

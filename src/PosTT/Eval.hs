@@ -34,9 +34,9 @@ lookupInt :: Env -> Gen -> VI
 lookupInt (EnvInt _ y r)  x | y == x = r
 lookupInt (EnvCons ρ _ _) x = ρ `lookupInt` x
 
-reAppDef :: AtStage (Name -> Env -> Val)
-reAppDef d (EnvDef _   x _ _) | x == d = VVar d
-reAppDef d (EnvFib rho x v)   | x /= d = reAppDef d rho `doApp` v
+reAppDef :: AtStage (Env -> Name -> Val)
+reAppDef (EnvCons _   x _) d | x == d = VVar d
+reAppDef (EnvFib rho x v)  d | x /= d = reAppDef rho d `doApp` v
 
 
 --------------------------------------------------------------------------------
@@ -71,9 +71,13 @@ eval rho = \case
   ExtElm s ts -> vExtElm (eval rho s) (evalSys eval rho ts)
   ExtFun ws t -> doExtFun' (evalSys eval rho ws) (eval rho t)
 
-  Sum d lbl  -> VSum (reAppDef d rho) (map (evalLabel rho) lbl)
+  Sum d lbl  -> VSum (reAppDef rho d) (map (evalLabel rho) lbl)
   Con c args -> VCon c (map (eval rho) args)
-  Split f bs -> VSplitPartial (reAppDef f rho) (map (evalBranch rho) bs)
+  Split f bs -> VSplitPartial (reAppDef rho f) (map (evalBranch rho) bs)
+
+  HSum d lbl       -> VHSum (reAppDef rho d) (map (evalHLabel rho) lbl)
+  HCon c as is sys -> vHCon c (map (eval rho) as) (map (evalI rho) is) (evalSys eval rho sys)
+
 
 evalI :: Env -> I -> VI
 evalI rho = \case
@@ -115,6 +119,9 @@ evalLabel rho (Label c tel) = (c, evalTel rho tel)
 
 evalTel :: AtStage (Env -> Tel -> VTel)
 evalTel rho (Tel ts) = VTel ts rho
+
+evalHLabel :: AtStage (Env -> HLabel -> VHLabel)
+evalHLabel rho (HLabel c (Tel tel) is at) = (c, VHTel tel is at rho)
 
 
 --------------------------------------------------------------------------------
@@ -181,6 +188,20 @@ tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
 pattern VTelNil :: VTel
 pattern VTelNil <- VTel [] _
+
+headVHTel :: AtStage (VHTel -> Maybe VTy)
+headVHTel (VHTel ((_, a):_) _     _ ρ) = Just (eval ρ a)
+headVHTel (VHTel _          (_:_) _ _) = Nothing -- I
+
+pattern VHTelNil :: (?s :: Stage) => VSys Val -> VHTel
+pattern VHTelNil vtel <- (evalVHTelSys -> Right vtel) -- TODO: can this one simplify?
+
+evalVHTelSys :: AtStage (VHTel -> Either Val (VSys Val))
+evalVHTelSys (VHTel [] [] sys ρ) = evalSys eval ρ sys
+
+tailVHTel :: VHTel -> Either Val VI -> VHTel
+tailVHTel (VHTel ((x, _):tel) is     sys ρ) (Left v)  = VHTel tel is sys (EnvFib ρ x v)
+tailVHTel (VHTel []           (i:is) sys ρ) (Right v) = VHTel []  is sys (EnvInt ρ i v)
 
 
 --------------------------------------------------------------------------------
@@ -322,6 +343,9 @@ doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ a (
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
 doSplit _ bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
 doSplit f bs (VNeu k)    = VSplit f bs k
+
+vHCon :: Name -> [Val] -> [VI] -> Either Val (VSys Val) -> Val 
+vHCon c as is = either id (VHCon c as is)
 
 
 --------------------------------------------------------------------------------
@@ -517,6 +541,9 @@ instance Restrictable Val where
     VSum a lbl         -> VSum (a @ f) (lbl @ f)
     VCon c as          -> VCon c (as @ f)
     VSplitPartial v bs -> VSplitPartial (v @ f) (bs @ f)
+
+    VHSum _ _         -> error "VHSum @ f"
+    VHCon c as is sys -> vHCon c (as @ f) (is @ f) (sys @ f)
 
     VNeu k -> k @ f
 

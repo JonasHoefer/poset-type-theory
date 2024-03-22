@@ -5,3 +5,8 @@ data S1 : U
   | loopAt <i> [ (i=0) -> base, (i=1) -> base ]
 
 loop : Path S1 base base = \i. loopAt i
+
+-- stating this w/o PathP seems annoying
+-- indS1 (M : S1 -> U) (b : M base) (l : _) : (z : S1) -> M z = hsplit
+--   base   -> b
+--   loop i -> l i

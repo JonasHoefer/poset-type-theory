@@ -15,4 +15,8 @@ data Torus : U
       , (i=1) -> loop2At j
       , (j=0) -> loop1At i
       , (j=1) -> loop1At i
-      ] 
+      ]
+
+loop1 : Path Torus base base = \i. loop1At i
+
+loop2 : Path Torus base base = \i. loop2At i
