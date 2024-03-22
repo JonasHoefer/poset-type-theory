@@ -1,7 +1,7 @@
 # Poset Type Theory
 
 Experimental Haskell implementation of a version of cubical type theory with a model in presheaves over finite, non-empty posets.
-Some additional information can be found in the file located in [`./doc`][path/doc], a PDF version of which can be found [here][doc].
+Some additional information can be found in the file located in [`doc`][path/doc], a PDF version of which can be found [here][doc].
 
 
 ## Setup

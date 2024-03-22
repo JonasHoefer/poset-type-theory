@@ -24,4 +24,5 @@ data TypeError where
   TypeErrorSystemCompat :: SrcSpan -> ConvError -> TypeError
   TypeErrorExtElmCompat :: SrcSpan -> Tm -> Tm -> ConvError -> TypeError
   TypeErrorMissingCon :: SrcSpan -> Name -> Tm -> TypeError
+  TypeErrorConArgCount :: SrcSpan -> Name -> Int -> Int -> TypeError 
   TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError

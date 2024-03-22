@@ -15,7 +15,7 @@ import PosTT.Errors
 
 -- We mirror terminology and observations by András Kovács.
 -- We have two types of binders in cubical NbE:
--- 1. Those which just have to be evaluated at some poitn
+-- 1. Those which just have to be evaluated at some point
 -- 2. Those which have to be peeked under during the evaluation
 -- We call the semantic values associated to a binder a *closure*, and call
 -- those closures associated to binders of the second type *transparent*.
@@ -49,9 +49,9 @@ data Val where
   VSplitPartial :: Val -> [VBranch] -> Val
 
   VHSum :: Val -> [VHLabel] -> VTy
+  VHCon :: Name -> [Val] -> [VI] -> VSys Val -> Val
 
   VNeu :: !Neu -> Val
-  VHCon :: Name -> [Val] -> [VI] -> VSys Val -> Val
 type VTy = Val
 
 
@@ -135,6 +135,9 @@ pattern VSplit f bs k = VNeu (NSplit f bs k)
 
 data VTel = VTel [(Name, Ty)] Env
 
+lengthVTel :: VTel -> Int
+lengthVTel (VTel as _) = length as
+
 type VLabel = (Name, VTel)
 
 type VBranch = (Name, SplitClosure)
@@ -145,6 +148,9 @@ data SplitClosure = SplitClosure [Name] Tm Env
 ---- Higher Inductive Types
 
 data VHTel = VHTel [(Name, Ty)] [Gen] (Sys Tm) Env
+
+lengthVHTel :: VHTel -> Int
+lengthVHTel (VHTel as is _ _) = length as + length is
 
 type VHLabel = (Name, VHTel)
 

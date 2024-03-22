@@ -107,13 +107,13 @@ convTC e x y = case x `conv` y of
 ---- Source Position handling and errors
 
 at :: SrcSpan -> TypeChecker a -> TypeChecker a
-at ss ma = local (\cxt -> cxt{pos = ss}) ma
+at ss = local (\cxt -> cxt{pos = ss})
 
 atArgPos :: (PTm -> TypeChecker a) -> (PTm -> TypeChecker a)
 atArgPos k t = at (P.srcSpan t) (k t)
 
 hoistEither :: Either TypeError a -> TypeChecker a
-hoistEither e = either throwError pure e
+hoistEither = either throwError pure
 
 
 --------------------------------------------------------------------------------
@@ -220,19 +220,22 @@ check = flip $ \ty -> atArgPos $ \case
     isSum ty >>= \case
       Left (d, cs) -> do
         asTys <- hoistEither $ maybe (Left $ TypeErrorMissingCon ss c (readBack d)) Right (c `lookup` cs)
+        unless (length as == lengthVTel asTys) $ throwError $ TypeErrorConArgCount ss c (length as) (lengthVTel asTys)
         Con c <$> checkConArgs as asTys
       Right (d, cs) -> do
         asTys <- hoistEither $ maybe (Left $ TypeErrorMissingCon ss c (readBack d)) Right (c `lookup` cs)
+        unless (length as == lengthVHTel asTys) $ throwError $ TypeErrorConArgCount ss c (length as) (lengthVHTel asTys)
         uncurry3 (HCon c) <$> checkHConArgs as asTys
   P.Split ss f bs -> do
     (a, b) <- isPi ty
     isSum a >>= \case
-      Left (d, cs) -> do
+      Left (d, cs) -> do -- split on ordinary type
         unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
           $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
         Split f <$> zipWithM (checkBranch b) bs (map snd cs)
-      Right (d, cs) -> do
+      Right (d, cs) -> do -- split on higher inductive type
         error "HSplit"
+        -- HSplit f <$> _
   P.ExtElm _ s ts -> do
     (a, bs) <- isExt ty
     (s', vs) <- checkAndEval s a
@@ -359,6 +362,7 @@ checkHConArgs (t:ts) tel = case headVHTel tel of
     second3 (t':) <$> checkHConArgs ts (tailVHTel tel (Right vt))
 checkHConArgs [] (VHTelNil sys) = return ([], [], readBack sys)
 checkHConArgs _  _              = impossible "checkHConArgs: Argument numbers do not match"
+
 
 
 ---- Interval
