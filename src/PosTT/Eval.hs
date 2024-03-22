@@ -163,11 +163,20 @@ instance Apply TrNeuIntClosure where
   TrNeuIntClosure i k $$ r = k @ (r `for` i)
 
 instance Apply SplitClosure where
-  type ArgType SplitClosure = [Val]
+  type ArgType SplitClosure = ([Val], [VI])
   type ResType SplitClosure = Val
 
-  ($$) :: AtStage (SplitClosure -> [Val] -> Val)
-  SplitClosure xs t rho $$ vs = eval (rho `envFibs` (xs `zip` vs)) t
+  ($$) :: AtStage (SplitClosure -> ([Val], [VI]) -> Val)
+  SplitClosure xs t rho $$ (vs, is) =
+    eval (rho `envFibs` (xs `zip` vs) `envInts` (drop (length vs) xs `zip` is)) t
+
+instance Apply VHTel where
+  type ArgType VHTel = ([Val], [VI])
+  type ResType VHTel = Either Val (VSys Val)
+
+  ($$) :: AtStage (VHTel -> ([Val], [VI]) -> Either Val (VSys Val))
+  VHTel xs is sys rho $$ (vs, vis) =
+    evalSys eval (rho `envFibs` (map fst xs `zip` vs) `envInts` (is `zip` vis)) sys
 
 -- | Forces the delayed restriction under the binder.
 force :: AtStage (TrIntClosure -> TrIntClosure)
@@ -193,15 +202,24 @@ headVHTel :: AtStage (VHTel -> Maybe VTy)
 headVHTel (VHTel ((_, a):_) _     _ ρ) = Just (eval ρ a)
 headVHTel (VHTel _          (_:_) _ _) = Nothing -- I
 
-pattern VHTelNil :: (?s :: Stage) => VSys Val -> VHTel
-pattern VHTelNil vtel <- (evalVHTelSys -> Right vtel) -- TODO: can this one simplify?
-
-evalVHTelSys :: AtStage (VHTel -> Either Val (VSys Val))
-evalVHTelSys (VHTel [] [] sys ρ) = evalSys eval ρ sys
-
 tailVHTel :: VHTel -> Either Val VI -> VHTel
 tailVHTel (VHTel ((x, _):tel) is     sys ρ) (Left v)  = VHTel tel is sys (EnvFib ρ x v)
 tailVHTel (VHTel []           (i:is) sys ρ) (Right v) = VHTel []  is sys (EnvInt ρ i v)
+
+unConsVHTel :: AtStage (VHTel -> Either (Either Val (VSys Val)) (Either (VTy, Val -> VHTel) (VI -> VHTel)))
+unConsVHTel = \case
+  VHTel []          []     sys ρ -> Left (evalSys eval ρ sys)
+  VHTel ((x, a):xs) is     sys ρ -> Right $ Left $ (eval ρ a, VHTel xs is sys . EnvFib ρ x)
+  VHTel []          (i:is) sys ρ -> Right $ Right $ (VHTel [] is sys . EnvInt ρ i)
+
+pattern VHTelNil :: (?s :: Stage) => Either Val (VSys Val) -> VHTel
+pattern VHTelNil vtel <- (unConsVHTel -> Left vtel)
+
+pattern VHTelConsFib :: (?s :: Stage) => VTy -> (Val -> VHTel) -> VHTel
+pattern VHTelConsFib a tail <- (unConsVHTel -> Right (Left (a, tail)))
+
+pattern VHTelConsInt :: (?s :: Stage) => (VI -> VHTel) -> VHTel
+pattern VHTelConsInt tail <- (unConsVHTel -> Right (Right tail))
 
 
 --------------------------------------------------------------------------------
@@ -341,10 +359,11 @@ doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ a (
     <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
-doSplit _ bs (VCon c as) | Just cl <- lookup c bs = cl $$ as
-doSplit f bs (VNeu k)    = VSplit f bs k
+doSplit _ bs (VCon c as)       | Just cl <- lookup c bs = cl $$ (as, [])
+doSplit _ bs (VHCon c as is _) | Just cl <- lookup c bs = cl $$ (as, is)
+doSplit f bs (VNeu k)          = VSplit f bs k
 
-vHCon :: Name -> [Val] -> [VI] -> Either Val (VSys Val) -> Val 
+vHCon :: Name -> [Val] -> [VI] -> Either Val (VSys Val) -> Val
 vHCon c as is = either id (VHCon c as is)
 
 

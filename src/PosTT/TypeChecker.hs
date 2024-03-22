@@ -4,7 +4,9 @@ import           Control.Monad.Reader
 import           Control.Monad.Except
 
 import           Data.Either (fromRight)
+import           Data.List (sortOn)
 import           Data.Tuple.Extra (uncurry3, first3, second3)
+
 import           PosTT.Common
 import           PosTT.Conversion
 import           PosTT.Errors
@@ -63,7 +65,7 @@ bindFibVar :: AtStage (Name -> VTy -> AtStage (Val -> TypeChecker a) -> TypeChec
 bindFibVar x a k = extName x (local (extFib x (VVar x) a) (k (VVar x)))
 
 bindFibVars :: AtStage ([Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> TypeChecker a)
-bindFibVars []     (VTel [] _) k = k []
+bindFibVars []     VTelNil     k = k []
 bindFibVars (x:xs) tel         k =
   bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (\vs -> k (v:vs)))
 bindFibVars _      _           _ = impossible "bindFibVars: Names and telescope do not match!"
@@ -75,6 +77,14 @@ bindIntVar i k = extGen i (local (extInt i (iVar i)) (k (iVar i)))
 bindIntVars :: AtStage ([Gen] -> AtStage ([VI] -> TypeChecker a) -> TypeChecker a)
 bindIntVars []     k = k []
 bindIntVars (i:is) k = bindIntVar i $ \i' -> bindIntVars is (k . (i':))
+
+bindFibIntVars :: AtStage ([Name] -> VHTel -> AtStage ([Val] -> [VI] -> VSys Val -> TypeChecker a) -> TypeChecker a)
+bindFibIntVars []     (VHTelNil (Right sys)) k = k [] [] sys
+bindFibIntVars (n:ns) (VHTelConsFib a tel)   k =
+  bindFibVar n a $ \v -> bindFibIntVars ns (tel v) $ \vs -> k (v:vs)
+bindFibIntVars (n:ns) (VHTelConsInt tel)     k =
+  bindIntVar n $ \i -> bindFibIntVars ns (tel i) $ \vs is -> k vs (i:is)
+bindFibIntVars _      _                      _ = impossible "bindFibIntVars: Names and telescope do not match!"
 
 
 ---- lookup types in context
@@ -234,8 +244,16 @@ check = flip $ \ty -> atArgPos $ \case
           $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
         Split f <$> zipWithM (checkBranch b) bs (map snd cs)
       Right (d, cs) -> do -- split on higher inductive type
-        error "HSplit"
-        -- HSplit f <$> _
+        unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
+          $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
+
+        bs' <- zipWithM (checkHBranch b) bs (map snd cs)
+
+        -- TODO: compat check!
+        -- forM_ cs $ \(c, tel) -> do
+        --   _
+
+        return $ Split f bs'
   P.ExtElm _ s ts -> do
     (a, bs) <- isExt ty
     (s', vs) <- checkAndEval s a
@@ -341,7 +359,7 @@ checkBranch b (P.Branch _ c as t) argTys =
 ---- Higher inductive types
 
 checkHLabels :: AtStage (VTy -> [P.HLabel] -> TypeChecker [HLabel])
-checkHLabels = go []
+checkHLabels a = fmap (sortOn hLabelName) . go [] a
   where
     go :: AtStage ([VHLabel] -> VTy -> [P.HLabel] -> TypeChecker [HLabel])
     go _    _ []                              = return []
@@ -360,9 +378,12 @@ checkHConArgs (t:ts) tel = case headVHTel tel of
   Nothing -> do
     (t', vt) <- checkAndEvalI t
     second3 (t':) <$> checkHConArgs ts (tailVHTel tel (Right vt))
-checkHConArgs [] (VHTelNil sys) = return ([], [], readBack sys)
-checkHConArgs _  _              = impossible "checkHConArgs: Argument numbers do not match"
+checkHConArgs [] (VHTelNil (Right sys)) = return ([], [], readBack sys)
+checkHConArgs _  _                      = impossible "checkHConArgs: Argument numbers do not match"
 
+checkHBranch :: AtStage (Closure -> P.Branch -> VHTel -> TypeChecker Branch)
+checkHBranch b (P.Branch _ c as t) tel = do
+  BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
 
 
 ---- Interval

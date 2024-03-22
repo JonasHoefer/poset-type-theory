@@ -45,7 +45,7 @@ data Tm where
   HCon :: Name -> [Tm] -> [I] -> Sys Tm -> Tm
 type Ty = Tm
 
-instance IsString Tm where 
+instance IsString Tm where
   fromString :: String -> Tm
   fromString = Var . fromString
 
@@ -94,6 +94,9 @@ pattern BBranch :: Name -> [Name] -> Tm -> Branch
 pattern BBranch n xs t = Branch n (SplitBinder xs t)
 
 data HLabel = HLabel Name Tel [Gen] (Sys Tm)
+
+hLabelName :: HLabel -> Name
+hLabelName (HLabel n _ _ _) = n
 
 
 --------------------------------------------------------------------------------

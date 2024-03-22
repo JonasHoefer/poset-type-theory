@@ -140,10 +140,6 @@ lengthVTel (VTel as _) = length as
 
 type VLabel = (Name, VTel)
 
-type VBranch = (Name, SplitClosure)
-
-data SplitClosure = SplitClosure [Name] Tm Env
-
 
 ---- Higher Inductive Types
 
@@ -153,6 +149,13 @@ lengthVHTel :: VHTel -> Int
 lengthVHTel (VHTel as is _ _) = length as + length is
 
 type VHLabel = (Name, VHTel)
+
+
+---- Case Splits
+
+type VBranch = (Name, SplitClosure)
+
+data SplitClosure = SplitClosure [Name] Tm Env
 
 
 --------------------------------------------------------------------------------
@@ -324,6 +327,9 @@ pattern EnvDef rho x s t = (x, EntryDef s t):rho
 
 envFibs :: Env -> [(Name, Val)] -> Env
 envFibs = foldr (\(x, v) rho' -> EnvFib rho' x v)
+
+envInts :: Env -> [(Name, VI)] -> Env
+envInts = foldr (\(x, v) rho' -> EnvInt rho' x v)
 
 envRestr :: Env -> Restr
 envRestr = Restr . go
