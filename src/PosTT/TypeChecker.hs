@@ -247,11 +247,14 @@ check = flip $ \ty -> atArgPos $ \case
         unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
           $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
 
-        bs' <- zipWithM (checkHBranch b) bs (map snd cs)
+        vf <- evalTC reAppDef f
+        (bs', vbs) <- unzip <$> zipWithM (checkAndEvalHBranch b) bs (map snd cs)
 
-        -- TODO: compat check!
-        -- forM_ cs $ \(c, tel) -> do
-        --   _
+        forM_ (cs `zip` bs `zip` vbs) $ \(((_, tel), P.Branch _ _ ns _), (_, vb)) ->
+          bindFibIntVars ns tel $ \xs is sys -> do
+            let fv = vb $$ (xs, is)
+            mapSysM sys $ \v -> do
+              convTC (TypeErrorHSplitCompat (readBack vf)) (re fv) (doSplit vf vbs v)
 
         return $ Split f bs'
   P.ExtElm _ s ts -> do
@@ -381,9 +384,10 @@ checkHConArgs (t:ts) tel = case headVHTel tel of
 checkHConArgs [] (VHTelNil (Right sys)) = return ([], [], readBack sys)
 checkHConArgs _  _                      = impossible "checkHConArgs: Argument numbers do not match"
 
-checkHBranch :: AtStage (Closure -> P.Branch -> VHTel -> TypeChecker Branch)
-checkHBranch b (P.Branch _ c as t) tel = do
-  BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
+checkAndEvalHBranch :: AtStage (Closure -> P.Branch -> VHTel -> TypeChecker (Branch, VBranch))
+checkAndEvalHBranch b (P.Branch _ c as t) tel = do
+  b <- BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
+  (b,) <$> evalTC evalBranch b
 
 
 ---- Interval

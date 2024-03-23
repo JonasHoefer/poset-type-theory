@@ -1,0 +1,15 @@
+module Int where
+
+import Nat
+
+data Int : U
+  = pos (n : Nat)
+  | neg (n : Nat)
+  | zeroPathAt <i> [ (i=0) -> pos zero, (i=1) -> neg zero ]
+
+zeroPath : Path Int (pos zero) (neg zero) = \i. zeroPathAt i
+
+succ : Int -> Int = split
+  pos n        -> pos (suc n)
+  neg n        -> recNat Int (pos (suc zero)) (\m _. neg m) n
+  zeroPathAt i -> pos (suc zero)
