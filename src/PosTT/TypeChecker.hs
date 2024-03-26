@@ -368,7 +368,9 @@ checkHLabels a = fmap (sortOn hLabelName) . go [] a
     go _    _ []                              = return []
     go vlbl d ((P.HLabel _ c tel is sys):lbl) = do
       l <- checkTel tel $ \tel' -> bindIntVars is $ \_ -> do
-        sys' <- checkSys sys $ \_ t -> check t $ VHSum d vlbl -- check against "partial" HIT; TODO: should we replace in env?
+        sys' <- checkSys sys $ \_ t -> check t $ VHSum d vlbl
+        vsys <- evalTC (evalSys eval) sys'
+        either (\_ -> pure ()) compatible vsys
         return $ HLabel c tel' is sys'
       vl <- evalTC evalHLabel l
       (l:) <$> go (vl:vlbl) d lbl
@@ -386,8 +388,8 @@ checkHConArgs _  _                      = impossible "checkHConArgs: Argument nu
 
 checkAndEvalHBranch :: AtStage (Closure -> P.Branch -> VHTel -> TypeChecker (Branch, VBranch))
 checkAndEvalHBranch b (P.Branch _ c as t) tel = do
-  b <- BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
-  (b,) <$> evalTC evalBranch b
+  b' <- BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
+  (b',) <$> evalTC evalBranch b'
 
 
 ---- Interval

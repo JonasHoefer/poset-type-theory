@@ -160,8 +160,9 @@ checkCon (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
 checkFreshAIdent :: AIdent -> ScopeChecker (Name, ((Int, Int), (Int, Int)))
 checkFreshAIdent (AIdent (ss, "_")) = return ("_", ss)
 checkFreshAIdent (AIdent (ss, id))  = asks (lookup (fromString id)) >>= \case
-  Nothing       -> return (fromString id, ss)
-  Just (ss', _) -> throwError $ ReboundError id ss' ss
+  Nothing                 -> return (fromString id, ss)
+  Just (_  , Constructor) -> return (fromString id, ss)
+  Just (ss', Variable)    -> throwError $ ReboundError id ss' ss
 
 bindAIdent' :: AIdent -> (Name -> ((Int, Int), (Int, Int)) -> ScopeChecker a) -> ScopeChecker a
 bindAIdent' id k = checkFreshAIdent id >>= \(id', ss) -> local ((id', (ss, Variable)):) (k id' ss)
