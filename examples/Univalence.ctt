@@ -1,29 +1,11 @@
 module Univalence where
 
 import Prelude
+import Foundations
 import Paths
 
 
 -- https://github.com/mortberg/cubicaltt/blob/master/examples/univalence.ctt
-
---------------------------------------------------------------------------------
----- basics
-
-const (A B : U) (b : B) (_ : A) : B = b
-
-
---------------------------------------------------------------------------------
----- HoTT basics
-
-Homotopy (A B : U) (f g : A -> B) : U = (x : A) -> Path B (f x) (g x)
-
-hasRetract (A B : U) (s : A -> B) : U = (r : B -> A) * Homotopy A A (\x. r (s x)) (id A)
-
-Retraction (A B : U) : U = (s : A -> B) * hasRetract A B s
-
-RetractionInd (A B : U) (P : A -> U) (ret : Retraction A B) (p : (y : B) -> P (ret.2.1 y)) (x : A) : P x
-  = tr A P (ret.2.1 (ret.1 x)) x (ret.2.2 x) (p (ret.1 x))
-
 
 --------------------------------------------------------------------------------
 ---- HLevel

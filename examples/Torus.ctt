@@ -1,5 +1,8 @@
 module Torus where
 
+import Foundations
+import S1
+
 data Torus : U
   = base
   | loop1At <i>
@@ -20,3 +23,56 @@ data Torus : U
 loop1 : Path Torus base base = \i. loop1At i
 
 loop2 : Path Torus base base = \i. loop2At i
+
+
+--------------------------------------------------------------------------------
+---- Torus → S¹ × S¹
+
+torusToS1TimesS1 : Torus -> Prod S1 S1 = split
+  base       -> (base  , base  )
+  loop1At i  -> (loop i, base  )
+  loop2At j  -> (base  , loop j)
+  surfAt i j -> (loop i, loop j)
+
+--------------------------------------------------------------------------------
+---- S¹ × S¹ → Torus
+
+S1TimesS1toTorus-Base : S1 -> Torus = split
+  base     -> base
+  loopAt i -> loop2At i
+
+S1TimesS1toTorus-Loop : (c : S1) -> Path Torus (S1TimesS1toTorus-Base c) (S1TimesS1toTorus-Base c) = split
+  base     -> \i. loop1At i
+  loopAt j -> \i. surfAt i j
+
+S1TimesS1toTorus' : S1 -> S1 -> Torus = split
+  base     -> S1TimesS1toTorus-Base
+  loopAt i -> \c. S1TimesS1toTorus-Loop c i
+
+S1TimesS1toTorus (t : Prod S1 S1) : Torus = S1TimesS1toTorus' t.1 t.2
+
+--------------------------------------------------------------------------------
+---- Torus → S¹ × S¹ → Torus
+
+TorusToS1TimesS1Section : Homotopy Torus Torus (\t. S1TimesS1toTorus (torusToS1TimesS1 t)) (id Torus) = split
+  base       -> \i. base
+  loop1At i  -> \_. loop1At i
+  loop2At j  -> \_. loop2At j
+  surfAt i j -> \_. surfAt i j
+
+
+--------------------------------------------------------------------------------
+---- S¹ × S¹ → Torus → S¹ × S¹
+
+TorusToS1TimesS1Retraction-base : (c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (base , c2))) (base , c2) = split
+  base     -> \_. (base, base)
+  loopAt j -> \_. (base, loop2At j)
+
+-- TorusToS1TimesS1Retraction-loop :  -- we cannot state this w/o PathP ):
+--
+-- TorusToS1TimesS1Retraction' : (c1 c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (c1 , c2))) (c1 , c2) = split
+--   base     -> TorusToS1TimesS1Retraction-base
+--   loopAt i -> \c2. TorusToS1TimesS1Retraction-loop c2 i
+--
+-- TorusToS1TimesS1Retraction : Homotopy (Prod S1 S1) (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus t)) (id (Prod S1 S1))
+--   = \p. TorusToS1TimesS1Retraction' (p.1, p.2)
