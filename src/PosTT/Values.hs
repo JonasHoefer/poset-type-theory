@@ -11,6 +11,8 @@ import Data.String (IsString(..))
 import PosTT.Common
 import PosTT.Terms
 import PosTT.Errors
+import qualified Control.Applicative as M
+import qualified PosTT.Common as M
 
 
 -- We mirror terminology and observations by András Kovács.
@@ -206,10 +208,10 @@ instance InfSemilattice VCof where
 
 ---- Stages
 
-data Stage = Stage { gens :: [Gen], cof :: VCof, names :: [Name], nextFresh :: Int  }
+data Stage = Stage { gens :: !NameStore, cof :: !VCof, names :: !NameStore }
 
 terminalStage :: Stage
-terminalStage = Stage [] top [] 0
+terminalStage = Stage M.emptyStore top M.emptyStore
 
 type AtStage a = (?s :: Stage) => a
 
@@ -217,10 +219,10 @@ bindStage :: Stage -> AtStage a -> a
 bindStage s k = let ?s = s in k
 
 sExtName :: Name -> Stage -> Stage
-sExtName n s = s { names = n : names s }
+sExtName n s = s { names = addNameStore n (names s) }
 
 sExtGen :: Gen -> Stage -> Stage
-sExtGen n s = s { gens = n : gens s }
+sExtGen n s = s { gens = addNameStore n (gens s) }
 
 sExtCof :: VCof -> Stage -> Stage
 sExtCof φ s = s { cof = φ /\ cof s}
@@ -229,7 +231,7 @@ extName :: AtStage (Name -> AtStage a -> a)
 extName n = bindStage (sExtName n ?s)
 
 extGen :: AtStage (Gen -> AtStage a -> a)
-extGen n = bindStage (?s { gens = n : gens ?s })
+extGen n = bindStage (sExtGen n ?s)
 
 extCof :: AtStage (VCof -> AtStage a -> a)
 extCof φ = bindStage (sExtCof φ ?s)
@@ -251,32 +253,14 @@ freshIntVar k = freshGen (k . iVar)
 
 
 refreshName :: AtStage (Name -> AtStage (Name -> a) -> a)
-refreshName _ k =
-  let x  = fromString ("_x" ++ show (nextFresh ?s))
-  in  let ?s = ?s { nextFresh = 1 + nextFresh ?s }
-      in  extName x (k x)
-
--- refreshName y k = extName x $ k x
---  where
---    x = Name $ head
---          [ x'
---          | x' <- unName y : [ fromString ('x':show n) | n <- [1..] ]
---          , Name x' `notElem` names ?s, Gen x' `notElem` gens ?s
---          ]
+refreshName n k =
+  let (s', n') = refreshNameStore n (names ?s)
+  in  bindStage (?s {names = s'}) (k n')
 
 refreshGen :: AtStage (Gen -> AtStage (Gen -> a) -> a)
-refreshGen _ k =
-  let x  = fromString ("_i" ++ show (nextFresh ?s))
-  in  let ?s = ?s { nextFresh = 1 + nextFresh ?s }
-      in  extGen x (k x)
-
--- refreshGen j k = extGen i $ k i
---  where
---    i = Gen $ head
---          [ i'
---          | i' <- unGen j : [ fromString ('i':show n) | n <- [1..] ]
---          , Name i' `notElem` names ?s, Gen i' `notElem` gens ?s
---          ]
+refreshGen n k =
+  let (s', n') = refreshNameStore n (gens ?s)
+  in  bindStage (?s {gens = s'}) (k n')
 
 
 ---- Restrictions maps
