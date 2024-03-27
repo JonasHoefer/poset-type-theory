@@ -18,6 +18,10 @@ To type check all definitions in a file, and evaluate the last one use `postt ev
 To start a read-eval-print-loop (repl) use `postt repl`.
 In the repl, use `:help` to see all available commands.
 
+## References
+
+This implementation is inspired by [cctt][software/cctt] by András Kovács and [cubicaltt][software/cubicaltt] by Anders Mörtberg.
+
 
 ## Versions
 
@@ -40,3 +44,11 @@ In the repl, use `:help` to see all available commands.
 [software/cabal]:
   https://www.haskell.org/cabal/
   "Common Architecture for Building Applications and Libraries"
+
+[software/cctt]:
+  https://github.com/AndrasKovacs/cctt/
+  "cctt —  high-performance cubical evaluation"
+
+[software/cubicaltt]:
+  https://github.com/mortberg/cubicaltt/
+  "cubicaltt — Experimental implementation of Cubical Type Theory"
