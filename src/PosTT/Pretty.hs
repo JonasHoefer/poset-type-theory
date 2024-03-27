@@ -31,7 +31,7 @@ instance Show I where
 
 instance Show Cof where
   show :: Cof -> String
-  show = error "TODO"
+  show (Cof eqs) = intercalate "," (map (\(l, r) -> prettyI l ++ "=" ++ prettyI r) eqs)
 
 instance Show Tm where
   show :: Tm -> String
@@ -40,6 +40,15 @@ instance Show Tm where
 deriving instance Show ConvError
 deriving instance Show TypeError
 
+--instance Show TypeError where
+--  show = \case
+--    TypeErrorConv ss u v err -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": Could not convert between\n\n" ++ pretty u
+--                                  ++ "\n\nand\n\n" ++ pretty v ++ "\n\nbecause " ++ show err
+--    _ -> error "TODO: pretty print this error"
+
+prettySrcSpan :: SrcSpan -> String
+prettySrcSpan (Just ((r1,c1),(r2,c2))) = " (" ++ show r1 ++ ":" ++ show c1 ++ ")-(" ++ show r2 ++ ":" ++ show c2 ++ ")"
+prettySrcSpan Nothing                  = ""
 
 --------------------------------------------------------------------------------
 ---- Reflect Terms back into BNFC expressions to reuse pretty printer

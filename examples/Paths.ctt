@@ -6,6 +6,9 @@ import Prelude
 doubleComp (A : U) (x y z w : A) (p : Path A y x) (q : Path A y z) (r : Path A z w) : Path A x w
   = \i. hComp 0 1 A (q i) [ (i=0) -> j. p j , (i=1) -> j. r j]
 
+comp (A : U) (x y z : A) : Path A x y -> Path A y z -> Path A x z
+  = doubleComp A x x y z (refl A x)
+
 inv (A : U) (x y : A) (p : Path A y x) : Path A x y
   = doubleComp A x y y y p (refl A y) (refl A y)
 
@@ -19,4 +22,7 @@ apd (A : U) (B : A -> U) (f : (x : A) -> B x) (x y : A) (p : Path A x y) : PathP
   = \i. f (p i)
 
 funExt (A B : U) (f g : A -> B) (h : (a : A) -> Path B (f a) (g a)) : Path (A -> B) f g
+  = \i x. h x i
+
+depFunExt (A : U) (B : A -> U) (f g : (x : A) -> B x) (h : (a : A) -> Path (B a) (f a) (g a)) : Path ((x : A) -> B x) f g
   = \i x. h x i

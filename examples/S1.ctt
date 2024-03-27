@@ -24,6 +24,10 @@ S1-loop : Loop S1 = (base , loop)
 DepLoop (A : U) (l : Loop A) (M : A -> U) : U
   = (x : M l.1) * PathP (i. M (l.2 i)) x x
 
+
+----------------------------------------------------------------------------------------
+---- Universal Property
+
 gen-S1 (A : U) (f : S1 -> A) : Loop A
   = (f base , ap S1 A f base base loop)
 
@@ -37,3 +41,27 @@ S1-univ-prop-Iso (A : U) : Iso (S1 -> A) (Loop A)
               (ind-S1 (\z. Path A (rec-S1 A (gen-S1 A f) z) (f z)) (\_. f base) (\k _. f (loop k)))
 
     in  (gen-S1 A, rec-S1 A, sec, refl (Loop A))
+
+
+----------------------------------------------------------------------------------------
+---- Dependent Universal Property
+
+ind-S1' (M : S1 -> U) (l : DepLoop S1 S1-loop M) : (z : S1) -> M z = ind-S1 M l.1 l.2
+
+dgen-S1 (P : S1 -> U) (f : (z : S1) -> P z) : DepLoop S1 S1-loop P
+  = (f base, apd S1 P f base base loop)
+
+S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P)
+  = let sec (f : (z : S1) -> P z) : Path ((z : S1) -> P z) (ind-S1' P (dgen-S1 P f)) f
+          = depFunExt S1 P (ind-S1' P (dgen-S1 P f)) f
+              (ind-S1 (\z. Path (P z) (ind-S1' P (dgen-S1 P f) z) (f z)) (\_. f base) (\k _. f (loop k)))
+
+    in  (dgen-S1 P, \l. ind-S1 P l.1 l.2, sec, refl (DepLoop S1 S1-loop P))
+
+
+----------------------------------------------------------------------------------------
+---- Descent
+
+DescData : U = (X : U) * Equiv X X
+
+-- desc-S1 (P : S1 -> U) : DescData = (P base , _)

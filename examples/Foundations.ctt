@@ -10,6 +10,10 @@ Prod (A B : U) : U = (_ : A) * B
 
 const (A B : U) (b : B) (_ : A) : B = b
 
+--tr-comp (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (P : A -> U) (u : P x) :
+--    Path (P z) (tr A P x z (comp A x y z p q) u) (tr A P y z q (tr A P x y p u))
+--  = _
+
 
 --------------------------------------------------------------------------------
 ---- HoTT basics
@@ -31,3 +35,16 @@ Iso (A B : U) : U =
   (f : A -> B) (g : B -> A)
   * Homotopy A A (\x. g (f x)) (id A)
   * Homotopy B B (\x. f (g x)) (id B)
+
+
+--------------------------------------------------------------------------------
+---- Contractible Maps
+
+Equiv (A B : U) : U = (f : A -> B) * isEquiv A B f
+
+IdEquiv (A : U) : Equiv A A = (id A , isEquivId A)
+
+EquivToPath (A B : U) (e : Equiv A B) : Path U A B
+  = \i. Ext B [ (i=0) -> (A, e.1, e.2) , (i=1) -> (B, id B, isEquivId B) ]
+
+

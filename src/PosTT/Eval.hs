@@ -103,8 +103,7 @@ evalBinder rho (Binder x t) = Closure x t rho
 evalIntBinder :: AtStage (Env -> IntBinder Tm -> IntClosure)
 evalIntBinder rho (IntBinder i t) = IntClosure i t rho
 
--- | We evaluate a transparent binder, by evaluating the *open* term t under
---   the binder. (TODO: How can i be already used if the terms have no shadowing?)
+-- | We evaluate a transparent binder, by evaluating the *open* term t under the binder.
 evalTrIntBinder :: AtStage (Env -> TrIntBinder Tm -> TrIntClosure)
 evalTrIntBinder rho (TrIntBinder i t) = trIntCl i $ \i' -> eval (EnvInt rho i (iVar i')) t
 
@@ -422,6 +421,7 @@ doCoePartialApp :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
 doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) restr (incl. eqs)
   TrIntClosure z (VSum d lbl) f      -> doCoeSum r0 r1 z d lbl f
+  TrIntClosure z (VHSum d lbl) f     -> error "TODO: coe VHSum"
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
