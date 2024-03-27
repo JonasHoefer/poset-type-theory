@@ -29,7 +29,7 @@ instance ReadBack Val where
    VLam c              -> Lam (readBack c)
    VSigma a b          -> Sigma (readBack a) (readBack b)
    VPair u v           -> Pair (readBack u) (readBack v)
-   VPathP a a₀ a₁      -> PathP (readBack a) (readBack a₀) (readBack a₁)
+   VPath a a₀ a₁       -> Path (readBack a) (readBack a₀) (readBack a₁)
    VPLam c a₀ a₁       -> PLam (readBack c) (readBack a₀) (readBack a₁)
    VCoePartial r₀ r₁ c -> Coe (readBack r₀) (readBack r₁) (readBack c)
    VCoe r₀ r₁ c u₀     -> readBack (VCoePartial r₀ r₁ c) `App` readBack u₀

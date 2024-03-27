@@ -142,12 +142,12 @@ isPi (VPi a b) = return (a, b)
 isPi t         = fail $ "Expected Π-type, got " ++ prettyVal t
 
 isPath :: AtStage (VTy -> TypeChecker (TrIntClosure, Val, Val))
-isPath (VPathP a a0 a1) = return (a, a0, a1)
+isPath (VPath a a0 a1) = return (a, a0, a1)
 isPath t               = fail $ "Expected Path-type, got " ++ prettyVal t
 
 isPiOrPath :: AtStage (VTy -> TypeChecker (Either (VTy, Closure) (TrIntClosure, Val, Val)))
 isPiOrPath (VPi a b)       = return $ Left (a, b)
-isPiOrPath (VPathP a a0 a1) = return $ Right (a, a0, a1)
+isPiOrPath (VPath a a0 a1) = return $ Right (a, a0, a1)
 isPiOrPath t               = fail $ "Expected Path-Type or Π-Type, got " ++ prettyVal t
 
 isSigma :: AtStage (VTy -> TypeChecker (VTy, Closure))
@@ -186,10 +186,10 @@ check = flip $ \ty -> atArgPos $ \case
     (a', va) <- checkAndEval a VU
     b' <- bindFibVar x va (\_ -> check b VU)
     return $ BSigma a' x b'
-  P.PathP _ i a a₀ a₁ -> do
+  P.Path _ i a a₀ a₁ -> do
     () <- isU ty
     (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
-    BPathP i a' <$> check a₀ (va @  (0 `for` i)) <*> check a₁ (va @  (1 `for` i))
+    BPath i a' <$> check a₀ (va @  (0 `for` i)) <*> check a₁ (va @  (1 `for` i))
   P.Sum _ d cs -> do
     () <- isU ty
     Sum d <$> mapM checkLabel cs
