@@ -37,6 +37,7 @@ PAppAn.   Exp4 ::= Exp4 "@" "[" Exp "," Exp "]" Exp5 ;
 ExtFun.   Exp4 ::= "extFun" Exp5 ;
 ExtElm.   Exp4 ::= "ext" Exp5 "(" [Exp] ")" ;
 Path.     Exp5 ::= "Path" Exp6 Exp6 Exp6 ;
+PathP.    Exp5 ::= "PathP" "(" AIdent "." Exp ")" Exp6 Exp6 ;
 HComp.    Exp5 ::= "hComp" Exp6 Exp6 Exp6 Exp6 SysBinder ; -- first two are formula
 Coe.      Exp5 ::= "coe" Exp6 Exp6 "(" AIdent "." Exp ")" ; -- first two are formula
 Ext.      Exp5 ::= "Ext" Exp6 SysExt ;

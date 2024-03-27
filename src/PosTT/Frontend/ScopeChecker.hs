@@ -113,7 +113,7 @@ checkSysBinder :: SysBinder -> ScopeChecker (P.Sys (Name, PTm))
 checkSysBinder (SysBinder ss sys) = P.Sys ss <$> traverse checkSideBinder sys
 
 checkSideBinder :: SideBinder -> ScopeChecker ([(P.ITm, P.ITm)], (Name, PTm))
-checkSideBinder (SideBinder _ fs i u) = uncurry <$> ((\x y z -> (x, (y, z))) <$> traverse checkFace fs) <*> bindAIdent i (\i' -> (i',) <$> checkExp u)
+checkSideBinder (SideBinder _ fs i u) = (uncurry . (\x y z -> (x, (y, z))) <$> traverse checkFace fs) <*> bindAIdent i (\i' -> (i',) <$> checkExp u)
 
 checkFace :: Face -> ScopeChecker (P.ITm, P.ITm)
 checkFace (Face _ r s) = (,) <$> checkExp r <*> checkExp s
@@ -131,7 +131,8 @@ checkExp (Sigma _ pts u)       = checkSigmas pts u
 checkExp (Conj ss r s)         = P.Inf ss <$> checkExp r <*> checkExp s
 checkExp (Disj ss r s)         = P.Sup ss <$> checkExp r <*> checkExp s
 checkExp (App ss u v)          = P.app ss <$> checkExp u <*> checkExp v -- applies to constructors
-checkExp (Path ss a u v)       = P.Path ss <$> checkExp a <*> checkExp u <*> checkExp v
+checkExp (Path ss a u v)       = P.PathP ss "_" <$> checkExp a <*> checkExp u <*> checkExp v
+checkExp (PathP ss i a u v)    = bindAIdent i (\i' -> P.PathP ss i' <$> checkExp a) <*> checkExp u <*> checkExp v
 checkExp (Coe ss r s id a)     = uncurry <$> (P.Coe ss <$> checkExp r <*> checkExp s) <*> bindAIdent id (\id' -> (id',) <$> checkExp a)
 checkExp (HComp ss r s a a0 α) = P.HComp ss <$> checkExp r <*> checkExp s <*> checkExp a <*> checkExp a0 <*> checkSysBinder α
 checkExp (Fst ss u)            = P.Pr1 ss <$> checkExp u

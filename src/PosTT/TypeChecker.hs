@@ -141,13 +141,13 @@ isPi :: AtStage (VTy -> TypeChecker (VTy, Closure))
 isPi (VPi a b) = return (a, b)
 isPi t         = fail $ "Expected Π-type, got " ++ prettyVal t
 
-isPath :: AtStage (VTy -> TypeChecker (VTy, Val, Val))
-isPath (VPath a a0 a1) = return (a, a0, a1)
+isPath :: AtStage (VTy -> TypeChecker (TrIntClosure, Val, Val))
+isPath (VPathP a a0 a1) = return (a, a0, a1)
 isPath t               = fail $ "Expected Path-type, got " ++ prettyVal t
 
-isPiOrPath :: AtStage (VTy -> TypeChecker (Either (VTy, Closure) (VTy, Val, Val)))
+isPiOrPath :: AtStage (VTy -> TypeChecker (Either (VTy, Closure) (TrIntClosure, Val, Val)))
 isPiOrPath (VPi a b)       = return $ Left (a, b)
-isPiOrPath (VPath a a0 a1) = return $ Right (a, a0, a1)
+isPiOrPath (VPathP a a0 a1) = return $ Right (a, a0, a1)
 isPiOrPath t               = fail $ "Expected Path-Type or Π-Type, got " ++ prettyVal t
 
 isSigma :: AtStage (VTy -> TypeChecker (VTy, Closure))
@@ -186,10 +186,10 @@ check = flip $ \ty -> atArgPos $ \case
     (a', va) <- checkAndEval a VU
     b' <- bindFibVar x va (\_ -> check b VU)
     return $ BSigma a' x b'
-  P.Path _ a a₀ a₁ -> do
+  P.PathP _ i a a₀ a₁ -> do
     () <- isU ty
-    (a', va) <- checkAndEval a VU
-    Path a' <$> check a₀ va <*> check a₁ va
+    (a', va) <- bindIntVar i $ \_ -> checkAndEval a VU
+    BPathP i a' <$> check a₀ (va @  (0 `for` i)) <*> check a₁ (va @  (1 `for` i))
   P.Sum _ d cs -> do
     () <- isU ty
     Sum d <$> mapM checkLabel cs
@@ -218,7 +218,7 @@ check = flip $ \ty -> atArgPos $ \case
         BLam x <$> bindFibVar x a (\vx -> check t (b $$ vx))
       Right (a, a₀, a₁) -> do
         let i = x
-        (t', vt) <- bindIntVar i (\_ -> checkAndEval t a)
+        (t', vt) <- bindIntVar i (\vi -> checkAndEval t (a $$ vi))
         convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
         convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
         return $ BPLam i t' (readBack a₀) (readBack a₁)
@@ -297,8 +297,8 @@ infer = atArgPos $ \case
         (t', vt) <- checkAndEval t a
         return (App s' t', b $$ vt)
       Right (a, a₀, a₁) -> do
-        t' <- checkI t
-        return (PApp s' (readBack a₀) (readBack a₁) t' ,a)
+        (t', vt) <- checkAndEvalI t
+        return (PApp s' (readBack a₀) (readBack a₁) t', a $$ vt)
   P.Pr1 _ t -> do
     (t', tt) <- infer t
     (a, _) <- isSigma tt

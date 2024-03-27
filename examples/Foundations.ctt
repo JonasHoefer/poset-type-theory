@@ -22,3 +22,12 @@ Retraction (A B : U) : U = (s : A -> B) * hasRetract A B s
 
 RetractionInd (A B : U) (P : A -> U) (ret : Retraction A B) (p : (y : B) -> P (ret.2.1 y)) (x : A) : P x
   = tr A P (ret.2.1 (ret.1 x)) x (ret.2.2 x) (p (ret.1 x))
+
+
+--------------------------------------------------------------------------------
+---- Isomorphisms
+
+Iso (A B : U) : U =
+  (f : A -> B) (g : B -> A)
+  * Homotopy A A (\x. g (f x)) (id A)
+  * Homotopy B B (\x. f (g x)) (id B)

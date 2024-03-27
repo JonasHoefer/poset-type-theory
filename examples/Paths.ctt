@@ -12,5 +12,11 @@ inv (A : U) (x y : A) (p : Path A y x) : Path A x y
 tr (A : U) (P : A -> U) (x y : A) (p : Path A x y) (u : P x) : P y
   = coe 0 1 (i. P (p i)) u
 
-ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y) =
-  \i. f (p i)
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y)
+  = \i. f (p i)
+
+apd (A : U) (B : A -> U) (f : (x : A) -> B x) (x y : A) (p : Path A x y) : PathP (i. B (p i)) (f x) (f y)
+  = \i. f (p i)
+
+funExt (A B : U) (f g : A -> B) (h : (a : A) -> Path B (f a) (g a)) : Path (A -> B) f g
+  = \i x. h x i

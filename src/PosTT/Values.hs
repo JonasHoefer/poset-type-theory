@@ -32,7 +32,8 @@ data Val where
   VSigma :: Val -> Closure -> Val
   VPair :: Val -> Val -> Val
 
-  VPath :: Val -> Val -> Val -> Val
+  -- VPath :: Val -> Val -> Val -> Val
+  VPathP :: TrIntClosure -> Val -> Val -> Val
   VPLam :: IntClosure -> Val -> Val -> Val
 
   VCoePartial :: VI -> VI -> TrIntClosure -> Val
@@ -61,8 +62,10 @@ pattern VCoePi r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VPi a b) �
 pattern VCoeSigma :: VI -> VI -> Gen -> Val -> Closure -> Restr -> Val -> Val
 pattern VCoeSigma r₀ r₁ i a b α u = VCoe r₀ r₁ (TrIntClosure i (VSigma a b) α)  u
 
-pattern VCoePath :: VI -> VI -> Gen -> Val -> Val -> Val -> Restr -> Val -> Val
-pattern VCoePath r₀ r₁ i a a₀ a₁ α u = VCoe r₀ r₁ (TrIntClosure i (VPath a a₀ a₁) α)  u
+-- pattern VCoePath :: VI -> VI -> Gen -> Val -> Val -> Val -> Restr -> Val -> Val
+-- pattern VCoePath r₀ r₁ i a a₀ a₁ α u = VCoe r₀ r₁ (TrIntClosure i (VPath a a₀ a₁) α)  u
+pattern VCoePath :: VI -> VI -> Gen -> TrIntClosure -> Val -> Val -> Restr -> Val -> Val
+pattern VCoePath r₀ r₁ i a a₀ a₁ α u = VCoe r₀ r₁ (TrIntClosure i (VPathP a a₀ a₁) α)  u
 
 
 pattern VHCompPi :: VI -> VI -> Val -> Closure -> Val -> VSys TrIntClosure -> Val
@@ -71,8 +74,10 @@ pattern VHCompPi r r' a b a0 sys = VHComp r r' (VPi a b) a0 sys
 pattern VHCompSigma :: VI -> VI -> Val -> Closure -> Val -> VSys TrIntClosure -> Val
 pattern VHCompSigma r r' a b a0 sys = VHComp r r' (VSigma a b) a0 sys
 
-pattern VHCompPath :: VI -> VI -> Val -> Val -> Val -> Val -> VSys TrIntClosure -> Val
-pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
+-- pattern VHCompPath :: VI -> VI -> Val -> Val -> Val -> Val -> VSys TrIntClosure -> Val
+-- pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
+pattern VHCompPath :: VI -> VI -> TrIntClosure -> Val -> Val -> Val -> VSys TrIntClosure -> Val
+pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPathP a ar ar') a0 sys
 
 
 newtype VSys a = VSys { unVSys :: [(VCof, a)] }

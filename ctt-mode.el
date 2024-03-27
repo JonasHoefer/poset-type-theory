@@ -24,7 +24,7 @@
   "Keywords.")
 
 (defvar ctt-operations
-  '("Ext" "hComp" "coe" "refl" "U" "I" "ap" "split" ".1" ".2")
+  '("Ext" "Path" "PathP" "hComp" "coe" "refl" "U" "I" "ap" "split" ".1" ".2")
   "Operations.")
 
 (defvar ctt-special

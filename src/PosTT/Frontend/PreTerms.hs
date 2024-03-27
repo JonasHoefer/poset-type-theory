@@ -25,7 +25,8 @@ data PTm where
   Pr1 :: SrcSpan -> PTm -> PTm
   Pr2 :: SrcSpan -> PTm -> PTm
 
-  Path :: SrcSpan -> PTy -> PTm -> PTm -> PTm
+  -- Path :: SrcSpan -> PTy -> PTm -> PTm -> PTm
+  PathP :: SrcSpan -> Name -> PTy -> PTm -> PTm -> PTm
   PLam :: SrcSpan -> Name -> PTm -> PTm -> PTm -> PTm
   -- ^ λᵢ.u from a₀ to a₁
   PApp :: SrcSpan -> PTm -> PTm -> PTm -> ITm -> PTm
@@ -107,7 +108,7 @@ srcSpan = \case
   Pair ss _ _        -> ss
   Pr1 ss _           -> ss
   Pr2 ss _           -> ss
-  Path ss _ _ _      -> ss
+  PathP ss _ _ _ _   -> ss
   I ss               -> ss
   Zero ss            -> ss
   One ss             -> ss

@@ -42,7 +42,7 @@ instance Conv Val where
     (u@VHCompSigma{}, v              ) -> u `convSigma` v
     (u              , v@VHCompSigma{}) -> u `convSigma` v
 
-    (VPath a₀ a₀₀ a₀₁ , VPath a₁ a₁₀ a₁₁ ) -> (a₀, a₀₀, a₀₁) `conv` (a₁, a₁₀, a₁₁)
+    (VPathP a₀ a₀₀ a₀₁ , VPathP a₁ a₁₀ a₁₁ ) -> (a₀, a₀₀, a₀₁) `conv` (a₁, a₁₀, a₁₁)
     (u@(VPLam _ a₀ a₁), v                ) -> convPath a₀ a₁ u v
     (u                , v@(VPLam _ a₀ a₁)) -> convPath a₀ a₁ u v
     (u@(VCoePath _ _ _ _ a₀ a₁ _ _), v)    -> convPath a₀ a₁ u v
@@ -63,7 +63,7 @@ instance Conv Val where
     (d₀                , VHSum d₁ _        ) -> d₀ `conv` d₁
     -- TODO: hsplit; is the above correct?
     (VHCon c₀ as₀ is₀ _, VHCon c₁ as₁ is₁ _) | c₀ == c₁ -> (as₀, is₀) `conv` (as₁, is₁)
-    
+
     (VNeu k₀, VNeu k₁) -> k₀ `conv` k₁
 
     (u, v) -> Left $ ConvErrorTm (readBack u) (readBack v)

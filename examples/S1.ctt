@@ -1,12 +1,39 @@
 module S1 where
 
+import Paths
+import Foundations
+
 data S1 : U
   = base
   | loopAt <i> [ (i=0) -> base, (i=1) -> base ]
 
 loop : Path S1 base base = \i. loopAt i
 
--- stating this w/o PathP seems annoying
--- indS1 (M : S1 -> U) (b : M base) (l : _) : (z : S1) -> M z = hsplit
---   base   -> b
---   loop i -> l i
+ind-S1 (M : S1 -> U) (b : M base) (l : PathP (i. M (loop i)) b b) : (z : S1) -> M z = split
+  base     -> b
+  loopAt i -> l i
+
+
+----------------------------------------------------------------------------------------
+---- Loops
+
+Loop (A : U) : U = (x : A) * Path A x x
+
+S1-loop : Loop S1 = (base , loop)
+
+DepLoop (A : U) (l : Loop A) (M : A -> U) : U
+  = (x : M l.1) * PathP (i. M (l.2 i)) x x
+
+gen-S1 (A : U) (f : S1 -> A) : Loop A
+  = (f base , ap S1 A f base base loop)
+
+rec-S1 (A : U) (l : Loop A) : S1 -> A = split
+  base     -> l.1
+  loopAt i -> l.2 i
+
+S1-univ-prop-Iso (A : U) : Iso (S1 -> A) (Loop A)
+  = let sec (f : S1 -> A) : Path (S1 -> A) (rec-S1 A (gen-S1 A f)) f
+          = funExt S1 A (rec-S1 A (gen-S1 A f)) f
+              (ind-S1 (\z. Path A (rec-S1 A (gen-S1 A f) z) (f z)) (\_. f base) (\k _. f (loop k)))
+
+    in  (gen-S1 A, rec-S1 A, sec, refl (Loop A))

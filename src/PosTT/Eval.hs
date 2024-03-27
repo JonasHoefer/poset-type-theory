@@ -60,7 +60,8 @@ eval rho = \case
   Pr1 t     -> doPr1 (eval rho t)
   Pr2 t     -> doPr2 (eval rho t)
 
-  Path a s t     -> VPath (eval rho a) (eval rho s) (eval rho t)
+  -- Path a s t     -> VPath (eval rho a) (eval rho s) (eval rho t)
+  PathP a s t     -> VPathP (evalTrIntBinder rho a) (eval rho s) (eval rho t)
   PLam t t0 t1   -> VPLam (evalIntBinder rho t) (eval rho t0) (eval rho t1)
   PApp t t0 t1 r -> doPApp (eval rho t) (eval rho t0) (eval rho t1) (evalI rho r)
 
@@ -232,11 +233,11 @@ pFunType = closedEval $
 pFib :: Val
 pFib = closedEval $
   BLam "A" $ BLam "B" $ BLam "f" $ BLam "y" $
-    BSigma "A" "x" (Path "B" "y" ("f" `App` "x"))
+    BSigma "A" "x" (BPathP "_" "B" "y" ("f" `App` "x"))
 
 pIsContr :: Val
 pIsContr = closedEval $
-  BLam "A" $ BSigma "A" "x" $ BPi "A" "y" $ Path "A" "x" "y"
+  BLam "A" $ BSigma "A" "x" $ BPi "A" "y" $ BPathP "_" "A" "x" "y"
 
 pIsEquiv :: Val
 pIsEquiv = bindStage terminalStage $ eval (EnvFib (EnvFib EmptyEnv "fib" pFib) "is-contr" pIsContr) $
@@ -351,10 +352,10 @@ doPApp (VNeu k)       p0 p1 r
   | r === 1   = p1
   | otherwise = VPApp k p0 p1 r
 doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀) a₀(r₀) a₁(r₀)
-  doComp r₀ r₁ (TrIntClosure i a α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
+  doComp r₀ r₁ (TrIntClosure i (a $$ r) α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
     singSys (VCof [(r, 0)]) (TrIntClosure i (extGen i (re a₀)) α)
       <> singSys (VCof [(r, 1)]) (TrIntClosure i (extGen i (re a₁)) α)
-doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ a (doPApp u₀ a₀ a₁ r) $ simplifySys $
+doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ (a $$ r) (doPApp u₀ a₀ a₁ r) $ simplifySys $
   mapSys tb (rebindI $ \_ u -> doPApp u (re a₀) (re a₁) (re r))
     <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
 
@@ -412,7 +413,7 @@ doCoePartial r0 r1 = go False
       VSum{}   -> VCoePartial r0 r1 l
       VPi{}    -> VCoePartial r0 r1 l
       VSigma{} -> VCoePartial r0 r1 l
-      VPath{}  -> VCoePartial r0 r1 l
+      VPathP{} -> VCoePartial r0 r1 l
       VNeu k   | forced     -> VNeuCoePartial r0 r1 (TrNeuIntClosure i k)
       VExt{}   | forced     -> VCoePartial r0 r1 l -- we keep Ext types forced (3) -- REMARK: this slows "flip test" significantly
       _        | not forced -> go True (force l)
@@ -424,7 +425,7 @@ doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   TrIntClosure z (VSum d lbl) f      -> doCoeSum r0 r1 z d lbl f
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
-  l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
+  l@(TrIntClosure _ VPathP{}  _)     -> VCoe r0 r1 l
   TrIntClosure _ (VNeu _) _          -> impossible "doCoe with Neu"
 
 -- | Coercion for extension types. Note that the given type is assumed to be fully restricted.
@@ -435,7 +436,7 @@ doCoeExt r₀ r₁ z a bs u₀ = -- a, bs depend on z!
       b'p = mapSys (mapSysCof (forAll z) bs) $ \(b, w, _) -> -- here we could have simplification!
               let b' = trIntCl' $ \z' -> doCoe (re r₀) (iVar z') (TrIntClosure z (extGen z (re b)) IdRestr) (re u₀)
                   p  = doCoe (re r₀) (re r₁)
-                         (TrIntClosure z (extGen z (VPath (re a) (re a' $$ iVar z) (re w `doApp` (b' $$ iVar z)))) IdRestr)
+                         (TrIntClosure z (extGen z (VPathP (trIntCl "_" $ \_ -> re a) (re a' $$ iVar z) (re w `doApp` (b' $$ iVar z)))) IdRestr)
                          (refl (a @ (r₀ `for` z)) (re a₀))
               in  (b', p)
 
@@ -475,13 +476,13 @@ doHComp' r₀ r₁ a u0 = either ($$ r₁) (doHComp r₀ r₁ a u0)
 doHComp :: AtStage (VI -> VI -> VTy -> Val -> VSys TrIntClosure -> Val)
 doHComp r₀ r₁ _ u₀ _ | r₀ === r₁ = u₀
 doHComp r₀ r₁ t u₀ tb = case t of
-  VNeu k        -> VNeuHComp r₀ r₁ k u₀ tb
-  VPi a b       -> VHCompPi r₀ r₁ a b u₀ tb
-  VSigma a b    -> VHCompSigma r₀ r₁ a b u₀ tb
-  VPath a a₀ a₁ -> VHCompPath r₀ r₁ a a₀ a₁ u₀ tb
-  VSum d lbl    -> doHCompSum r₀ r₁ d lbl u₀ tb
-  VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
-  VU            -> doHCompU r₀ r₁ u₀ tb
+  VNeu k         -> VNeuHComp r₀ r₁ k u₀ tb
+  VPi a b        -> VHCompPi r₀ r₁ a b u₀ tb
+  VSigma a b     -> VHCompSigma r₀ r₁ a b u₀ tb
+  VPathP a a₀ a₁ -> VHCompPath r₀ r₁ a a₀ a₁ u₀ tb
+  VSum d lbl     -> doHCompSum r₀ r₁ d lbl u₀ tb
+  VExt a bs      -> doHCompExt r₀ r₁ a bs u₀ tb
+  VU             -> doHCompU r₀ r₁ u₀ tb
 
 
 ---- Cases for positive types
@@ -546,7 +547,7 @@ instance Restrictable Val where
     VSigma a b -> VSigma (a @ f) (b @ f)
     VPair u v  -> VPair (u @ f) (v @ f)
 
-    VPath a a0 a1  -> VPath (a @ f) (a0 @ f) (a1 @ f)
+    VPathP a a0 a1 -> VPathP (a @ f) (a0 @ f) (a1 @ f)
     VPLam cl p0 p1 -> VPLam (cl @ f) (p0 @ f) (p1 @ f)
 
     VCoePartial r0 r1 l -> doCoePartial (r0 @ f) (r1 @ f) (l @ f)
@@ -561,7 +562,7 @@ instance Restrictable Val where
     VCon c as          -> VCon c (as @ f)
     VSplitPartial v bs -> VSplitPartial (v @ f) (bs @ f)
 
-    VHSum _ _         -> error "VHSum @ f"
+    VHSum a lbl       -> VHSum (a @ f) (lbl @ f)
     VHCon c as is sys -> vHCon c (as @ f) (is @ f) (sys @ f)
 
     VNeu k -> k @ f
@@ -605,6 +606,10 @@ instance Restrictable VBranch where
   act :: AtStage (Restr -> VBranch -> VBranch)
   act f = fmap (@ f)
 
+instance Restrictable VHLabel where
+  act :: AtStage (Restr -> VHLabel -> VHLabel)
+  act f = fmap (@ f)
+
 instance Restrictable Closure where
   -- | ((λx.t)ρ)f = (λx.t)(ρf)
   act :: AtStage (Restr -> Closure -> Closure)
@@ -632,6 +637,10 @@ instance Restrictable TrNeuIntClosure where
 instance Restrictable VTel where
   act :: AtStage (Restr -> VTel -> VTel )
   act f (VTel ts rho) = VTel ts (rho @ f)
+
+instance Restrictable VHTel where
+  act :: AtStage (Restr -> VHTel -> VHTel)
+  act f (VHTel ts gen sys rho) = VHTel ts gen sys (rho @ f)
 
 instance Restrictable (Name, EnvEntry) where
   act :: AtStage (Restr -> (Name, EnvEntry) -> Alt (Name, EnvEntry))

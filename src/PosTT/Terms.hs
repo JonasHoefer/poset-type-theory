@@ -26,7 +26,8 @@ data Tm where
   Pr1 :: Tm -> Tm
   Pr2 :: Tm -> Tm
 
-  Path :: Ty -> Tm -> Tm -> Tm
+  PathP :: {-# UNPACK #-} TrIntBinder Ty -> Tm -> Tm -> Tm
+  -- Path :: Ty -> Tm -> Tm -> Tm
   PLam :: {-# UNPACK #-} IntBinder Tm -> ~Tm -> ~Tm -> Tm
   PApp :: Tm -> ~Tm -> ~Tm -> I -> Tm
 
@@ -59,6 +60,9 @@ data IntBinder a = IntBinder Gen a
 data TrIntBinder a = TrIntBinder Gen a
 
 data SplitBinder = SplitBinder [Name] Tm
+
+pattern BPathP :: Gen -> Ty -> Tm -> Tm -> Tm
+pattern BPathP x a  a₀ a₁ = PathP (TrIntBinder x a) a₀ a₁
 
 pattern BPi :: Ty -> Name -> Ty -> Tm
 pattern BPi a x b = Pi a (Binder x b)

@@ -24,6 +24,8 @@ loop1 : Path Torus base base = \i. loop1At i
 
 loop2 : Path Torus base base = \i. loop2At i
 
+surf : PathP (i. Path Torus (loop1 i) (loop1 i)) loop2 loop2 = \i j. surfAt i j
+
 
 --------------------------------------------------------------------------------
 ---- Torus → S¹ × S¹
@@ -64,9 +66,9 @@ TorusToS1TimesS1Section : Homotopy Torus Torus (\t. S1TimesS1toTorus (torusToS1T
 --------------------------------------------------------------------------------
 ---- S¹ × S¹ → Torus → S¹ × S¹
 
-TorusToS1TimesS1Retraction-base : (c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (base , c2))) (base , c2) = split
-  base     -> \_. (base, base)
-  loopAt j -> \_. (base, loop2At j)
+-- TorusToS1TimesS1Retraction-base : (c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (base , c2))) (base , c2) = split
+--   base     -> \_. (base, base)
+--   loopAt j -> \_. (base, loop2At j)
 
 -- TorusToS1TimesS1Retraction-loop :  -- we cannot state this w/o PathP ):
 --
