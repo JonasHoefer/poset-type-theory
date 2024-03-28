@@ -15,13 +15,26 @@ unit-l (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x x y (ref
   = \i j. hComp 0 1 A x
             [ (j=0) -> _. x
             , (j=1) -> k. p k
-            , (i=0) -> k.
+            , (i=0) -> k. -- hfill
                 hComp 0 k A x
                   [ (j=0) -> m. x
                   , (j=1) -> m. p (m /\ k)
                   ]
             , (i=1) -> k. p (j /\ k)
             ]
+
+unit-r (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x y y p (refl A y)) p
+  = \i j. hComp 0 1 A (p j)
+            [ (i=0) -> k.
+                hComp 0 k A (p j)
+                  [ (j=0) -> _. x
+                  , (j=1) -> _. y
+                  ]
+            , (i=1) -> _. p j
+            , (j=0) -> _. x
+            , (j=1) -> _. y
+            ]
+
 
 inv (A : U) (x y : A) (p : Path A y x) : Path A x y
   = doubleComp A x y y y p (refl A y) (refl A y)
