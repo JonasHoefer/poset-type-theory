@@ -1,6 +1,5 @@
 module S1 where
 
-import Paths
 import Foundations
 
 data S1 : U
@@ -65,3 +64,10 @@ S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P
 DescData : U = (X : U) * Equiv X X
 
 -- desc-S1 (P : S1 -> U) : DescData = (P base , _)
+
+
+
+----------------------------------------------------------------------------------------
+---- Tests
+
+doubleLoop : Path S1 base base = comp S1 base base base loop loop

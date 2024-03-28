@@ -1,7 +1,49 @@
 module Foundations where
 
 import Prelude
-import Paths
+
+--------------------------------------------------------------------------------
+---- paths
+
+doubleComp (A : U) (x y z w : A) (p : Path A y x) (q : Path A y z) (r : Path A z w) : Path A x w
+  = \i. hComp 0 1 A (q i) [ (i=0) -> j. p j , (i=1) -> j. r j]
+
+comp (A : U) (x y z : A) : Path A x y -> Path A y z -> Path A x z
+  = doubleComp A x x y z (refl A x)
+
+unit-l (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x x y (refl A x) p) p
+  = \i j. hComp 0 1 A x
+            [ (j=0) -> _. x
+            , (j=1) -> k. p k
+            , (i=0) -> k.
+                hComp 0 k A x
+                  [ (j=0) -> m. x
+                  , (j=1) -> m. p (m /\ k)
+                  ]
+            , (i=1) -> k. p (j /\ k)
+            ]
+
+inv (A : U) (x y : A) (p : Path A y x) : Path A x y
+  = doubleComp A x y y y p (refl A y) (refl A y)
+
+tr (A : U) (P : A -> U) (x y : A) (p : Path A x y) (u : P x) : P y
+  = coe 0 1 (i. P (p i)) u
+
+tr-refl (A : U) (B : A -> U) (a : A) (u : B a) : Path (B a) (tr A B a a (refl A a) u) u
+  = \i. coe i 1 (_. B a) u
+
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y)
+  = \i. f (p i)
+
+apd (A : U) (B : A -> U) (f : (x : A) -> B x) (x y : A) (p : Path A x y) : PathP (i. B (p i)) (f x) (f y)
+  = \i. f (p i)
+
+funExt (A B : U) (f g : A -> B) (h : (a : A) -> Path B (f a) (g a)) : Path (A -> B) f g
+  = \i x. h x i
+
+depFunExt (A : U) (B : A -> U) (f g : (x : A) -> B x) (h : (a : A) -> Path (B a) (f a) (g a)) : Path ((x : A) -> B x) f g
+  = \i x. h x i
+
 
 --------------------------------------------------------------------------------
 ---- basics
@@ -10,9 +52,34 @@ Prod (A B : U) : U = (_ : A) * B
 
 const (A B : U) (b : B) (_ : A) : B = b
 
---tr-comp (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (P : A -> U) (u : P x) :
---    Path (P z) (tr A P x z (comp A x y z p q) u) (tr A P y z q (tr A P x y p u))
---  = _
+
+--------------------------------------------------------------------------------
+---- contractability of singletons
+
+is-contr (A : U) : U = (x : A) * ((y : A) -> Path A x y)
+
+Singl (A : U) (x : A) : U = (y : A) * Path A x y
+
+is-contr-singl-center (A : U) (x : A) : Singl A x = (x , refl A x)
+
+is-contr-singl-contr (A : U) (x : A) (s : Singl A x) : Path (Singl A x) (is-contr-singl-center A x) s
+  = \i. (s.2 i , \j. s.2 (i /\ j))
+
+is-contr-singl (A : U) (x : A) : is-contr (Singl A x) = (is-contr-singl-center A x , is-contr-singl-contr A x)
+
+
+--------------------------------------------------------------------------------
+---- J
+
+J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
+  = tr (Singl A x) (\s. M s.1 s.2) (x , refl A x) (y , p) ((is-contr-singl A x).2 (y , p)) m
+
+JRefl (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) (J A x M m x (refl A x)) m
+  = tr-refl (Singl A x) (\s. M s.1 s.2) (x , refl A x) m
+
+-- tr-comp (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (P : A -> U) (u : P x) :
+--     Path (P z) (tr A P x z (comp A x y z p q) u) (tr A P y z q (tr A P x y p u))
+--   = _
 
 
 --------------------------------------------------------------------------------
@@ -46,5 +113,3 @@ IdEquiv (A : U) : Equiv A A = (id A , isEquivId A)
 
 EquivToPath (A B : U) (e : Equiv A B) : Path U A B
   = \i. Ext B [ (i=0) -> (A, e.1, e.2) , (i=1) -> (B, id B, isEquivId B) ]
-
-
