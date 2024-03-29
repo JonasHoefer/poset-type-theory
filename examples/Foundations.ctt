@@ -23,7 +23,7 @@ unit-l (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x x y (ref
             , (i=0) -> k. -- hfill
                 hComp 0 k A x
                   [ (j=0) -> m. x
-                  , (j=1) -> m. p (m /\ k)
+                  , (j=1) -> m. p m
                   ]
             , (i=1) -> k. p (j /\ k)
             ]
