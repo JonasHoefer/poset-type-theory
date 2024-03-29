@@ -1,0 +1,3 @@
+module Unit where
+
+data Unit : U = tt

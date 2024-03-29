@@ -5,11 +5,16 @@ import Prelude
 --------------------------------------------------------------------------------
 ---- paths
 
+Homotopy (A B : U) (f g : A -> B) : U = (x : A) -> Path B (f x) (g x)
+
 doubleComp (A : U) (x y z w : A) (p : Path A y x) (q : Path A y z) (r : Path A z w) : Path A x w
   = \i. hComp 0 1 A (q i) [ (i=0) -> j. p j , (i=1) -> j. r j]
 
 comp (A : U) (x y z : A) : Path A x y -> Path A y z -> Path A x z
   = doubleComp A x x y z (refl A x)
+
+invComp (A : U) (x y z : A) (p : Path A y x) (q : Path A y z) : Path A x z
+  = doubleComp A x y z z p q (refl A z)
 
 unit-l (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x x y (refl A x) p) p
   = \i j. hComp 0 1 A x
@@ -57,6 +62,9 @@ funExt (A B : U) (f g : A -> B) (h : (a : A) -> Path B (f a) (g a)) : Path (A ->
 depFunExt (A : U) (B : A -> U) (f g : (x : A) -> B x) (h : (a : A) -> Path (B a) (f a) (g a)) : Path ((x : A) -> B x) f g
   = \i x. h x i
 
+PathOver (A : U) (B : A -> U) (a0 a1 : A) (p : Path A a0 a1) (b0 : B a0) (b1 : B a1) : U
+  = Path (B a1) (tr A B a0 a1 p b0) b1
+
 
 --------------------------------------------------------------------------------
 ---- basics
@@ -82,6 +90,19 @@ is-contr-singl (A : U) (x : A) : is-contr (Singl A x) = (is-contr-singl-center A
 
 
 --------------------------------------------------------------------------------
+---- H-Levels
+
+is-prop (A : U) : U = (x y : A) -> (Path A x y)
+
+is-prop-fam (A : U) (B : A -> U) : U = (x : A) -> is-prop (B x)
+
+is-set (A : U) : U = (x y : A) -> is-prop (Path A x y)
+
+PointedPropIsContr (A : U) (a : A) (p : is-prop A) : is-contr A
+  = (a, \b. p a b)
+
+
+--------------------------------------------------------------------------------
 ---- J
 
 J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
@@ -96,9 +117,7 @@ JRefl (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) :
 
 
 --------------------------------------------------------------------------------
----- HoTT basics
-
-Homotopy (A B : U) (f g : A -> B) : U = (x : A) -> Path B (f x) (g x)
+---- Retracts
 
 hasRetract (A B : U) (s : A -> B) : U = (r : B -> A) * Homotopy A A (\x. r (s x)) (id A)
 
@@ -116,6 +135,10 @@ Iso (A B : U) : U =
   * Homotopy A A (\x. g (f x)) (id A)
   * Homotopy B B (\x. f (g x)) (id B)
 
+isoFun (A B : U) (iso : Iso A B) : A -> B = iso.1
+
+isoInv (A B : U) (iso : Iso A B) : B -> A = iso.2.1
+
 
 --------------------------------------------------------------------------------
 ---- Contractible Maps
@@ -126,3 +149,32 @@ IdEquiv (A : U) : Equiv A A = (id A , isEquivId A)
 
 EquivToPath (A B : U) (e : Equiv A B) : Path U A B
   = \i. Ext B [ (i=0) -> (A, e.1, e.2) , (i=1) -> (B, id B, isEquivId B) ]
+
+
+--------------------------------------------------------------------------------
+---- Sigma Basics
+
+SigmaPath (A : U) (B : A -> U) (u v : (a : A) * B a) : U =
+  (p : Path A u.1 v.1) * PathOver A B u.1 v.1 p u.2 v.2
+
+pairPathCurried (A : U) (B : A -> U) (a0 : A) : (a1 : A) (p : Path A a0 a1) (b0 : B a0) (b1 : B a1) (q : PathOver A B a0 a1 p b0 b1)
+  -> Path ((a : A) * B a) (a0, b0) (a1, b1)
+  = J A a0 (\a1 p. (b0 : B a0) (b1 : B a1) (q : PathOver A B a0 a1 p b0 b1) -> Path ((a : A) * B a) (a0, b0) (a1, b1))
+      (\b0 b1 q. J (B a0) b0 (\b1' _. Path ((a : A) * B a) (a0, b0) (a0, b1')) (refl ((a : A) * B a) (a0, b0)) b1
+        (invComp (B a0) b0 (coe 0 1 (i. B a0) b0) b1 (tr-refl A B a0 b0) q))
+
+pairPath (A : U) (B : A -> U) (u v : (a : A) * B a) (p : SigmaPath A B u v) : Path ((a : A) * B a) u v
+  = pairPathCurried A B u.1 v.1 p.1 u.2 v.2 p.2
+
+pairPathProp (A : U) (B : A -> U) (u v : (a : A) * B a) (p : Path A u.1 v.1) (q : is-prop-fam A B) : Path ((a : A) * B a) u v
+  = pairPath A B u v (p, q v.1 (coe 0 1 (i. B (p i)) u.2) v.2)
+
+
+--------------------------------------------------------------------------------
+---- Univalence
+
+ua (A B : U) (e : Equiv A B) : Path U A B
+  = \i. Ext B [ (i=0) -> (A, e.1, e.2) , (i=1) -> (B, id B, isEquivId B) ]
+
+uaInv (A B : U) (e : Equiv B A) : Path U A B
+  = \i. Ext A [ (i=0) -> (A, id A, isEquivId A) , (i=1) -> (B, e.1, e.2) ]

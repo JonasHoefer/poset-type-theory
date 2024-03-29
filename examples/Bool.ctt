@@ -1,5 +1,7 @@
 module Bool where
 
+import Foundations
+
 data Bool : U = true | false
 
 --------------------------------------------------------------------------------
@@ -17,3 +19,82 @@ recBool (M : U) (t : M) (f : M) (b : Bool) : M
 
 neg (b : Bool) : Bool = elimBool (\_. Bool) false true b
 
+
+--------------------------------------------------------------------------------
+---- Bool Observational Equiv
+
+BoolEq : Bool -> Bool -> U
+  = recBool (Bool -> U) (recBool U Unit Empty) (recBool U Empty Unit)
+
+BoolPathToBoolEq (x : Bool) : (y : Bool) (p : Path Bool x y) -> BoolEq x y
+  = J Bool x (\y _. BoolEq x y) (elimBool (\y. BoolEq y y) tt tt x)
+
+BoolEqToBoolPath (x y : Bool) (eq : BoolEq x y) : Path Bool x y
+  = elimBool (\x'. (y' : Bool) -> BoolEq x' y' -> Path Bool x' y')
+      (\y' eq'. elimBool (\y''. BoolEq true  y'' -> Path Bool true  y'') (\_. refl Bool true)            (absurd (Path Bool true false)) y' eq')
+      (\y' eq'. elimBool (\y''. BoolEq false y'' -> Path Bool false y'') (absurd (Path Bool false true)) (\_. refl Bool false)           y' eq')
+      x y eq
+
+TrueNeFalse : not (Path Bool true false) = BoolPathToBoolEq true false
+
+FalseNeTrue : not (Path Bool false true) = BoolPathToBoolEq false true
+
+
+--------------------------------------------------------------------------------
+---- Negation
+
+is-involutive-neg (b : Bool) : Path Bool (neg (neg b)) b
+  = elimBool (\x. Path Bool (neg (neg x)) x) (refl Bool true) (refl Bool false) b
+
+NegIso : Iso Bool Bool = (neg, neg, is-involutive-neg, is-involutive-neg)
+
+
+--------------------------------------------------------------------------------
+---- Bool is Set
+
+lemTrue : (x y : Bool) (p : Path Bool true x) (q : Path Bool true y) -> Path Bool x y
+  = elimBool (\x. (y : Bool) (p : Path Bool true x) (q : Path Bool true y) -> Path Bool x y)
+      (elimBool (\y. (p : Path Bool true true) (q : Path Bool true y) -> Path Bool true y)
+        (\_ _. refl Bool true)
+        (\_ q. absurd (Path Bool true false) (TrueNeFalse q))
+      )
+      (\y p _. absurd (Path Bool false y) (TrueNeFalse p))
+
+lemFalse : (x y : Bool) (p : Path Bool false x) (q : Path Bool false y) -> Path Bool x y
+  = elimBool (\x. (y : Bool) (p : Path Bool false x) (q : Path Bool false y) -> Path Bool x y)
+      (\y p _. absurd (Path Bool true y) (FalseNeTrue p))
+      (elimBool (\y. (p : Path Bool false false) (q : Path Bool false y) -> Path Bool false y)
+        (\_ q. absurd (Path Bool false true) (FalseNeTrue q))
+        (\_ _. refl Bool false)
+      )
+
+isPropPathTrueTrue : is-prop (Path Bool true true)
+  = \p q j i. lemTrue (p i) (q i) (\k. p (i /\ k)) (\k. q (i /\ k)) j
+
+isPropPathFalseFalse : is-prop (Path Bool false false)
+  = \p q j i. lemFalse (p i) (q i) (\k. p (i /\ k)) (\k. q (i /\ k)) j
+
+isSetBool : is-set Bool
+  = elimBool2 (\x y. (p q : Path Bool x y) -> Path (Path Bool x y) p q)
+      isPropPathTrueTrue (\p q. absurd (Path (Path Bool true false) p q) (TrueNeFalse q))
+      (\p q. absurd (Path (Path Bool false true) p q) (FalseNeTrue q)) isPropPathFalseFalse
+
+
+--------------------------------------------------------------------------------
+---- Ad-hoc proof that neg is equiv
+
+isEquiv-neg : isEquiv Bool Bool neg
+  = \b. PointedPropIsContr (fiber Bool Bool neg b)
+      (neg b, inv Bool b (neg (neg b)) (is-involutive-neg b))
+      (\f0 f1. pairPathProp Bool (\x. Path Bool b (neg x)) f0 f1
+        (doubleComp Bool f0.1 (neg (neg f0.1)) (neg (neg f1.1)) f1.1
+          (is-involutive-neg f0.1)
+          (\i. neg (invComp Bool (neg f0.1) b (neg f1.1) f0.2 f1.2 i))
+          (is-involutive-neg f1.1))
+        (\x. isSetBool b (neg x)))
+
+NegEquiv : Equiv Bool Bool = (neg, isEquiv-neg)
+
+NegPath : Path U Bool Bool = ua Bool Bool NegEquiv
+
+IterNeg : Nat -> Path U Bool Bool = recNat (Path U Bool Bool) (refl U Bool) (\_ e. comp U Bool Bool Bool e NegPath)

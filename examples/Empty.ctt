@@ -1,0 +1,7 @@
+module Empty where
+
+data Empty : U =
+
+absurd (A : U) : Empty -> A = split {}
+
+not (A : U) : U = A -> Empty

@@ -1,0 +1,7 @@
+module Sum where
+
+data Sum (A B : U) : U = inl (x : A) | inr (y : B)
+
+elimSum (A B : U) (M : Sum A B -> U) (l : (a : A) -> M (inl a)) (r : (b : B) -> M (inr b)) : (p : Sum A B) -> M p = split
+  inl x -> l x
+  inr y -> r y

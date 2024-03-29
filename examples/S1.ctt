@@ -65,6 +65,9 @@ DescData : U = (X : U) * Equiv X X
 
 -- desc-S1 (P : S1 -> U) : DescData = (P base , _)
 
+TwistedDoubleCover : S1 -> U = split
+  base     -> _
+  loopAt i -> _
 
 
 ----------------------------------------------------------------------------------------
