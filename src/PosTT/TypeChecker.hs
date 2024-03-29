@@ -219,8 +219,8 @@ check = flip $ \ty -> atArgPos $ \case
       Right (a, a₀, a₁) -> do
         let i = x
         (t', vt) <- bindIntVar i (\vi -> checkAndEval t (a $$ vi))
-        convTC (TypeErrorEndpoint I0) a₀ (vt @ (0 `for` i))
-        convTC (TypeErrorEndpoint I1) a₁ (vt @ (1 `for` i))
+        convTC (TypeErrorEndpoint i I0) a₀ (vt @ (0 `for` i))
+        convTC (TypeErrorEndpoint i I1) a₁ (vt @ (1 `for` i))
         return $ BPLam i t' (readBack a₀) (readBack a₁)
   P.Pair _ s t -> do
     (a, b) <- isSigma ty
@@ -254,9 +254,9 @@ check = flip $ \ty -> atArgPos $ \case
           bindFibIntVars ns tel $ \xs is sys -> do
             let fv = vb $$ (xs, is)
             mapSysM sys $ \v -> do
-              convTC (TypeErrorHSplitCompat (readBack vf)) (re fv) (doSplit vf vbs v)
+              convTC (TypeErrorHSplitCompat (readBack vf)) (re fv) (doHSplit vf b vbs v)
 
-        return $ Split f bs'
+        return $ HSplit f (readBack b) bs'
   P.ExtElm _ s ts -> do
     (a, bs) <- isExt ty
     (s', vs) <- checkAndEval s a

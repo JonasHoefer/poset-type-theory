@@ -77,7 +77,7 @@ eval rho = \case
 
   HSum d lbl       -> VHSum (reAppDef rho d) (map (evalHLabel rho) lbl)
   HCon c as is sys -> vHCon c (map (eval rho) as) (map (evalI rho) is) (evalSys eval rho sys)
-
+  HSplit f a bs    -> VHSplitPartial (reAppDef rho f) (evalBinder rho a) (map (evalBranch rho) bs)
 
 evalI :: Env -> I -> VI
 evalI rho = \case
@@ -333,10 +333,11 @@ doPr2 (VHCompSigma r₀ r₁ a b u₀ tb) = doComp r₀ r₁
   (mapSys tb $ rebindI $ \_ u -> doPr2 u)
 
 doApp :: AtStage (Val -> Val -> Val)
-doApp (VLam cl)             v = cl $$ v
-doApp (VNeu k)              v = VApp k v
-doApp (VSplitPartial f bs)  v = doSplit f bs v
-doApp (VCoePartial r0 r1 l) v = doCoePartialApp r0 r1 l v
+doApp (VLam cl)               v = cl $$ v
+doApp (VNeu k)                v = VApp k v
+doApp (VSplitPartial f bs)    v = doSplit f bs v
+doApp (VHSplitPartial f a bs) v = doHSplit f a bs v
+doApp (VCoePartial r0 r1 l)   v = doCoePartialApp r0 r1 l v
 doApp (VCoePi r₀ r₁ z a b α u₀) a₁ = doCoe r₀ r₁
   (trIntCl z $ \z' -> b @ ((iVar z' `for` z) <> α) $$ doCoe r₁ (iVar z') (TrIntClosure z a α) a₁)
   (u₀ `doApp` doCoe r₁ r₀ (TrIntClosure z a α) a₁)
@@ -358,9 +359,15 @@ doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ (a 
     <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
 
 doSplit :: AtStage (Val -> [VBranch] -> Val -> Val)
-doSplit _ bs (VCon c as)       | Just cl <- lookup c bs = cl $$ (as, [])
-doSplit _ bs (VHCon c as is _) | Just cl <- lookup c bs = cl $$ (as, is)
-doSplit f bs (VNeu k)          = VSplit f bs k
+doSplit _ bs (VCon c as) | Just cl <- lookup c bs = cl $$ (as, [])
+doSplit f bs (VNeu k)    = VSplit f bs k
+
+doHSplit :: AtStage (Val -> Closure -> [VBranch] -> Val -> Val)
+doHSplit _ _ bs (VHCon c as is _)              | Just cl <- lookup c bs = cl $$ (as, is)
+doHSplit f a bs (VHCompHSum r r' d lbl u₀ sys) =
+  doComp r r' (trIntCl' $ \i -> a $$ doHComp r (iVar i) (VHSum d lbl) u₀ sys)
+    (doHSplit f a bs u₀) (mapSys sys $ rebindI $ \_ -> doHSplit (re f) (re a) (re bs))
+doHSplit f a bs (VNeu k)                       = VHSplit f a bs k
 
 vHCon :: Name -> [Val] -> [VI] -> Either Val (VSys Val) -> Val
 vHCon c as is = either id (VHCon c as is)
@@ -479,6 +486,7 @@ doHComp r₀ r₁ t u₀ tb = case t of
   VPi a b       -> VHCompPi r₀ r₁ a b u₀ tb
   VSigma a b    -> VHCompSigma r₀ r₁ a b u₀ tb
   VPath a a₀ a₁ -> VHCompPath r₀ r₁ a a₀ a₁ u₀ tb
+  VHSum d lbl   -> VHCompHSum r₀ r₁ d lbl u₀ tb
   VSum d lbl    -> doHCompSum r₀ r₁ d lbl u₀ tb
   VExt a bs     -> doHCompExt r₀ r₁ a bs u₀ tb
   VU            -> doHCompU r₀ r₁ u₀ tb
@@ -561,8 +569,9 @@ instance Restrictable Val where
     VCon c as          -> VCon c (as @ f)
     VSplitPartial v bs -> VSplitPartial (v @ f) (bs @ f)
 
-    VHSum a lbl       -> VHSum (a @ f) (lbl @ f)
-    VHCon c as is sys -> vHCon c (as @ f) (is @ f) (sys @ f)
+    VHSum a lbl           -> VHSum (a @ f) (lbl @ f)
+    VHCon c as is sys     -> vHCon c (as @ f) (is @ f) (sys @ f)
+    VHSplitPartial v a bs -> VHSplitPartial (v @ f) (a @ f) (bs @ f)
 
     VNeu k -> k @ f
 
@@ -589,7 +598,8 @@ instance Restrictable Neu where
 
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
-    NSplit g bs k -> doSplit (g @ f) (bs @ f) (k @ f)
+    NSplit g bs k    -> doSplit (g @ f) (bs @ f) (k @ f)
+    NHSplit g a bs k -> doHSplit (g @ f) (a @ f) (bs @ f) (k @ f)
 
 instance Restrictable a => Restrictable (VSys a) where
   type Alt (VSys a) = Either (Alt a) (VSys (Alt a))

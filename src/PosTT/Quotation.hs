@@ -24,24 +24,25 @@ instance ReadBack Val where
 
   readBack :: AtStage (Val -> Tm)
   readBack = \case
-   VU                  -> U
-   VPi a b             -> Pi (readBack a) (readBack b)
-   VLam c              -> Lam (readBack c)
-   VSigma a b          -> Sigma (readBack a) (readBack b)
-   VPair u v           -> Pair (readBack u) (readBack v)
-   VPath a a₀ a₁       -> Path (readBack a) (readBack a₀) (readBack a₁)
-   VPLam c a₀ a₁       -> PLam (readBack c) (readBack a₀) (readBack a₁)
-   VCoePartial r₀ r₁ c -> Coe (readBack r₀) (readBack r₁) (readBack c)
-   VCoe r₀ r₁ c u₀     -> readBack (VCoePartial r₀ r₁ c) `App` readBack u₀
-   VHComp r₀ r₁ a u₀ s -> HComp (readBack r₀) (readBack r₁) (readBack a) (readBack u₀) (readBack s)
-   VExt a b            -> Ext (readBack a) (readBack b)
-   VExtElm v us        -> ExtElm (readBack v) (readBack us)
-   VSum d _            -> readBack d
-   VCon c as           -> Con c (map readBack as)
-   VSplitPartial f _   -> readBack f
-   VHSum d _           -> readBack d
-   VHCon c as is sys   -> HCon c (map readBack as) (map readBack is) (readBack sys)
-   VNeu k              -> readBack k
+   VU                   -> U
+   VPi a b              -> Pi (readBack a) (readBack b)
+   VLam c               -> Lam (readBack c)
+   VSigma a b           -> Sigma (readBack a) (readBack b)
+   VPair u v            -> Pair (readBack u) (readBack v)
+   VPath a a₀ a₁        -> Path (readBack a) (readBack a₀) (readBack a₁)
+   VPLam c a₀ a₁        -> PLam (readBack c) (readBack a₀) (readBack a₁)
+   VCoePartial r₀ r₁ c  -> Coe (readBack r₀) (readBack r₁) (readBack c)
+   VCoe r₀ r₁ c u₀      -> readBack (VCoePartial r₀ r₁ c) `App` readBack u₀
+   VHComp r₀ r₁ a u₀ s  -> HComp (readBack r₀) (readBack r₁) (readBack a) (readBack u₀) (readBack s)
+   VExt a b             -> Ext (readBack a) (readBack b)
+   VExtElm v us         -> ExtElm (readBack v) (readBack us)
+   VSum d _             -> readBack d
+   VCon c as            -> Con c (map readBack as)
+   VSplitPartial f _    -> readBack f
+   VHSum d _            -> readBack d
+   VHCon c as is sys    -> HCon c (map readBack as) (map readBack is) (readBack sys)
+   VHSplitPartial f _ _ -> readBack f
+   VNeu k               -> readBack k
 
 instance ReadBack Neu where
   type Quot Neu = Tm
@@ -59,6 +60,7 @@ instance ReadBack Neu where
     NHCompSum r₀ r₁ d _ k tb  -> HComp (readBack r₀) (readBack r₁) (readBack d) (readBack k) (readBack tb)
     NExtFun ws k              -> ExtFun (readBack ws) (readBack k)
     NSplit f bs k             -> readBack (VSplitPartial f bs) `App` readBack k
+    NHSplit f a bs k          -> readBack (VHSplitPartial f a bs) `App` readBack k
 
 instance ReadBack v => ReadBack (VSys v) where
   type Quot (VSys v) = Sys (Quot v)

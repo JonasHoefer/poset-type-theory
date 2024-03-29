@@ -72,8 +72,12 @@ S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P
 
 doubleLoop : Path S1 base base = comp S1 base base base loop loop
 
+tripleLoop : Path S1 base base = comp S1 base base base loop doubleLoop
+
 TwistedDoubleCover : S1 -> U = rec-S1 U (Bool, NegPath)
 
 testTrTDC1 : Bool = tr S1 TwistedDoubleCover base base loop true
 
--- testTrTDC2 : Bool = tr S1 TwistedDoubleCover base base (doubleLoop) true
+testTrTDC2 : Bool = tr S1 TwistedDoubleCover base base doubleLoop true
+
+testTrTDC3 : Bool = tr S1 TwistedDoubleCover base base tripleLoop true

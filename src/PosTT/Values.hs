@@ -6,12 +6,10 @@ import Algebra.Lattice
 import Data.Bifunctor
 import Data.List (uncons)
 import Data.Either (isRight)
-import Data.String (IsString(..))
 
 import PosTT.Common
 import PosTT.Terms
 import PosTT.Errors
-import qualified Control.Applicative as M
 import qualified PosTT.Common as M
 
 
@@ -52,6 +50,7 @@ data Val where
 
   VHSum :: Val -> [VHLabel] -> VTy
   VHCon :: Name -> [Val] -> [VI] -> VSys Val -> Val
+  VHSplitPartial :: Val -> Closure -> [VBranch] -> Val
 
   VNeu :: !Neu -> Val
 type VTy = Val
@@ -76,6 +75,9 @@ pattern VHCompSigma r r' a b a0 sys = VHComp r r' (VSigma a b) a0 sys
 pattern VHCompPath :: VI -> VI -> TrIntClosure -> Val -> Val -> Val -> VSys TrIntClosure -> Val
 pattern VHCompPath r r' a ar ar' a0 sys = VHComp r r' (VPath a ar ar') a0 sys
 
+pattern VHCompHSum :: VI -> VI -> Val -> [VHLabel] -> Val -> VSys TrIntClosure -> Val
+pattern VHCompHSum r r' d lbl a0 sys = VHComp r r' (VHSum d lbl) a0 sys
+
 
 newtype VSys a = VSys { unVSys :: [(VCof, a)] }
   deriving Semigroup via [(VCof, a)]
@@ -98,6 +100,7 @@ data Neu where
   NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
   NSplit :: Val -> [VBranch] -> Neu -> Neu
+  NHSplit :: Val -> Closure -> [VBranch] -> Neu -> Neu
 
 pattern VVar :: Name -> Val
 pattern VVar x = VNeu (NVar x)
@@ -131,6 +134,9 @@ pattern VExtFun ws k = VNeu (NExtFun ws k)
 
 pattern VSplit :: Val -> [VBranch] -> Neu -> Val
 pattern VSplit f bs k = VNeu (NSplit f bs k)
+
+pattern VHSplit :: Val -> Closure -> [VBranch] -> Neu -> Val
+pattern VHSplit f a bs k = VNeu (NHSplit f a bs k)
 
 
 ---- Data Types

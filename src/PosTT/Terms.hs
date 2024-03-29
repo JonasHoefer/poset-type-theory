@@ -43,6 +43,7 @@ data Tm where
 
   HSum :: Name -> [HLabel] -> Tm
   HCon :: Name -> [Tm] -> [I] -> Sys Tm -> Tm
+  HSplit :: Name -> Binder Ty -> [Branch] -> Tm
 type Ty = Tm
 
 instance IsString Tm where

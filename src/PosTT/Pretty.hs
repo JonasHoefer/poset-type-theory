@@ -38,13 +38,24 @@ instance Show Tm where
   show = pretty
 
 deriving instance Show ConvError
-deriving instance Show TypeError
+-- deriving instance Show TypeError
 
---instance Show TypeError where
---  show = \case
---    TypeErrorConv ss u v err -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": Could not convert between\n\n" ++ pretty u
---                                  ++ "\n\nand\n\n" ++ pretty v ++ "\n\nbecause " ++ show err
---    _ -> error "TODO: pretty print this error"
+instance Show TypeError where
+  show = \case
+    TypeErrorConv ss u v err -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": Could not convert between\n\n" ++ pretty u
+                                  ++ "\n\nand\n\n" ++ pretty v ++ "\n\nbecause " ++ show err
+    TypeErrorEndpoint n e ss pi ti err -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": Endpoints do not match at " ++ pretty (Var n)
+      ++ " = " ++ prettyI e ++ "\n\n" ++ pretty pi ++ "\n\nand\n\n" ++ pretty ti ++ "\n\nbecause " ++ show err
+
+    TypeErrorMsg ss msg -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": " ++ msg
+    -- TypeErrorBoundary :: I -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+    -- TypeErrorSystemCompat :: SrcSpan -> ConvError -> TypeError
+    -- TypeErrorExtElmCompat :: SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+    -- TypeErrorMissingCon :: SrcSpan -> Name -> Tm -> TypeError
+    -- TypeErrorConArgCount :: SrcSpan -> Name -> Int -> Int -> TypeError
+    -- TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError
+    -- TypeErrorHSplitCompat :: Tm -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+    _ -> error "TODO: pretty print this error"
 
 prettySrcSpan :: SrcSpan -> String
 prettySrcSpan (Just ((r1,c1),(r2,c2))) = " (" ++ show r1 ++ ":" ++ show c1 ++ ")-(" ++ show r2 ++ ":" ++ show c2 ++ ")"
@@ -82,6 +93,7 @@ reflect = \case
   Split _ _                      -> R.Var () (reflectName "[Split]") -- Should only occur if we print non-normalized term!
   HSum _ _                       -> R.Var () (reflectName "[HSum]") -- Should only occur if we print non-normalized term!
   HCon c as is _                 -> foldl1 (R.App ()) (R.Var () (reflectName c) : map reflect as ++ map reflectFormula is)
+  HSplit _ _ _                   -> R.Var () (reflectName "[Higher Split]") -- Should only occur if we print non-normalized term!
 
 reflectSysBinder :: Sys (TrIntBinder Tm) -> R.SysBinder' ()
 reflectSysBinder (Sys bs) = R.SysBinder () (map reflectSideBinder bs)
