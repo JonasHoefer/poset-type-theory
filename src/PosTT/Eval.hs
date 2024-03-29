@@ -351,9 +351,9 @@ doPApp (VNeu k)       p0 p1 r
   | r === 1   = p1
   | otherwise = VPApp k p0 p1 r
 doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀) a₀(r₀) a₁(r₀)
-  doComp r₀ r₁ (TrIntClosure i (a $$ r) α) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
-    singSys (VCof [(r, 0)]) (TrIntClosure i (extGen i (re a₀)) α)
-      <> singSys (VCof [(r, 1)]) (TrIntClosure i (extGen i (re a₁)) α)
+  doComp r₀ r₁ (trIntCl i $ \i' -> a @ (α <> (iVar i' `for` i)) $$ r) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
+    singSys (VCof [(r, 0)]) (TrIntClosure i a₀ α) <> singSys (VCof [(r, 1)]) (TrIntClosure i a₁ α)
+  -- restr introducting equation (r=c) do not affect closures, so we can omitt `re` above
 doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ (a $$ r) (doPApp u₀ a₀ a₁ r) $ simplifySys $
   mapSys tb (rebindI $ \_ u -> doPApp u (re a₀) (re a₁) (re r))
     <> singSys (VCof [(r, bot)]) (trIntCl' $ \_ -> re a₀) <> singSys (VCof [(r, top)]) (trIntCl' $ \_ -> re a₁)
