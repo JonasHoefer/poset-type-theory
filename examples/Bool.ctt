@@ -2,6 +2,9 @@ module Bool where
 
 import Foundations
 
+import Unit
+import Empty
+
 data Bool : U = true | false
 
 --------------------------------------------------------------------------------
@@ -96,5 +99,3 @@ isEquiv-neg : isEquiv Bool Bool neg
 NegEquiv : Equiv Bool Bool = (neg, isEquiv-neg)
 
 NegPath : Path U Bool Bool = ua Bool Bool NegEquiv
-
-IterNeg : Nat -> Path U Bool Bool = recNat (Path U Bool Bool) (refl U Bool) (\_ e. comp U Bool Bool Bool e NegPath)

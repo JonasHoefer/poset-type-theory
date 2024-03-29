@@ -1,13 +1,10 @@
 module Test where
 
-import Prelude
 import Foundations
 
 import Bool
-import Empty
-import Nat
 import Sum
-import Unit
+import Nat
 
 
 funComp (A B C : U) (f : B -> C) (g : A -> B) (x : A) : C = f (g x)
@@ -76,6 +73,8 @@ DecToQuasiConstant (A : U) (dec : isDec A) : QuasiConst A A
 
 --------------------------------------------------------------------------------
 ---- Test
+
+IterNeg : Nat -> Path U Bool Bool = recNat (Path U Bool Bool) (refl U Bool) (\_ e. comp U Bool Bool Bool e NegPath)
 
 testTwo : Bool = transport U (id U) Bool Bool (IterNeg (suc (suc zero))) true
 

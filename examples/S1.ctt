@@ -1,6 +1,7 @@
 module S1 where
 
 import Foundations
+import Bool
 
 data S1 : U
   = base
@@ -61,16 +62,18 @@ S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P
 ----------------------------------------------------------------------------------------
 ---- Descent
 
-DescData : U = (X : U) * Equiv X X
+-- DescData : U = (X : U) * Equiv X X
 
 -- desc-S1 (P : S1 -> U) : DescData = (P base , _)
-
-TwistedDoubleCover : S1 -> U = split
-  base     -> _
-  loopAt i -> _
 
 
 ----------------------------------------------------------------------------------------
 ---- Tests
 
 doubleLoop : Path S1 base base = comp S1 base base base loop loop
+
+TwistedDoubleCover : S1 -> U = rec-S1 U (Bool, NegPath)
+
+testTrTDC1 : Bool = tr S1 TwistedDoubleCover base base loop true
+
+-- testTrTDC2 : Bool = tr S1 TwistedDoubleCover base base (doubleLoop) true
