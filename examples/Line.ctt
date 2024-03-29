@@ -1,0 +1,22 @@
+module Partial where
+
+import Bool
+
+
+data FreeLine : U = lineAt <i> []
+
+Line (A : U) : U = FreeLine -> A
+
+DepLine (A : Line U) : U = (l : FreeLine) -> A l
+
+ep0 (A : U) (l : Line A) : A = l (lineAt 0)
+
+ep1 (A : U) (l : Line A) : A = l (lineAt 1)
+
+LineToPath (A : U) (l : Line A) : Path A (ep0 A l) (ep1 A l) = \i. l (lineAt i)
+
+ConstLine (A : U) (a : A) : Line A = split
+  lineAt i -> a
+
+ConstLineIsRefl (A : U) (a : A) : Path (Path A a a) (LineToPath A (ConstLine A a)) (\_. a)
+  = \_ _. a
