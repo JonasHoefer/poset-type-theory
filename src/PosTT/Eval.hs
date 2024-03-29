@@ -194,16 +194,23 @@ headVTel (VTel ((_, a):_) ρ) = eval ρ a
 tailVTel :: VTel -> Val -> VTel
 tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
+unConsVTel :: AtStage (VTel -> Maybe (VTy, Val -> VTel))
+unConsVTel (VTel ((x, a):tel) ρ) = Just (eval ρ a, \v -> VTel tel (EnvFib ρ x v))
+unConsVTel _                     = Nothing
+
+pattern VTelCons :: (?s :: Stage) => VTy -> (Val -> VTel) -> VTel
+pattern VTelCons a tel <- (unConsVTel -> Just (a, tel))
+
 pattern VTelNil :: VTel
 pattern VTelNil <- VTel [] _
 
-headVHTel :: AtStage (VHTel -> Maybe VTy)
-headVHTel (VHTel ((_, a):_) _     _ ρ) = Just (eval ρ a)
-headVHTel (VHTel _          (_:_) _ _) = Nothing -- I
-
-tailVHTel :: VHTel -> Either Val VI -> VHTel
-tailVHTel (VHTel ((x, _):tel) is     sys ρ) (Left v)  = VHTel tel is sys (EnvFib ρ x v)
-tailVHTel (VHTel []           (i:is) sys ρ) (Right v) = VHTel []  is sys (EnvInt ρ i v)
+-- headVHTel :: AtStage (VHTel -> Maybe VTy)
+-- headVHTel (VHTel ((_, a):_) _     _ ρ) = Just (eval ρ a)
+-- headVHTel (VHTel _          (_:_) _ _) = Nothing -- I
+--
+-- tailVHTel :: VHTel -> Either Val VI -> VHTel
+-- tailVHTel (VHTel ((x, _):tel) is     sys ρ) (Left v)  = VHTel tel is sys (EnvFib ρ x v)
+-- tailVHTel (VHTel []           (i:is) sys ρ) (Right v) = VHTel []  is sys (EnvInt ρ i v)
 
 unConsVHTel :: AtStage (VHTel -> Either (Either Val (VSys Val)) (Either (VTy, Val -> VHTel) (VI -> VHTel)))
 unConsVHTel = \case
@@ -351,7 +358,7 @@ doPApp (VNeu k)       p0 p1 r
   | r === 1   = p1
   | otherwise = VPApp k p0 p1 r
 doPApp (VCoePath r₀ r₁ i a a₀ a₁ α u₀) _ _ r = -- u₀ : Path a(r₀) a₀(r₀) a₁(r₀)
-  doComp r₀ r₁ (trIntCl i $ \i' -> a @ (α <> (iVar i' `for` i)) $$ r) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
+  doComp r₀ r₁ (trIntCl i $ \i' -> a @ ((iVar i' `for` i) <> α) $$ r) (doPApp u₀ (a₀ @ (r₀ `for` i)) (a₁ @ (r₁ `for` i)) r) $
     singSys (VCof [(r, 0)]) (TrIntClosure i a₀ α) <> singSys (VCof [(r, 1)]) (TrIntClosure i a₁ α)
   -- restr introducting equation (r=c) do not affect closures, so we can omitt `re` above
 doPApp (VHCompPath r₀ r₁ a a₀ a₁ u₀ tb) _ _ r = doHComp' r₀ r₁ (a $$ r) (doPApp u₀ a₀ a₁ r) $ simplifySys $
@@ -464,12 +471,19 @@ doCoeExt r₀ r₁ z a bs u₀ = -- a, bs depend on z!
 
 -- | Coercion in a sum type. Note that the type given by (d, lbl) has to be restricted by f.
 doCoeSum :: AtStage (VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Val -> Val)
-doCoeSum r₀ r₁ i _ lbl f (VCon c as) | Just tel <- lookup c lbl = VCon c (doCoeTel r₀ r₁ i tel f as)
+doCoeSum r₀ r₁ i _ lbl f (VCon c as) | Just tel <- lookup c lbl =
+  let (i', tel') = refreshGen i $ \i' -> (i', tel @ ((iVar i' `for` i) <> f))
+      -- we have a closure (λi.tel)f which we force to (λi'.tel')() to simplify doCoeTel
+  in  VCon c (doCoeTel r₀ r₁ i' tel' as)
 doCoeSum r₀ r₁ i d lbl f (VNeu k)    = VNeuCoeSum r₀ r₁ i d lbl f k
 
-doCoeTel :: AtStage (VI -> VI -> Gen -> VTel -> Restr -> [Val] -> [Val])
-doCoeTel _ _ _ VTelNil _ [] = []
-doCoeTel _ _ _ _       _ _  = error "TODO: copy"
+-- | Coercion in a telescope. Note that the line of telescopes is at the current stage.
+doCoeTel :: AtStage (VI -> VI -> Gen -> VTel -> [Val] -> [Val])
+doCoeTel _  _  _ VTelNil                       []     = []
+doCoeTel r₀ r₁ i (unConsVTel -> Just (a, tel)) (v:vs) =
+  let v' j = doCoe r₀ j (TrIntClosure i a IdRestr) v
+      vs'  = doCoeTel r₀ r₁ i (tel (v' (iVar i))) vs
+  in  v' r₁ : vs'
 
 
 --------------------------------------------------------------------------------

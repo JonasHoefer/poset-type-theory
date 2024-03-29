@@ -376,13 +376,12 @@ checkHLabels a = fmap (sortOn hLabelName) . go [] a
       (l:) <$> go (vl:vlbl) d lbl
 
 checkHConArgs :: AtStage ([PTm] -> VHTel -> TypeChecker ([Tm], [I], Sys Tm))
-checkHConArgs (t:ts) tel = case headVHTel tel of
-  Just a  -> do
-    (t', vt) <- checkAndEval t a
-    first3 (t':) <$> checkHConArgs ts (tailVHTel tel (Left vt))
-  Nothing -> do
-    (t', vt) <- checkAndEvalI t
-    second3 (t':) <$> checkHConArgs ts (tailVHTel tel (Right vt))
+checkHConArgs (t:ts) (VHTelConsFib a tel) = do
+  (t', vt) <- checkAndEval t a
+  first3 (t':) <$> checkHConArgs ts (tel vt)
+checkHConArgs (t:ts) (VHTelConsInt tel)   = do
+  (t', vt) <- checkAndEvalI t
+  second3 (t':) <$> checkHConArgs ts (tel vt)
 checkHConArgs [] (VHTelNil (Right sys)) = return ([], [], readBack sys)
 checkHConArgs _  _                      = impossible "checkHConArgs: Argument numbers do not match"
 
