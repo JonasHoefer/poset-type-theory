@@ -96,6 +96,7 @@ data Neu where
   NPApp :: Neu -> Val -> Val -> VI -> Neu
   NCoePartial :: VI -> VI -> TrNeuIntClosure -> Neu
   NCoeSum :: VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Neu -> Neu
+  NCoeHSum :: VI -> VI -> Gen -> VTy -> [VHLabel] -> Restr -> Neu -> Neu
   NHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Neu
   NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
@@ -122,6 +123,9 @@ pattern VNeuCoePartial r0 r1 cl = VNeu (NCoePartial r0 r1 cl)
 
 pattern VNeuCoeSum :: VI -> VI -> Gen -> VTy -> [VLabel] -> Restr -> Neu -> Val
 pattern VNeuCoeSum r₀ r₁ i d lbl f k = VNeu (NCoeSum r₀ r₁ i d lbl f k)
+
+pattern VNeuCoeHSum :: VI -> VI -> Gen -> VTy -> [VHLabel] -> Restr -> Neu -> Val
+pattern VNeuCoeHSum r₀ r₁ i d lbl f k = VNeu (NCoeHSum r₀ r₁ i d lbl f k)
 
 pattern VNeuHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Val
 pattern VNeuHComp r r' a u₀ tb = VNeu (NHComp r r' a u₀ tb)
@@ -155,6 +159,9 @@ data VHTel = VHTel [(Name, Ty)] [Gen] (Sys Tm) Env
 
 lengthVHTel :: VHTel -> Int
 lengthVHTel (VHTel as is _ _) = length as + length is
+
+hTelToTel :: VHTel -> VTel
+hTelToTel (VHTel tel _ _ ρ) = VTel tel ρ
 
 type VHLabel = (Name, VHTel)
 

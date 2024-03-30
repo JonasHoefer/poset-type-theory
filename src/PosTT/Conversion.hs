@@ -92,6 +92,7 @@ instance Conv Neu where
     (NHComp r₀ s₀ k₀ u₀ tb₀, NHComp r₁ s₁ k₁ u₁ tb₁) -> (r₀, s₀, k₀, u₀, tb₀) `conv` (r₁, s₁, k₁, u₁, tb₁)
     -- TODO: NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
     -- TODO: coe in sum
+    -- TODO: hsum coe and hcomp
     (NExtFun ws₀ k₀        , NExtFun ws₁ k₁        ) -> (ws₀, k₀) `conv` (ws₁, k₁)
     (NSplit f₀ _ k₀        , NSplit f₁ _ k₁        ) -> (f₀, k₀) `conv` (f₁, k₁)
     (NHSplit f₀ _ _ k₀     , NHSplit f₁ _ _ k₁     ) -> (f₀, k₀) `conv` (f₁, k₁)

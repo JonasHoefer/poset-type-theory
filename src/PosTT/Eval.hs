@@ -435,7 +435,7 @@ doCoePartialApp :: AtStage (VI -> VI -> TrIntClosure -> Val -> Val)
 doCoePartialApp r0 r1 = \case -- r0 != r1 by (1) ; by (2) these are all cases
   TrIntClosure z (VExt a bs) IdRestr -> doCoeExt r0 r1 z a bs -- by (3) restr (incl. eqs)
   TrIntClosure z (VSum d lbl) f      -> doCoeSum r0 r1 z d lbl f
-  TrIntClosure z (VHSum d lbl) f     -> error "TODO: coe VHSum"
+  TrIntClosure z (VHSum d lbl) f     -> doCoeHSum r0 r1 z d lbl f
   l@(TrIntClosure _ VPi{}    _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VSigma{} _)      -> VCoe r0 r1 l
   l@(TrIntClosure _ VPath{}  _)      -> VCoe r0 r1 l
@@ -484,6 +484,17 @@ doCoeTel r₀ r₁ i (unConsVTel -> Just (a, tel)) (v:vs) =
   let v' j = doCoe r₀ j (TrIntClosure i a IdRestr) v
       vs'  = doCoeTel r₀ r₁ i (tel (v' (iVar i))) vs
   in  v' r₁ : vs'
+
+-- | Coercion in a HIT. Note that the type given by (d, lbl) has to be restricted by f.
+doCoeHSum :: AtStage (VI -> VI -> Gen -> VTy -> [VHLabel] -> Restr -> Val -> Val)
+doCoeHSum r₀ r₁ i d lbl f (VHCon c vs is sys) | Just tel <- lookup c lbl =
+  let (i', tel') = refreshGen i $ \i' -> (i', tel @ ((iVar i' `for` i) <> f))
+      -- we have a closure (λi.tel)f which we force to (λi'.tel')() to simplify doCoeTel
+  in  VHCon c (doCoeTel r₀ r₁ i' (hTelToTel tel') vs) is
+        (mapSys sys (doCoeHSum (re r₀) (re r₁) i d lbl f))
+      -- we do not restrict the line (λHSum d lbl)f because this formally only yields (λHSum d lbl)fη
+      -- where η only projects onto the quotient with the additional equation.
+doCoeHSum r₀ r₁ i d lbl f (VNeu k)            = VNeuCoeHSum r₀ r₁ i d lbl f k
 
 
 --------------------------------------------------------------------------------
@@ -593,6 +604,7 @@ instance Restrictable Neu where
   -- a neutral can get "unstuck" when restricted
   type Alt Neu = Val
 
+  -- TODO: check for completeness
   act :: AtStage (Restr -> Neu -> Val)
   act f = \case
     NVar x -> VVar x
@@ -604,8 +616,9 @@ instance Restrictable Neu where
 
     NPApp k a₀ a₁ r -> doPApp (k @ f) (a₀ @ f) (a₁ @ f) (r @ f)
 
-    NCoePartial r₀ r₁ cl      -> doCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
-    NCoeSum r₀ r₁ i d lbl g k -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VSum d lbl) g @ f) (k @ f)
+    NCoePartial r₀ r₁ cl       -> doCoePartial (r₀ @ f) (r₁ @ f) (cl @ f)
+    NCoeSum r₀ r₁ i d lbl g k  -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VSum d lbl) g @ f) (k @ f)
+    NCoeHSum r₀ r₁ i d lbl g k -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VHSum d lbl) g @ f) (k @ f)
 
     NHComp r₀ r₁ k u₀ tb       -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
     NHCompSum r₀ r₁ d lbl k tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
