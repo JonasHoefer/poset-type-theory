@@ -108,6 +108,8 @@ toBoolExpr (VI sys) = sup [ inf (map return cl) | cl <- sys ]
 -- If I, φ₁, …, φₙ ⊢ r : 𝕀 and I, φ₁, …, φₙ ⊢ s : 𝕀 then we decide if I, Ψ ⊢ r ≡ s : 𝕀
 -- For that we check the validity of the formula φ₁ ∧ … ∧ φₙ → (r ↔ s) as a boolean formula.
 -- Here, we interpret a cofibration φₗ = φᵣ as the boolean formula φₗ ↔ φᵣ.
+--
+-- Formally, we decide a word problem in a finite distrib lattice D=⟨X∣R⟩ with r,s ∈ Free(X)
 equivalent :: AtStage (VI -> VI -> Bool)
 equivalent r s = val $ stageCofForm `impl` (toBoolExpr r `equiv` toBoolExpr s)
 
@@ -121,7 +123,7 @@ impliesCof :: AtStage (VCof -> VCof -> Bool)
 impliesCof φ ψ = val $ stageCofForm `impl` (cofToBoolExpr φ `impl` cofToBoolExpr ψ)
 
 equivalentCof :: AtStage (VCof -> VCof -> Bool)
-equivalentCof φ ψ = val $ stageCofForm `equiv` (cofToBoolExpr φ `impl` cofToBoolExpr ψ)
+equivalentCof φ ψ = val $ stageCofForm `impl` (cofToBoolExpr φ `equiv` cofToBoolExpr ψ)
 
 validCof :: AtStage (VCof -> Bool)
 validCof φ = val $ stageCofForm `impl` cofToBoolExpr φ
@@ -148,7 +150,7 @@ simplifySys (VSys sys) = reducedRemaining  -- TODO: pick only satisfyable ones!
     reducedRemaining :: Either a (VSys a)
     reducedRemaining = case remaining of
       [(cofibs, b)] | validCof cofibs             -> Left b
-      [(cofibs, b)] | not (satisfiableCof cofibs) -> Right $ VSys []
+      [(cofibs, _)] | not (satisfiableCof cofibs) -> Right $ VSys []
       _                                           -> Right $ VSys remaining
 
     hasOutgoing :: G.SCC (node, Int, [Int]) -> Bool
