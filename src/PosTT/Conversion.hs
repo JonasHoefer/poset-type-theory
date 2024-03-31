@@ -83,20 +83,23 @@ instance Conv TrNeuIntClosure where
 instance Conv Neu where
   conv :: AtStage (Neu -> Neu -> Either ConvError ())
   conv = curry $ \case
-    (NVar x₀               , NVar x₁               ) | x₀ == x₁ -> pure ()
-    (NApp k₀ v₀            , NApp k₁ v₁            ) -> (k₀, v₀) `conv` (k₁, v₁)
-    (NPr1 k₀               , NPr1 k₁               ) -> k₀ `conv` k₁
-    (NPr2 k₀               , NPr2 k₁               ) -> k₀ `conv` k₁
-    (NPApp v₀ _ _ r₀       , NPApp v₁ _ _ r₁       ) -> (v₀ `conv` v₁) *> (r₀ `conv` r₁)
-    (NCoePartial r₀ s₀ c₀  , NCoePartial r₁ s₁ c₁  ) -> (r₀, s₀, c₀) `conv` (r₁, s₁, c₁)
-    (NHComp r₀ s₀ k₀ u₀ tb₀, NHComp r₁ s₁ k₁ u₁ tb₁) -> (r₀, s₀, k₀, u₀, tb₀) `conv` (r₁, s₁, k₁, u₁, tb₁)
-    -- TODO: NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys IntClosure -> Neu
-    -- TODO: coe in sum
-    -- TODO: hsum coe and hcomp
-    (NExtFun ws₀ k₀        , NExtFun ws₁ k₁        ) -> (ws₀, k₀) `conv` (ws₁, k₁)
-    (NSplit f₀ _ k₀        , NSplit f₁ _ k₁        ) -> (f₀, k₀) `conv` (f₁, k₁)
-    (NHSplit f₀ _ _ k₀     , NHSplit f₁ _ _ k₁     ) -> (f₀, k₀) `conv` (f₁, k₁)
-    (k₀                    , k₁                    ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)
+    (NVar x₀                        , NVar x₁                        ) | x₀ == x₁ -> pure ()
+    (NApp k₀ v₀                     , NApp k₁ v₁                     ) -> (k₀, v₀) `conv` (k₁, v₁)
+    (NPr1 k₀                        , NPr1 k₁                        ) -> k₀ `conv` k₁
+    (NPr2 k₀                        , NPr2 k₁                        ) -> k₀ `conv` k₁
+    (NPApp v₀ _ _ r₀                , NPApp v₁ _ _ r₁                ) -> (v₀ `conv` v₁) *> (r₀ `conv` r₁)
+    (NCoePartial r₀ s₀ c₀           , NCoePartial r₁ s₁ c₁           ) -> (r₀, s₀, c₀) `conv` (r₁, s₁, c₁)
+    (NHComp r₀ s₀ k₀ u₀ tb₀         , NHComp r₁ s₁ k₁ u₁ tb₁         ) -> (r₀, s₀, k₀, u₀, tb₀) `conv` (r₁, s₁, k₁, u₁, tb₁)
+    (NExtFun ws₀ k₀                 , NExtFun ws₁ k₁                 ) -> (ws₀, k₀) `conv` (ws₁, k₁)
+    (NSplit f₀ _ k₀                 , NSplit f₁ _ k₁                 ) -> (f₀, k₀) `conv` (f₁, k₁)
+    (NHSplit f₀ _ _ k₀              , NHSplit f₁ _ _ k₁              ) -> (f₀, k₀) `conv` (f₁, k₁)
+    (NCoeSum r₀ s₀ z₀ d₀ lbl₀ α₀ k₀ , NCoeSum r₁ s₁ z₁ d₁ lbl₁ α₁ k₁ )
+      -> (r₀, s₀, TrIntClosure z₀ (VSum d₀ lbl₀) α₀, k₀) `conv` (r₁, s₁, TrIntClosure z₁ (VSum d₁ lbl₁) α₁, k₁)
+    (NCoeHSum r₀ s₀ z₀ d₀ lbl₀ α₀ k₀, NCoeHSum r₁ s₁ z₁ d₁ lbl₁ α₁ k₁)
+      -> (r₀, s₀, TrIntClosure z₀ (VHSum d₀ lbl₀) α₀, k₀) `conv` (r₁, s₁, TrIntClosure z₁ (VHSum d₁ lbl₁) α₁, k₁)
+    (NHCompSum r₀ s₀ d₀ lbl₀ k₀ tb₀ , NHCompSum r₁ s₁ d₁ lbl₁ k₁ tb₁ )
+      -> (r₀, s₀, VSum d₀ lbl₀, k₀, tb₀) `conv` (r₁, s₁, VSum d₁ lbl₁, k₁, tb₁)
+    (k₀                             , k₁                             ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)
 
 instance Conv a => Conv (VSys a) where
   -- here we use that φ ≤ φ₁ ∨ … ∨ φₙ iff φ ≤ φᵢ for some i
