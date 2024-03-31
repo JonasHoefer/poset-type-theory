@@ -6,6 +6,7 @@ import           Data.String (IsString(..))
 import           Data.Tuple.Extra (fst3)
 
 import           Control.Monad.Except
+import           Control.Monad.Extra (ifM)
 import           Control.Monad.State.Strict
 
 import           System.Console.Haskeline
@@ -144,7 +145,9 @@ repl = do
           repl
         Right Quit     -> return ()
         Right (Load p) -> do
-          replLoad p
+          () <- ifM (liftIO (doesFileExist p))
+            (replLoad p)
+            (outputStrLn $ "File " ++ show p ++ " does not exist!")
           repl
         Right Reload -> do
           gets currentFile >>= \case
