@@ -99,6 +99,7 @@ instance Conv Neu where
     (k₀                    , k₁                    ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)
 
 instance Conv a => Conv (VSys a) where
+  -- here we use that φ ≤ φ₁ ∨ … ∨ φₙ iff φ ≤ φᵢ for some i
   conv :: Conv a => AtStage (VSys a -> VSys a -> Either ConvError ())
   conv EmptySys            EmptySys   = pure ()
   conv (VSys ((phi,a):bs)) (VSys bs') = case extractWith (===) phi bs' of

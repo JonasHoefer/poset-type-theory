@@ -5,8 +5,6 @@ module PosTT.Eval where
 
 import Algebra.Lattice
 
-import Control.Applicative
-
 import Data.Bifunctor
 import Data.Either.Extra (fromRight')
 import Data.Tuple.Extra (fst3, snd3, thd3)
@@ -181,8 +179,17 @@ instance Apply VHTel where
 force :: AtStage (TrIntClosure -> TrIntClosure)
 force cl@(TrIntClosure i _ _) = trIntCl i $ \j -> cl $$ iVar j
 
+-- | Allows the construction of a new `TrIntClosure` from an old one, where the
+--   the function depends on the new abstracted name, and the value of the old
+--   closure applied to it. This allows semantic computations under a closure.
 rebindI :: AtStage (AtStage (Gen -> Val -> Val) -> TrIntClosure -> TrIntClosure)
 rebindI k c@(TrIntClosure i _ _) = trIntCl i $ \j -> k j (c $$ iVar j)
+
+-- | Same as `rebindI` for multiple lines at once
+rebindIs :: AtStage (AtStage (Gen -> [Val] -> [Val]) -> [TrIntClosure] -> [TrIntClosure])
+rebindIs _ []                          = []
+rebindIs k cs@((TrIntClosure i _ _):_) =
+  refreshGen i $ \i' -> flip (TrIntClosure i') IdRestr <$> k i' (map ($$ iVar i') cs)
 
 
 --------------------------------------------------------------------------------
@@ -195,7 +202,7 @@ tailVTel :: VTel -> Val -> VTel
 tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
 
 unConsVTel :: AtStage (VTel -> Maybe (VTy, Val -> VTel))
-unConsVTel (VTel ((x, a):tel) ρ) = Just (eval ρ a, \v -> VTel tel (EnvFib ρ x v))
+unConsVTel (VTel ((x, a):tel) ρ) = Just (eval ρ a, VTel tel . EnvFib ρ x)
 unConsVTel _                     = Nothing
 
 pattern VTelCons :: (?s :: Stage) => VTy -> (Val -> VTel) -> VTel
@@ -315,7 +322,7 @@ wid' a isContrA = either id (wid a isContrA)
 
 doComp :: AtStage (VI -> VI -> TrIntClosure -> Val -> VSys TrIntClosure -> Val)
 doComp r₀ r₁ ℓ u₀ tb = doHComp r₀ r₁ (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀)
-  $ mapSys tb $ \u -> trIntCl' $ \z -> doCoe (re r₁) (iVar z) (re ℓ) (u $$ iVar z)
+  $ mapSys tb $ rebindI $ \z -> doCoe (re r₁) (iVar z) (re ℓ)
 
 
 --------------------------------------------------------------------------------
@@ -492,7 +499,7 @@ doCoeHSum r₀ r₁ i d lbl f (VHCon c vs is sys) | Just tel <- lookup c lbl =
       -- we have a closure (λi.tel)f which we force to (λi'.tel')() to simplify doCoeTel
   in  VHCon c (doCoeTel r₀ r₁ i' (hTelToTel tel') vs) is
         (mapSys sys (doCoeHSum (re r₀) (re r₁) i d lbl f))
-      -- we do not restrict the line (λHSum d lbl)f because this formally only yields (λHSum d lbl)fη
+      -- we do not restrict the line (λHSum d lbl)f because this formally yields (λHSum d lbl)fη
       -- where η only projects onto the quotient with the additional equation.
 doCoeHSum r₀ r₁ i d lbl f (VNeu k)            = VNeuCoeHSum r₀ r₁ i d lbl f k
 
@@ -547,22 +554,40 @@ doHCompU r₀ r₁ a₀ tb =
 -- Sum Types
 
 doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum r₀ r₁ _ lbl (VCon c as) tb
-  | Just tel <- lookup c lbl, Just tb' <- unConSys c tb = VCon c (doHCompTel r₀ r₁ tel as tb')
+doHCompSum r₀ r₁ _ lbl (VCon c as) tb | Just tel <- lookup c lbl = case unConSys c tb of
+  Just tb' -> VCon c (doHCompTel r₀ r₁ tel as tb')
+  Nothing  -> error "TODO: composition in contradictory context, new base case for neutrals?"
 doHCompSum r₀ r₁ d lbl (VNeu k)    tb = VNeuHCompSum r₀ r₁ d lbl k tb
 
 unConSys :: AtStage (Name -> VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
-unConSys c tb = go tb <|> go (mapSys tb force) -- TODO: do we want selective forcing here?
-  where
-    go :: AtStage (VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
-    go tb' = mapSysM tb' $ \case
+unConSys c tb = mapSysM tb $ \case
+  -- we can work under  the closue because we do not compute and just manipulate syntax
+  (TrIntClosure i (VCon c' as) α)
+    | c == c' -> Just (flip (TrIntClosure i) α <$> as)
+    | c /= c' -> Nothing
+  -- we force if necessary
+  (force -> TrIntClosure i (VCon c' as) IdRestr)
+    | c == c' -> Just (flip (TrIntClosure i) IdRestr <$> as)
+    | c /= c' -> Nothing
 
 
 -- Telescopes
 
 doHCompTel :: AtStage (VI -> VI -> VTel -> [Val] -> VSys [TrIntClosure] -> [Val])
-doHCompTel _ _ VTelNil [] _ = []
-doHCompTel _ _ _       _  _ = error "TODO: copy doHCompTel"
+doHCompTel _  _  VTelNil                       []       _   = []
+doHCompTel r₀ r₁ (unConsVTel -> Just (a, tel)) (u₀:u₀s) tbs = 
+  let -- we do not restrict, because we only use this value only at ?s and ?s, z' below
+      u₁ :: AtStage (VI -> Val) 
+      u₁ z = doHComp r₀ z a u₀ (mapSys tbs head)
+      -- we build a line of telescopes, as we do in the Σ case in `doPr2`
+      (z'', ℓ) = freshGen $ \z' -> (z', tel $ u₁ $ iVar z')
+      u₁s      = doCompTel r₀ r₁ z'' ℓ u₀s (mapSys tbs tail)
+  in  u₁ r₁ : u₁s
+
+-- | Compositions in a telescopes, where λz.ℓ is a line of telescopes (with no delayed restriction)
+doCompTel :: AtStage (VI -> VI -> Name -> VTel -> [Val] -> VSys [TrIntClosure] -> [Val])
+doCompTel r₀ r₁ z ℓ u₀s tbs = doHCompTel r₀ r₁ (ℓ @ (r₁ `for` z)) (doCoeTel r₀ r₁ z ℓ u₀s)
+  $ mapSys tbs $ rebindIs $ \i vs -> doCoeTel (re r₀) (iVar i) z (extGen z (re ℓ)) vs
 
 
 --------------------------------------------------------------------------------
