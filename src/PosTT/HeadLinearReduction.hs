@@ -81,8 +81,10 @@ singleReductionNeu δ = \case
   NHComp r₀ r₁ k u₀ tb       -> (\t -> doHComp r₀ r₁ t u₀ tb) <$> singleReductionNeu δ k
   NExtFun ws k               -> doExtFun ws <$> singleReductionNeu δ k
   NCoeSum r₀ r₁ i d lbl f k  -> doCoeSum r₀ r₁ i d lbl f <$> singleReductionNeu δ k
+  NCoeHSum r₀ r₁ i d lbl f k -> doCoeHSum r₀ r₁ i d lbl f <$> singleReductionNeu δ k
   NHCompSum r₀ r₁ d lbl k tb -> (\v -> doHCompSum r₀ r₁ d lbl v tb) <$> singleReductionNeu δ k
   NSplit f bs k              -> doSplit f bs <$> singleReductionNeu δ k
+  NHSplit f d bs k           -> doHSplit f d bs <$> singleReductionNeu δ k
 
 singleReductionTrNeuIntClosure :: AtStage (AtStage (Name -> Val) -> TrNeuIntClosure -> (Name, TrIntClosure))
 singleReductionTrNeuIntClosure δ (TrNeuIntClosure i k) =
