@@ -11,53 +11,53 @@ import PosTT.Common (Name, Gen, SrcSpan)
 data PTm where
   U :: SrcSpan -> PTy
   Var :: SrcSpan -> Name -> PTm
+  -- | let x = u : A in v
   Let :: SrcSpan -> Name -> PTm -> PTy -> PTm -> PTm
-  -- ^ let x = u : A in v
 
+  -- | (x : A) -> B
   Pi :: SrcSpan -> Name -> PTy -> PTy -> PTy
-  -- ^ (x : A) -> B
   Lam :: SrcSpan -> Name -> Maybe PTy -> PTm -> PTm
   App :: SrcSpan -> PTm -> PTm -> PTm
 
+  -- | (x : A) * B
   Sigma :: SrcSpan -> Name -> PTy -> PTy -> PTy
-  -- ^ (x : A) * B
   Pair :: SrcSpan -> PTm -> PTm -> PTm
   Pr1 :: SrcSpan -> PTm -> PTm
   Pr2 :: SrcSpan -> PTm -> PTm
 
+  -- | Path (z.A) u v
   Path :: SrcSpan -> Name -> PTy -> PTm -> PTm -> PTm
+  -- | λᵢ.u from a₀ to a₁
   PLam :: SrcSpan -> Name -> PTm -> PTm -> PTm -> PTm
-  -- ^ λᵢ.u from a₀ to a₁
+  -- | u @ʳˢ v
   PApp :: SrcSpan -> PTm -> PTm -> PTm -> ITm -> PTm
-  -- ^ u @ʳˢ v
 
-  -- ^ Path A u v
   I :: SrcSpan -> PTy
   Zero :: SrcSpan -> ITm
   One :: SrcSpan -> ITm
   Inf :: SrcSpan -> ITm -> ITm -> ITm
   Sup :: SrcSpan -> ITm -> ITm -> ITm
 
+  -- | coeʳ⃗ˢ (i.A)
   Coe :: SrcSpan -> ITm -> ITm -> Name -> PTy -> PTm
-  -- ^ coeʳ⃗ˢ (i.A)
+  -- | hcompʳ⃗ˢ A a₀ [ψᵢ ↪ j.uᵢ]
   HComp :: SrcSpan -> ITm -> ITm -> PTy -> PTm -> Sys (Name, PTm) -> PTm
-  -- ^ hcompʳ⃗ˢ A a₀ [ψᵢ ↪ j.uᵢ]
 
+  -- | Ext A [ψᵢ ↪ (Bᵢ, eᵢ, pᵢ)]
   Ext :: SrcSpan -> PTy -> Sys (PTy, PTm, PTm) -> PTm
-  -- ^ Ext A [ψᵢ ↪ (Bᵢ, eᵢ, pᵢ)]
+  -- | ExtElem a [ψᵢ ↪ bᵢ]
   ExtElm :: SrcSpan -> PTm -> [PTm] -> PTm
-  -- ^ ExtElem a [ψᵢ ↪ bᵢ]
+  -- | ExtFun [ψᵢ ↪ e] u
   ExtFun :: SrcSpan -> PTm -> PTm
-  -- ^ ExtFun [ψᵢ ↪ e] u
 
+  -- | A (recursive) labeled sum type
   Sum :: SrcSpan -> Name -> [Label] -> PTm
-  -- ^ A (recursive) labeled sum type
+  HSum :: SrcSpan -> Name -> [HLabel] -> PTm
+
+  -- | A constructorfor a (recursive) labeled sum type or HIT with all its arguments
   Con :: SrcSpan -> Name -> [PTm] -> PTm
-  -- ^ A constructorfor a (recursive) labeled sum type with all its arguments
   Split :: SrcSpan -> Name -> [Branch] -> PTm
 
-  HSum :: SrcSpan -> Name -> [HLabel] -> PTm
-  -- HCon :: SrcSpan -> Name -> [PTm] -> PTm -- TODO: we could omitt this
 deriving instance Show PTm
 
 type PTy = PTm
@@ -92,7 +92,6 @@ data Decl = Decl SrcSpan Name PTm PTy
 
 app :: SrcSpan -> PTm -> PTm -> PTm
 app _  (Con ss c as)  v = Con ss c (as ++ [v])
--- app _  (HCon ss c as) v = HCon ss c (as ++ [v])
 app ss u              v = App ss u v
 
 srcSpan :: PTm -> SrcSpan
@@ -122,4 +121,3 @@ srcSpan = \case
   Con ss _ _         -> ss
   Split ss _ _       -> ss
   HSum ss _ _        -> ss
-  -- HCon ss _ _        -> ss
