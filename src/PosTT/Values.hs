@@ -99,6 +99,7 @@ data Neu where
   NCoeHSum :: VI -> VI -> Gen -> VTy -> [VHLabel] -> Restr -> Neu -> Neu
   NHComp :: VI -> VI -> Neu -> Val -> VSys TrIntClosure -> Neu
   NHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Neu
+  NNonConstHCompSum :: VI -> VI -> VTy -> [VLabel] -> Name -> [Val] -> VSys TrIntClosure -> Neu
   NExtFun :: VSys Val -> Neu -> Neu
   NSplit :: Val -> [VBranch] -> Neu -> Neu
   NHSplit :: Val -> Closure -> [VBranch] -> Neu -> Neu
@@ -132,6 +133,9 @@ pattern VNeuHComp r r' a u₀ tb = VNeu (NHComp r r' a u₀ tb)
 
 pattern VNeuHCompSum :: VI -> VI -> VTy -> [VLabel] -> Neu -> VSys TrIntClosure -> Val
 pattern VNeuHCompSum r₀ r₁ d lbl k tb = VNeu (NHCompSum r₀ r₁ d lbl k tb)
+
+pattern VNonConstHCompSum :: VI -> VI -> VTy -> [VLabel] -> Name -> [Val] -> VSys TrIntClosure -> Val
+pattern VNonConstHCompSum r₀ r₁ d lbl c as tb = VNeu (NNonConstHCompSum r₀ r₁ d lbl c as tb)
 
 pattern VExtFun :: VSys Val -> Neu -> Val
 pattern VExtFun ws k = VNeu (NExtFun ws k)

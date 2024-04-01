@@ -85,6 +85,7 @@ singleReductionNeu δ = \case
   NHCompSum r₀ r₁ d lbl k tb -> (\v -> doHCompSum r₀ r₁ d lbl v tb) <$> singleReductionNeu δ k
   NSplit f bs k              -> doSplit f bs <$> singleReductionNeu δ k
   NHSplit f d bs k           -> doHSplit f d bs <$> singleReductionNeu δ k
+  NNonConstHCompSum{}        -> impossible "Non-constant tubes for HComp in sum type during closed evaluation"
 
 singleReductionTrNeuIntClosure :: AtStage (AtStage (Name -> Val) -> TrNeuIntClosure -> (Name, TrIntClosure))
 singleReductionTrNeuIntClosure δ (TrNeuIntClosure i k) =

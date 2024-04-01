@@ -554,9 +554,9 @@ doHCompU r₀ r₁ a₀ tb =
 -- Sum Types
 
 doHCompSum :: AtStage (VI -> VI -> Val -> [VLabel] -> Val -> VSys TrIntClosure -> Val)
-doHCompSum r₀ r₁ _ lbl (VCon c as) tb | Just tel <- lookup c lbl = case unConSys c tb of
+doHCompSum r₀ r₁ d lbl (VCon c as) tb | Just tel <- lookup c lbl = case unConSys c tb of
   Just tb' -> VCon c (doHCompTel r₀ r₁ tel as tb')
-  Nothing  -> error "TODO: composition in contradictory context, new base case for neutrals?"
+  Nothing  -> VNonConstHCompSum r₀ r₁ d lbl c as tb
 doHCompSum r₀ r₁ d lbl (VNeu k)    tb = VNeuHCompSum r₀ r₁ d lbl k tb
 
 unConSys :: AtStage (Name -> VSys TrIntClosure -> Maybe (VSys [TrIntClosure]))
@@ -575,9 +575,9 @@ unConSys c tb = mapSysM tb $ \case
 
 doHCompTel :: AtStage (VI -> VI -> VTel -> [Val] -> VSys [TrIntClosure] -> [Val])
 doHCompTel _  _  VTelNil                       []       _   = []
-doHCompTel r₀ r₁ (unConsVTel -> Just (a, tel)) (u₀:u₀s) tbs = 
+doHCompTel r₀ r₁ (unConsVTel -> Just (a, tel)) (u₀:u₀s) tbs =
   let -- we do not restrict, because we only use this value only at ?s and ?s, z' below
-      u₁ :: AtStage (VI -> Val) 
+      u₁ :: AtStage (VI -> Val)
       u₁ z = doHComp r₀ z a u₀ (mapSys tbs head)
       -- we build a line of telescopes, as we do in the Σ case in `doPr2`
       (z'', ℓ) = freshGen $ \z' -> (z', tel $ u₁ $ iVar z')
@@ -645,8 +645,9 @@ instance Restrictable Neu where
     NCoeSum r₀ r₁ i d lbl g k  -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VSum d lbl) g @ f) (k @ f)
     NCoeHSum r₀ r₁ i d lbl g k -> doCoe (r₀ @ f) (r₁ @ f) (TrIntClosure i (VHSum d lbl) g @ f) (k @ f)
 
-    NHComp r₀ r₁ k u₀ tb       -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
-    NHCompSum r₀ r₁ d lbl k tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
+    NHComp r₀ r₁ k u₀ tb                  -> doHComp' (r₀ @ f) (r₁ @ f) (k @ f) (u₀ @ f) (tb @ f)
+    NHCompSum r₀ r₁ d lbl k tb            -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (k @ f) (tb @ f)
+    NNonConstHCompSum r₀ r₁ d lbl c as tb -> doHComp' (r₀ @ f) (r₁ @ f) (VSum (d @ f) (lbl @ f)) (VCon c (as @ f)) (tb @ f)
 
     NExtFun ws k -> doExtFun' (ws @ f) (k @ f)
 
