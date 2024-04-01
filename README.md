@@ -20,7 +20,7 @@ In the repl, use `:help` to see all available commands.
 
 ## References
 
-This implementation is inspired by [cctt][software/cctt] by András Kovács and [cubicaltt][software/cubicaltt] by Anders Mörtberg.
+This implementation is inspired by [cctt][software/cctt] by András Kovács and [cubicaltt][software/cubicaltt] by Cyril Cohen, Thierry Coquand, Simon Huber, and Anders Mörtberg.
 
 
 ## Versions
