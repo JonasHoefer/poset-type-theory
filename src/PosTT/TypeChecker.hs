@@ -212,7 +212,7 @@ check = flip $ \ty -> atArgPos $ \case
     () <- either (\_ -> return ()) compatible vsys'
 
     return $ Ext a' sys'
-  P.Lam _ x _ t ->
+  P.Lam _ x Nothing t ->
     isPiOrPath ty >>= \case
       Left (a, b) ->
         BLam x <$> bindFibVar x a (\vx -> check t (b $$ vx))
@@ -327,7 +327,7 @@ infer = atArgPos $ \case
     () <- either (\_ -> return ()) compatible vtb'
 
     return (HComp r'₀ r'₁ a' u'₀ tb', va)
-  t -> error $ show t
+  _ -> fail $ "Could not infer type!"
 
 inferAndEval :: AtStage (PTm -> TypeChecker (Tm, Val, VTy))
 inferAndEval t = do

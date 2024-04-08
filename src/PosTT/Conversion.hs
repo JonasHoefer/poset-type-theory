@@ -59,10 +59,11 @@ instance Conv Val where
     (VCon c₀ as₀       , VCon c₁ as₁       ) | c₀ == c₁ -> as₀ `conv` as₁
     (VSplitPartial f₀ _, VSplitPartial f₁ _) -> f₀ `conv` f₁
 
-    (VHSum d₀ _           , d₁                   ) -> d₀ `conv` d₁
-    (d₀                   , VHSum d₁ _           ) -> d₀ `conv` d₁
-    (VHSplitPartial f₀ _ _, VHSplitPartial f₁ _ _) -> f₀ `conv` f₁
-    (VHCon c₀ as₀ is₀ _   , VHCon c₁ as₁ is₁ _ ) | c₀ == c₁ -> (as₀, is₀) `conv` (as₁, is₁)
+    (VHSum d₀ _                 , d₁                         ) -> d₀ `conv` d₁
+    (d₀                         , VHSum d₁ _                 ) -> d₀ `conv` d₁
+    (VHSplitPartial f₀ _ _      , VHSplitPartial f₁ _ _      ) -> f₀ `conv` f₁
+    (VHCon c₀ as₀ is₀ _         , VHCon c₁ as₁ is₁ _ )       | c₀ == c₁ -> (as₀, is₀) `conv` (as₁, is₁)
+    (VHComp r₀ s₀ VHSum{} u₀ tb₀, VHComp r₁ s₁ VHSum{} u₁ tb₁) -> (r₀, s₀, u₀, tb₀) `conv` (r₁, s₁, u₁, tb₁)
 
     (VNeu k₀, VNeu k₁) -> k₀ `conv` k₁
 
