@@ -2,6 +2,7 @@ module Torus where
 
 import Foundations
 import S1
+import Square
 
 data Torus : U
   = base
@@ -30,7 +31,7 @@ surf : PathP (i. Path Torus (loop1 i) (loop1 i)) loop2 loop2 = \i j. surfAt i j
 --------------------------------------------------------------------------------
 ---- Torus → S¹ × S¹
 
-torusToS1TimesS1 : Torus -> Prod S1 S1 = split
+torusToS1TimesS1 : Torus -> S1 * S1 = split
   base       -> (base  , base  )
   loop1At i  -> (loop i, base  )
   loop2At j  -> (base  , loop j)
@@ -39,19 +40,8 @@ torusToS1TimesS1 : Torus -> Prod S1 S1 = split
 --------------------------------------------------------------------------------
 ---- S¹ × S¹ → Torus
 
-S1TimesS1toTorus-Base : S1 -> Torus = split
-  base     -> base
-  loopAt i -> loop2At i
+S1TimesS1toTorus (t : S1 * S1) : Torus = rec-S1-pair Torus base loop1 loop2 surf t.1 t.2
 
-S1TimesS1toTorus-Loop : (c : S1) -> Path Torus (S1TimesS1toTorus-Base c) (S1TimesS1toTorus-Base c) = split
-  base     -> \i. loop1At i
-  loopAt j -> \i. surfAt i j
-
-S1TimesS1toTorus' : S1 -> S1 -> Torus = split
-  base     -> S1TimesS1toTorus-Base
-  loopAt i -> \c. S1TimesS1toTorus-Loop c i
-
-S1TimesS1toTorus (t : Prod S1 S1) : Torus = S1TimesS1toTorus' t.1 t.2
 
 --------------------------------------------------------------------------------
 ---- Torus → S¹ × S¹ → Torus
@@ -66,15 +56,21 @@ TorusToS1TimesS1Section : Homotopy Torus Torus (\t. S1TimesS1toTorus (torusToS1T
 --------------------------------------------------------------------------------
 ---- S¹ × S¹ → Torus → S¹ × S¹
 
--- TorusToS1TimesS1Retraction-base : (c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (base , c2))) (base , c2) = split
---   base     -> \_. (base, base)
---   loopAt j -> \_. (base, loop2At j)
+TorusToS1TimesS1Retraction : Homotopy (S1 * S1) (S1 * S1) (\p. torusToS1TimesS1 (S1TimesS1toTorus p)) (id (S1 * S1))
+  = \p. ind-S1-pair (\r s. Path (S1 * S1) (torusToS1TimesS1 (S1TimesS1toTorus (r, s))) (r, s))
+          (\_. (base, base)) (\i _. (loop i, base)) (\j _. (base, loop j)) (\i j _. (loop i, loop j)) p.1 p.2
 
--- TorusToS1TimesS1Retraction-loop :  -- we cannot state this w/o PathP ):
---
--- TorusToS1TimesS1Retraction' : (c1 c2 : S1) -> Path (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus (c1 , c2))) (c1 , c2) = split
---   base     -> TorusToS1TimesS1Retraction-base
---   loopAt i -> \c2. TorusToS1TimesS1Retraction-loop c2 i
---
--- TorusToS1TimesS1Retraction : Homotopy (Prod S1 S1) (Prod S1 S1) (\t. torusToS1TimesS1 (S1TimesS1toTorus t)) (id (Prod S1 S1))
---   = \p. TorusToS1TimesS1Retraction' (p.1, p.2)
+
+--------------------------------------------------------------------------------
+---- Torus → S¹
+
+-- multiplication of S¹ as a map from S¹ × S¹ which is equivalent to the Torus
+TorusToS1 : Torus -> S1 = split
+  base       -> base
+  loop1At i  -> loop i
+  loop2At j  -> loop j
+  surfAt i j -> constSquare S1 base loop i j
+
+multHomotopicTorusToS1 : Homotopy (S1 * S1) S1 (\p. TorusToS1 (S1TimesS1toTorus p)) (\p. mult p.1 p.2)
+  = \p. ind-S1-pair (\r s. Path S1 (TorusToS1 (S1TimesS1toTorus (r, s))) (mult r s))
+      (\_. base) (\i _. loop i) (\j _. loop j) (\i j _. constSquare S1 base loop i j) p.1 p.2
