@@ -58,6 +58,15 @@ executable postt
       , PosTT.TypeChecker
       , PosTT.Values
 
+    autogen-modules:
+        PosTT.Frontend.Exp.Abs
+      , PosTT.Frontend.Exp.ErrM
+      , PosTT.Frontend.Exp.Layout
+      , PosTT.Frontend.Exp.Lex
+      , PosTT.Frontend.Exp.Par
+      , PosTT.Frontend.Exp.Print
+      , PosTT.Frontend.Exp.Skel
+
     default-extensions:
         TypeFamilies
       , ImplicitParams
@@ -67,10 +76,12 @@ executable postt
       , OverloadedStrings
       , UndecidableInstances
       , DerivingVia
+
     build-depends:    
         array
       , adjunctions
       , base ^>=4.17.2.1
+      , bytestring
       , containers
       , directory
       , extra
@@ -79,7 +90,6 @@ executable postt
       , mtl
       , optparse-applicative
       , prettyprinter
-      , bytestring
     build-tool-depends:
         alex:alex
       , happy:happy
