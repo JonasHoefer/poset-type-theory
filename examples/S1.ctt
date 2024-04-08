@@ -2,6 +2,7 @@ module S1 where
 
 import Foundations
 import Bool
+import Square
 
 data S1 : U
   = base
@@ -12,6 +13,13 @@ loop : Path S1 base base = \i. loopAt i
 ind-S1 (M : S1 -> U) (b : M base) (l : PathP (i. M (loop i)) b b) : (z : S1) -> M z = split
   base     -> b
   loopAt i -> l i
+
+ind-S1-pair (M : S1 -> S1 -> U) (b : M base base) (l1 : PathP (i. M (loop i) base) b b) (l2 : PathP (i. M base (loop i)) b b)
+  (sq : PathP (i. PathP (j. M (loop i) (loop j)) (l1 i) (l1 i)) l2 l2) : (z z' : S1) -> M z z'
+  = ind-S1 (\z. (z' : S1) -> M z z') (ind-S1 (\z'. M base z') b l2) (\i. ind-S1 (\z'. M (loop i) z') (l1 i) (\j. sq i j))
+
+rec-S1-pair (M : U) (b : M) (l1 l2 : Path M b b) (sq : Square M b b b b l1 l1 l2 l2) : S1 -> S1 -> M
+  = ind-S1-pair (\_ _. M) b l1 l2 sq
 
 
 ----------------------------------------------------------------------------------------
@@ -65,6 +73,36 @@ S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P
 -- DescData : U = (X : U) * Equiv X X
 
 -- desc-S1 (P : S1 -> U) : DescData = (P base , _)
+
+
+----------------------------------------------------------------------------------------
+---- H-Space Structure
+
+multLoop : (z : S1) -> Path S1 z z = split
+  base     -> loop
+  loopAt i -> constSquare S1 base loop i
+
+mult (z : S1) : S1 -> S1 = split
+  base     -> z
+  loopAt j -> multLoop z j
+
+mult-unit-right (z : S1) : Path S1 (mult z base) z = refl S1 z
+
+mult-unit-left : (z : S1) -> Path S1 (mult base z) z = split
+  base     -> refl S1 base
+  loopAt j -> refl S1 (loopAt j)
+
+mult-unit-coh : Path (Path S1 (mult base base) base) (mult-unit-left base) (mult-unit-right base)
+  = refl (Path S1 (mult base base) base) (refl S1 base)
+
+mult-comm : (z1 z2 : S1) -> Path S1 (mult z1 z2) (mult z2 z1) =
+  ind-S1-pair (\z1 z2. Path S1 (mult z1 z2) (mult z2 z1))
+    (\_. base) (\i _. loop i) (\j _. loop j) (\i j _. constSquare S1 base loop i j)
+
+-- mult-assoc (z1 z2 : S1) : (z3 : S1) -> Path S1 (mult (mult z1 z2) z3) (mult z1 (mult z2 z3)) = split
+--   base     -> refl S1 (mult z1 z2)
+--   loopAt i -> U
+-- it should be possible to define mult3 : S1 -> S1 -> S1 -> S1 using constCube; this map should be homotopic to both sides
 
 
 ----------------------------------------------------------------------------------------
