@@ -38,8 +38,9 @@ instance Show Tm where
   show = pretty
 
 deriving instance Show ConvError
--- deriving instance Show TypeError
+deriving instance Show TypeError
 
+{-
 instance Show TypeError where
   show = \case
     TypeErrorConv ss u v err -> "TYPE ERROR" ++ prettySrcSpan ss ++ ": Could not convert between\n\n" ++ pretty u
@@ -56,6 +57,7 @@ instance Show TypeError where
     -- TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError
     -- TypeErrorHSplitCompat :: Tm -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
     _ -> error "TODO: pretty print this error"
+-}
 
 prettySrcSpan :: SrcSpan -> String
 prettySrcSpan (Just ((r1,c1),(r2,c2))) = " (" ++ show r1 ++ ":" ++ show c1 ++ ")-(" ++ show r2 ++ ":" ++ show c2 ++ ")"
