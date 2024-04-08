@@ -43,6 +43,8 @@ isSplitOrSum :: Tm -> Bool
 isSplitOrSum = \case
   Split _ _ -> True
   Sum _ _   -> True
+  HSplit{}  -> True
+  HSum{}    -> True
   BLam _ t  -> isSplitOrSum t
   _         -> False
 
