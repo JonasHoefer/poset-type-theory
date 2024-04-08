@@ -7,7 +7,7 @@ import           PosTT.Common
 import           PosTT.Errors
 import           PosTT.Terms
 import           PosTT.Values
-import           PosTT.Quotation
+import           PosTT.Quotation ()
 
 import qualified PosTT.Frontend.Exp.Abs as R
 import qualified PosTT.Frontend.Exp.Print as R (printTree)

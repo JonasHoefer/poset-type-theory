@@ -107,6 +107,8 @@ srcSpan = \case
   Pr1 ss _           -> ss
   Pr2 ss _           -> ss
   Path ss _ _ _ _    -> ss
+  PLam ss _ _ _ _    -> ss
+  PApp ss _ _ _ _    -> ss
   I ss               -> ss
   Zero ss            -> ss
   One ss             -> ss

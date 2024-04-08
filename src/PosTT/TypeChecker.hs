@@ -240,11 +240,11 @@ check = flip $ \ty -> atArgPos $ \case
     (a, b) <- isPi ty
     isSum a >>= \case
       Left (d, cs) -> do -- split on ordinary type
-        unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
+        unless (length cs == length bs && and (zipWith (\br c -> P.branchConstructor br == fst c) bs cs))
           $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
         Split f <$> zipWithM (checkBranch b) bs (map snd cs)
       Right (d, cs) -> do -- split on higher inductive type
-        unless (length cs == length bs && and (zipWith (\b c -> P.branchConstructor b == fst c) bs cs))
+        unless (length cs == length bs && and (zipWith (\br c -> P.branchConstructor br == fst c) bs cs))
           $ throwError $ TypeErrorInvalidSplit ss (readBack d) (map P.branchConstructor bs) (map fst cs)
 
         vf <- evalTC reAppDef f

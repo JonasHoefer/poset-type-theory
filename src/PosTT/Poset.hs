@@ -41,6 +41,7 @@ instance Num VI where
   fromInteger :: Integer -> VI
   fromInteger 0 = bot
   fromInteger 1 = top
+  fromInteger _ = error "Only for literals"
 
   (+) :: VI -> VI -> VI
   (+) = error "Only for literals"
