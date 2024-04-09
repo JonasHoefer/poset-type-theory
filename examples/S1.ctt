@@ -1,7 +1,9 @@
 module S1 where
 
 import Foundations
+
 import Bool
+import PropTrunc
 import Square
 
 data S1 : U
@@ -74,6 +76,16 @@ S1-dep-univ-prop-Iso (P : S1 -> U) : Iso ((z : S1) -> P z) (DepLoop S1 S1-loop P
 
 -- desc-S1 (P : S1 -> U) : DescData = (P base , _)
 
+----------------------------------------------------------------------------------------
+---- Connectedness of the circle
+
+ind-S1-prop (P : PropFam S1) (b : P.1 base) : (z : S1) -> P.1 z
+  = ind-S1 (\z. P.1 z) b (PathP-PropFam S1 P base base loop b b)
+
+is-connected-S1 : is-connected S1
+  = ind-S1-prop (\z. (z' : S1) -> PropTrunc (Path S1 z z'), \z. is-prop-pi S1 (\z'. PropTrunc (Path S1 z z'), \z'. is-prop-PropTrunc (Path S1 z z')))
+      (ind-S1-prop (\z'. PropTrunc (Path S1 base z'), \z'. is-prop-PropTrunc (Path S1 base z')) (eta (refl S1 base)))
+ 
 
 ----------------------------------------------------------------------------------------
 ---- H-Space Structure
@@ -103,6 +115,9 @@ mult-comm : (z1 z2 : S1) -> Path S1 (mult z1 z2) (mult z2 z1) =
 --   base     -> refl S1 (mult z1 z2)
 --   loopAt i -> U
 -- it should be possible to define mult3 : S1 -> S1 -> S1 -> S1 using constCube; this map should be homotopic to both sides
+
+-- mult-left-equiv : (z : S1) -> is-equiv (mult z)
+--   = ind-S1-prop (\z. is-equiv (mult z), \z. _) _
 
 
 ----------------------------------------------------------------------------------------

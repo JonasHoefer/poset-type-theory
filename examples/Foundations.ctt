@@ -90,19 +90,6 @@ is-contr-singl (A : U) (x : A) : is-contr (Singl A x) = (is-contr-singl-center A
 
 
 --------------------------------------------------------------------------------
----- H-Levels
-
-is-prop (A : U) : U = (x y : A) -> (Path A x y)
-
-is-prop-fam (A : U) (B : A -> U) : U = (x : A) -> is-prop (B x)
-
-is-set (A : U) : U = (x y : A) -> is-prop (Path A x y)
-
-PointedPropIsContr (A : U) (a : A) (p : is-prop A) : is-contr A
-  = (a, \b. p a b)
-
-
---------------------------------------------------------------------------------
 ---- J
 
 J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
@@ -114,6 +101,29 @@ JRefl (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) :
 -- tr-comp (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (P : A -> U) (u : P x) :
 --     Path (P z) (tr A P x z (comp A x y z p q) u) (tr A P y z q (tr A P x y p u))
 --   = _
+
+
+--------------------------------------------------------------------------------
+---- H-Levels
+
+is-prop (A : U) : U = (x y : A) -> (Path A x y)
+
+is-prop-fam (A : U) (B : A -> U) : U = (x : A) -> is-prop (B x)
+
+Prop : U = (A : U) * is-prop A
+
+PropFam (A : U) : U = (P : A -> U) * is-prop-fam A P
+
+PathP-PropFam (A : U) (P : PropFam A) (x : A) : (y : A) (p : Path A x y) (u : P.1 x) (v : P.1 y) -> PathP (i. P.1 (p i)) u v
+  = J A x (\y p. (u : P.1 x) (v : P.1 y) -> PathP (i. P.1 (p i)) u v) (\u v. P.2 x u v)
+
+is-prop-pi (A : U) (B : PropFam A) : is-prop ((x : A) -> B.1 x)
+  = \f g i x. B.2 x (f x) (g x) i
+  
+is-set (A : U) : U = (x y : A) -> is-prop (Path A x y)
+
+PointedPropIsContr (A : U) (a : A) (p : is-prop A) : is-contr A
+  = (a, \b. p a b)
 
 
 --------------------------------------------------------------------------------
@@ -142,6 +152,9 @@ isoInv (A B : U) (iso : Iso A B) : B -> A = iso.2.1
 
 --------------------------------------------------------------------------------
 ---- Contractible Maps
+
+-- is-prop-is-equiv (A B : U) (f : A -> B) : is-prop (is-equiv A B f)
+--   = _
 
 Equiv (A B : U) : U = (f : A -> B) * isEquiv A B f
 
