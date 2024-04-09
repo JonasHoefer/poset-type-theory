@@ -61,7 +61,8 @@ instance Conv Val where
 
     (VHSum d₀ _                 , d₁                         ) -> d₀ `conv` d₁
     (d₀                         , VHSum d₁ _                 ) -> d₀ `conv` d₁
-    (VHSplitPartial f₀ _ _      , VHSplitPartial f₁ _ _      ) -> f₀ `conv` f₁
+    (VHSplitPartial f₀ _ _      , f₁                         ) -> f₀ `conv` f₁
+    (f₀                         , VHSplitPartial f₁ _ _      ) -> f₀ `conv` f₁
     (VHCon c₀ as₀ is₀ _         , VHCon c₁ as₁ is₁ _ )       | c₀ == c₁ -> (as₀, is₀) `conv` (as₁, is₁)
     (VHComp r₀ s₀ VHSum{} u₀ tb₀, VHComp r₁ s₁ VHSum{} u₁ tb₁) -> (r₀, s₀, u₀, tb₀) `conv` (r₁, s₁, u₁, tb₁)
 
@@ -94,6 +95,8 @@ instance Conv Neu where
     (NExtFun ws₀ k₀                 , NExtFun ws₁ k₁                 ) -> (ws₀, k₀) `conv` (ws₁, k₁)
     (NSplit f₀ _ k₀                 , NSplit f₁ _ k₁                 ) -> (f₀, k₀) `conv` (f₁, k₁)
     (NHSplit f₀ _ _ k₀              , NHSplit f₁ _ _ k₁              ) -> (f₀, k₀) `conv` (f₁, k₁)
+    (NHSplit f₀ _ _ k₀              , NApp f₁ k₁                     ) -> (f₀, VNeu k₀) `conv` (VNeu f₁, k₁)
+    (NApp f₀ k₀                     , NHSplit f₁ _ _ k₁              ) -> (VNeu f₀, k₀) `conv` (f₁, VNeu k₁)
     (NCoeSum r₀ s₀ z₀ d₀ lbl₀ α₀ k₀ , NCoeSum r₁ s₁ z₁ d₁ lbl₁ α₁ k₁ )
       -> (r₀, s₀, TrIntClosure z₀ (VSum d₀ lbl₀) α₀, k₀) `conv` (r₁, s₁, TrIntClosure z₁ (VSum d₁ lbl₁) α₁, k₁)
     (NCoeHSum r₀ s₀ z₀ d₀ lbl₀ α₀ k₀, NCoeHSum r₁ s₁ z₁ d₁ lbl₁ α₁ k₁)
