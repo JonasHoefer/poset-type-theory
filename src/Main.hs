@@ -1,6 +1,9 @@
 module Main where
 
-import           Data.List (intercalate)
+import           Data.Either.Extra (maybeToEither)
+import           Data.List (intercalate, isSuffixOf)
+import           Data.List.Extra (dropSuffix)
+import           Data.List.Split (splitOn)
 import qualified Data.Map as M
 import           Data.String (IsString(..))
 import           Data.Tuple.Extra (fst3)
@@ -11,7 +14,7 @@ import           Control.Monad.State.Strict
 
 import           System.Console.Haskeline
 import           System.Directory
-import           System.FilePath
+import           System.FilePath (stripExtension, (</>), (-<.>), stripExtension, splitFileName, splitDirectories, joinPath)
 
 import           Options.Applicative as O
 
@@ -19,8 +22,8 @@ import           PosTT.Common
 import           PosTT.Terms
 import           PosTT.Values
 import           PosTT.HeadLinearReduction
-import           PosTT.Pretty
-import           PosTT.Quotation
+import           PosTT.Pretty (pretty, prettyVal)
+import           PosTT.Quotation (normalize)
 import           PosTT.Frontend.ScopeChecker
 import           PosTT.TypeChecker
 
@@ -193,9 +196,12 @@ replLoad p = do
 ---- File Loading
 
 moduleRoot :: Module -> FilePath -> Either String FilePath
-moduleRoot m p | takeFileName p /= moduleName m ++ ".ctt" =
-  Left $ "File name " ++ takeFileName p ++ " does not match expected file name " ++ moduleName m ++ ".ctt"
-moduleRoot _ p = Right $ dropFileName p
+moduleRoot m p = go (splitOn "." $ moduleName m) =<< maybeToEither "Expected .ctt file" (stripExtension "ctt" p)
+  where
+    go :: [String] -> FilePath -> Either String FilePath
+    go parts (splitDirectories -> path)
+      | parts `isSuffixOf` path = Right $ joinPath (dropSuffix parts path)
+      | otherwise               = Left $ "Module name " ++ moduleName m ++ " does not match path " ++ p ++ show (parts, path)
 
 recursiveLoad :: FilePath -> ExceptT String IO [Module]
 recursiveLoad rp = liftIO (makeAbsolute rp) >>= go [] . pure
@@ -206,7 +212,7 @@ recursiveLoad rp = liftIO (makeAbsolute rp) >>= go [] . pure
     go done (p:ps) = do
       m <- ExceptT $ parseModule <$> readFile p
       d <- either error return $ moduleRoot m p
-      (m:) <$> go (p:done) (ps ++ [ d </> i -<.> "ctt" | i <- moduleImports m ])
+      (m:) <$> go (p:done) (ps ++ [ foldl (</>) d (splitOn "." i) -<.> "ctt" | i <- moduleImports m ])
 
 
 --------------------------------------------------------------------------------

@@ -77,7 +77,7 @@ executable postt
       , UndecidableInstances
       , DerivingVia
 
-    build-depends:    
+    build-depends:
         array
       , adjunctions
       , base ^>=4.17.2.1
@@ -90,6 +90,7 @@ executable postt
       , mtl
       , optparse-applicative
       , prettyprinter
+      , split
     build-tool-depends:
         alex:alex
       , happy:happy

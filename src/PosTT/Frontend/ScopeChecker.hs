@@ -43,13 +43,17 @@ parseModule :: String -> Either String Module
 parseModule = pModule . resolveLayout True . tokens
 
 moduleName :: Module -> String
-moduleName (Module _ (AIdent (_, name)) _ _) = name
+moduleName (Module _ name _ _) = mIdentToString name
 
 moduleDecls :: Module -> [Decl]
 moduleDecls (Module _ _ _ decls) = decls
 
 moduleImports :: Module -> [String]
-moduleImports (Module _ _ imps _) = [ name | Import _ (AIdent (_, name)) <- imps ]
+moduleImports (Module _ _ imps _) = [ mIdentToString name | Import _ name <- imps ]
+
+mIdentToString :: MIdent -> String
+mIdentToString (MIdentBase _ (AIdent (_, x)))  = x
+mIdentToString (MIdentExt _ (AIdent (_, p)) n) = p ++ "." ++ mIdentToString n
 
 
 --------------------------------------------------------------------------------

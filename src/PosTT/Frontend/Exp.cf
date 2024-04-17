@@ -7,9 +7,9 @@ layout "where", "let", "split" ;
 layout stop "in" ;
 -- Do not use layout toplevel as it makes pExp fail!
 
-Module.   Module ::= "module" AIdent "where" "{" [Imp] [Decl] "}" ;
+Module.   Module ::= "module" MIdent "where" "{" [Imp] [Decl] "}" ;
 
-Import.   Imp ::= "import" AIdent ;
+Import.   Imp ::= "import" MIdent ;
 separator Imp ";" ;
 
 DeclDef.   Decl ::= AIdent [Tele] ":" Exp "=" Body ;
@@ -84,7 +84,7 @@ PLabel.   Label ::= AIdent [Tele] "<" [AIdent] ">" Sys ;
 separator Label "|" ;
 
 -- Telescopes
-Tele.     Tele ::= "(" AIdent [AIdent] ":" Exp ")" ;
+Tele.      Tele ::= "(" AIdent [AIdent] ":" Exp ")" ;
 terminator Tele "" ;
 
 -- Nonempty telescopes with Exp:s, this is hack to avoid ambiguities
@@ -94,5 +94,9 @@ terminator nonempty PTele "" ;
 
 position token AIdent ('_')|(letter)(letter|digit|'\''|'_'|'-')*|('!')(digit)* ;
 separator AIdent "" ;
+
+MIdentBase. MIdent ::= AIdent ;
+MIdentExt.  MIdent ::= AIdent "." MIdent ;
+
 
 position token HoleIdent '?' ;
