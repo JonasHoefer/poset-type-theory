@@ -47,15 +47,27 @@ inv (A : U) (x y : A) (p : Path A y x) : Path A x y
   = doubleComp A x y y y p (refl A y) (refl A y)
 
 inv-l (A : U) (x y : A) (p : Path A x y) : Path (Path A y y) (comp A y x y (inv A y x p) p) (refl A y)
-  = \i j. hComp 0 1 A (hComp 0 i A x [(j=0) -> k. p k, (j=1) -> _. x])
-            [ (j=0) -> k. p (i \/ k)
-            , (j=1) -> k. p k
-            , (i=0) -> k. p k
-            , (i=1) -> k. hComp 0 k A (inv A y x p j)
-              [ (j=0) -> _. y
-              , (j=1) -> l. p l
-              ]
-            ]
+  = inv (Path A y y) (comp A y x y (inv A y x p) p) (refl A y)
+    (\i j. hComp 0 1 A (hComp 0 i A x [(j=0) -> k. p k, (j=1) -> _. x])
+             [ (j=0) -> k. p (i \/ k)
+             , (j=1) -> k. p k
+             , (i=0) -> k. p k
+             , (i=1) -> k. hComp 0 k A (inv A y x p j)
+               [ (j=0) -> _. y
+               , (j=1) -> l. p l
+               ]
+             ]
+    )
+
+inv-r (A : U) (x y : A) (p : Path A x y) : Path (Path A x x) (comp A x y x p (inv A y x p)) (refl A x)
+  = inv (Path A x x) (comp A x y x p (inv A y x p)) (refl A x)
+    (\i j. hComp 0 1 A (p (i /\ j))
+             [ (i=0) -> _. x
+             , (i=1) -> k. hComp 0 k A (p j) [ (j=0) -> _. x, (j=1) -> l. inv A y x p l ]
+             , (j=0) -> _. x
+             , (j=1) -> k. hComp 0 i A x [ (k=0) -> l. p l, (k=1) -> _. x ]
+             ]
+    )
 
 tr (A : U) (P : A -> U) (x y : A) (p : Path A x y) (u : P x) : P y
   = coe 0 1 (i. P (p i)) u
@@ -81,8 +93,6 @@ PathOver (A : U) (B : A -> U) (a0 a1 : A) (p : Path A a0 a1) (b0 : B a0) (b1 : B
 
 --------------------------------------------------------------------------------
 ---- basics
-
-Prod (A B : U) : U = (_ : A) * B
 
 const (A B : U) (b : B) (_ : A) : B = b
 
