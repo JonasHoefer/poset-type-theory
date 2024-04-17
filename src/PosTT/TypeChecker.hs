@@ -318,9 +318,9 @@ infer = atArgPos $ \case
     r'₁ <- checkI r₁
     (u'₀, vu₀) <- checkAndEval u₀ va
 
-    tb' <- checkSys tb $ \_ (i, u) -> do
+    tb' <- checkSys tb $ \φ (i, u) -> do
       (u', vu) <- bindIntVar i (\_ -> checkAndEval u va)
-      () <- convTC (TypeErrorBoundary (IVar i)) (re vu₀) (vu @ (re vr₀ `for` i))
+      () <- convTC (TypeErrorBoundary (IVar i) (readBack φ)) (re vu₀) (vu @ (re vr₀ `for` i))
       return (TrIntBinder i u')
 
     vtb' <- evalTC (evalSys evalTrIntBinder) tb'
