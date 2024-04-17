@@ -1,7 +1,5 @@
 module Nat where
 
-data Nat : U = zero | suc (n : Nat)
-
 elimNat (P : Nat -> U) (z : P zero) (s : (n : Nat) -> P n -> P (suc n)) : (n : Nat) -> P n = split
   zero  -> z
   suc n -> s n (elimNat P z s n)

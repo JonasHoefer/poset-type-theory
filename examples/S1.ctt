@@ -6,6 +6,7 @@ import Bool
 import PropTrunc
 import Square
 
+
 data S1 : U
   = base
   | loopAt <i> [ (i=0) -> base, (i=1) -> base ]
@@ -85,7 +86,7 @@ ind-S1-prop (P : PropFam S1) (b : P.1 base) : (z : S1) -> P.1 z
 is-connected-S1 : is-connected S1
   = ind-S1-prop (\z. (z' : S1) -> PropTrunc (Path S1 z z'), \z. is-prop-pi S1 (\z'. PropTrunc (Path S1 z z'), \z'. is-prop-PropTrunc (Path S1 z z')))
       (ind-S1-prop (\z'. PropTrunc (Path S1 base z'), \z'. is-prop-PropTrunc (Path S1 base z')) (eta (refl S1 base)))
- 
+
 
 ----------------------------------------------------------------------------------------
 ---- H-Space Structure
