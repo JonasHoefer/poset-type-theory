@@ -3,6 +3,7 @@ module PosTT.Errors where
 import PosTT.Common
 import PosTT.Terms
 
+
 data ConvError where
   ConvErrorTm :: Tm -> Tm -> ConvError
   ConvErrorI :: I -> I -> ConvError

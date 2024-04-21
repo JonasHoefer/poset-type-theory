@@ -254,4 +254,4 @@ recursiveLoad rp = liftIO (makeAbsolute rp) >>= go [] . pure
 main :: IO ()
 main = execParser options >>= \case
   Eval m p -> evalModule m p
-  Repl _   -> runRepl repl
+  Repl p   -> runRepl (mapM (replLoad False) p *> repl)
