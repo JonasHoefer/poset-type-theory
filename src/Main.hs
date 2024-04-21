@@ -61,7 +61,9 @@ evalModule :: EvalMode -> FilePath -> IO ()
 evalModule m p = do
   rawTm <- either (error . show) id <$> runExceptT (recursiveLoad p)
   preTm <- either (error . show) (return . snd) (checkModules rawTm)
-  rho   <- either (error . show) return (checkDeclsEnv preTm)
+  let (res, msgs) = checkDeclsEnv preTm
+  mapM_ putStrLn msgs
+  rho   <- either (error . show) return res
 
   putStrLn $ "\nSuccessfully checked " ++ show (length rho) ++ " definitions"
 
@@ -84,20 +86,27 @@ evalModule m p = do
 --------------------------------------------------------------------------------
 ---- Repl
 
-data ReplCmd = Term String | Load FilePath | Reload | Quit | Unfold Int String deriving (Show, Read, Eq)
+data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int String deriving (Show, Read, Eq)
 
 loadCmd :: Mod CommandFields ReplCmd
-loadCmd = command ":load" (info (Load <$> argument str (metavar "FILE")) (progDesc "Load file"))
+loadCmd = command ":load"
+  (info
+    (Load <$> switch (long "silent" <> short 's' <> help "Hide non-error messages")
+          <*> argument str (metavar "FILE"))
+    (progDesc "Load file"))
 
 reloadCmd :: Mod CommandFields ReplCmd
-reloadCmd = command ":reload" (info (pure Reload) (progDesc "Reload current module"))
+reloadCmd = command ":reload"
+  (info
+     (Reload <$> switch (long "silent" <> short 's' <> help "Hide non-error messages"))
+     (progDesc "Reload current module"))
 
 quitCmd :: Mod CommandFields ReplCmd
 quitCmd = command ":quit" (info (pure Quit) (progDesc "Quit repl"))
 
 unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
-  (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1)
+  (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1 <> help "Number of unfold steps")
           <*> argument str (metavar "DEF"))
   (progDesc "Perform head linear unfolding steps on a definition in the context")
 
@@ -166,14 +175,14 @@ repl = do
           unless (null err) (outputStrLn err)
           repl
         Right Quit     -> return ()
-        Right (Load p) -> do
+        Right (Load silent p) -> do
           () <- ifM (liftIO (doesFileExist p))
-            (replLoad p)
+            (replLoad silent p)
             (outputStrLn $ "File " ++ show p ++ " does not exist!")
           repl
-        Right Reload -> do
+        Right (Reload silent) -> do
           gets currentFile >>= \case
-            Just p  -> replLoad p
+            Just p  -> replLoad silent p
             Nothing -> outputStrLn "No module loaded!"
           repl
         Right (Term t) -> do
@@ -182,7 +191,9 @@ repl = do
             Left err -> outputStrLn err
             Right pt -> do
               cxt <- gets context
-              case runTC cxt (inferAndEval pt) of -- TODO: recheck stages
+              let (res, msgs) = runTC cxt (inferAndEval pt)
+              mapM_ outputStrLn msgs
+              case res of
                 Left err          -> outputStrLn $ show err
                 Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
@@ -198,15 +209,18 @@ repl = do
             _ -> outputStrLn $ d ++ " is not defined!"
           repl
 
-replLoad :: FilePath -> Repl ()
-replLoad p = do
+replLoad :: Bool -> FilePath -> Repl ()
+replLoad silent p = do
   liftIO (runExceptT $ recursiveLoad p) >>= \case
     Right ms -> case checkModules ms of
-      Right (scpEnv, ds) -> case checkDeclsCxt ds of
-        Right cxt -> do
-          put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
-          outputStrLn $ "Successfully checked " ++ show (length (env cxt)) ++ " definitions"
-        Left err -> outputStrLn $ show err
+      Right (scpEnv, ds) -> do
+        let (res, msgs) = checkDeclsCxt ds
+        unless silent $ mapM_ outputStrLn msgs
+        case res of
+          Right cxt -> do
+            put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
+            outputStrLn $ "Successfully checked " ++ show (length (env cxt)) ++ " definitions"
+          Left err -> outputStrLn $ show err
       Left err -> outputStrLn $ show err
     Left err -> outputStrLn $ show err
 

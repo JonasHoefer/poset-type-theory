@@ -1,8 +1,10 @@
 module PosTT.TypeChecker where
 
 import           Control.Monad.Reader
+import           Control.Monad.Writer (MonadWriter(..), Writer, runWriter)
 import           Control.Monad.Except
 
+import           Data.Bifunctor (first)
 import           Data.Either (fromRight)
 import           Data.List (sortOn)
 import           Data.Tuple.Extra (uncurry3, first3, second3)
@@ -19,8 +21,6 @@ import           PosTT.Quotation
 import           PosTT.Terms
 import           PosTT.Values
 
-import           Debug.Trace
-
 
 --------------------------------------------------------------------------------
 ---- Type Checking Monad
@@ -31,15 +31,15 @@ data Cxt = Cxt { env :: Env, types :: [(Name, VTy)], intVars :: [Gen], pos :: Sr
 emptyCxt :: Cxt
 emptyCxt = Cxt EmptyEnv [] [] Nothing
 
-newtype TypeChecker a = TypeChecker { unTypeChecker :: ReaderT Cxt (Either TypeError) a }
-  deriving (Functor, Applicative, Monad, MonadReader Cxt, MonadError TypeError)
+newtype TypeChecker a = TypeChecker { unTypeChecker :: ReaderT Cxt (ExceptT TypeError (Writer [String])) a }
+  deriving (Functor, Applicative, Monad, MonadReader Cxt, MonadWriter [String], MonadError TypeError)
 
 instance MonadFail TypeChecker where
   fail :: String -> TypeChecker a
   fail s = asks pos >>= \ss -> throwError (TypeErrorMsg ss s)
 
-runTC :: Cxt -> AtStage (TypeChecker a) -> Either TypeError a
-runTC cxt ma = bindStage terminalStage (runReaderT (unTypeChecker ma) cxt)
+runTC :: Cxt -> AtStage (TypeChecker a) -> (Either TypeError a, [String])
+runTC cxt ma = bindStage terminalStage $ runWriter $ runExceptT $ runReaderT (unTypeChecker ma) cxt
 
 
 --------------------------------------------------------------------------------
@@ -439,17 +439,17 @@ checkAndEvalCof eqs = do
 
 checkDecl :: AtStage (P.Decl -> TypeChecker (Name, Tm, Ty, VTy))
 checkDecl (P.Decl _ x b t) = do
-  traceM $ "\nChecking Definition: " ++ show x
+  tell ["\nChecking Definition: " ++ show x]
 
   (t', vt) <- checkAndEval t VU
   b' <- bindFibVar x vt $ \_ -> check b vt -- we treat every definition as recursive
 
-  traceM $ prettyVal vt
-  traceM $ pretty b'
+  tell [prettyVal vt]
+  tell [pretty b']
 
   return (x, b', t', vt)
 
-checkDeclsCxt :: [P.Decl] -> Either TypeError Cxt
+checkDeclsCxt :: [P.Decl] -> (Either TypeError Cxt, [String])
 checkDeclsCxt decls = runTC emptyCxt (go decls)
   where
     go :: AtStage ([P.Decl] -> TypeChecker Cxt)
@@ -458,5 +458,5 @@ checkDeclsCxt decls = runTC emptyCxt (go decls)
       (x, b, t, vt) <- checkDecl d
       local (extDef x b t vt) (go ds)
 
-checkDeclsEnv :: [P.Decl] -> Either TypeError Env
-checkDeclsEnv = fmap env . checkDeclsCxt
+checkDeclsEnv :: [P.Decl] -> (Either TypeError Env, [String])
+checkDeclsEnv = first (fmap env) . checkDeclsCxt
