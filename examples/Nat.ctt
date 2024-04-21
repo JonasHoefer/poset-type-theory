@@ -1,5 +1,7 @@
 module Nat where
 
+import Foundations
+
 elimNat (P : Nat -> U) (z : P zero) (s : (n : Nat) -> P n -> P (suc n)) : (n : Nat) -> P n = split
   zero  -> z
   suc n -> s n (elimNat P z s n)
