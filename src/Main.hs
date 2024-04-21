@@ -1,7 +1,8 @@
 module Main where
 
+import           Data.Char (isAlphaNum)
 import           Data.Either.Extra (maybeToEither)
-import           Data.List (intercalate, isSuffixOf)
+import           Data.List (intercalate, isSuffixOf, isPrefixOf)
 import           Data.List.Extra (dropSuffix)
 import           Data.List.Split (splitOn)
 import qualified Data.Map as M
@@ -100,6 +101,9 @@ unfoldCmd = command ":unfold" $ info
           <*> argument str (metavar "DEF"))
   (progDesc "Perform head linear unfolding steps on a definition in the context")
 
+replCmdStrings :: [String]
+replCmdStrings = [":load", ":reload", ":quit", ":unfold"]
+
 replCmds :: ParserInfo ReplCmd
 replCmds = info (subparser (quitCmd <> loadCmd <> reloadCmd <> unfoldCmd)) mempty
 
@@ -130,8 +134,23 @@ environment = env . context
 
 type Repl a = InputT (StateT ReplState IO) a
 
+replCompletion :: CompletionFunc (StateT ReplState IO)
+replCompletion input@(s, _)
+  | ":load" `isPrefixOf` reverse s = completeFilename input -- also for unfold?
+  | ":"     `isPrefixOf` reverse s = completeWord Nothing [] (return . cmdSearch) input
+  | otherwise                      = completeWord' Nothing (\c -> not (isAlphaNum c || c == '-')) nameSearch input
+  where
+    cmdSearch :: String -> [Completion]
+    cmdSearch s = map simpleCompletion $ filter (s `isPrefixOf`) replCmdStrings
+
+    nameSearch :: String -> StateT ReplState IO [Completion]
+    nameSearch s = map simpleCompletion <$> gets (filter (s `isPrefixOf`) . map show . envIdents . env . context)
+
+replSettings :: Settings (StateT ReplState IO)
+replSettings = Settings { historyFile = Just ".postt_history", complete = replCompletion, autoAddHistory = True }
+
 runRepl :: Repl a -> IO a
-runRepl = flip evalStateT initialReplState . runInputT (defaultSettings { historyFile = Just ".postt_history" })
+runRepl = flip evalStateT initialReplState . runInputT replSettings
 
 initialReplState :: ReplState
 initialReplState = ReplState "" Nothing mempty emptyCxt

@@ -325,6 +325,9 @@ pattern EnvInt rho x i   = (x, EntryInt i):rho
 pattern EnvDef :: Env -> Name -> Tm -> Ty -> Env
 pattern EnvDef rho x s t = (x, EntryDef s t):rho
 
+envIdents :: Env -> [Name]
+envIdents EmptyEnv          = []
+envIdents (EnvCons rho n _) = n : envIdents rho
 
 envFibs :: Env -> [(Name, Val)] -> Env
 envFibs = foldr (\(x, v) rho' -> EnvFib rho' x v)
