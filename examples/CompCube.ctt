@@ -1,0 +1,106 @@
+module CompCube where
+
+--
+-- z---q---w
+-- |       |
+-- r       s
+-- |       |
+-- x---p---y
+--
+Square (A : U) (x y z w : A) (p : Path A x y) (q : Path A z w) (r : Path A x z) (s : Path A y w)
+  : U
+  = PathP (i. Path A (r i) (s i)) p q
+
+
+-- the diagonal is the composition of the two paths
+compSquare (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Square A x y y z p q p q
+  = \i j. hComp 0 (i /\ j) A (p (i \/ j)) [ (i=1) -> k. q (k /\ j) , (j=1) -> k. q (k /\ i) ]
+
+-- the above square is symmetric by definition
+compSquareSym (A : U) (x y z : A) (p : Path A x y) (q : Path A y z)
+  : Path (Square A x y y z p q p q) (compSquare A x y z p q) (\i j. compSquare A x y z p q j i)
+  = \_. compSquare A x y z p q
+
+compSquareBot (A : U) (x y z : A) (p : Path A x y) (q : Path A y z)
+  : Path (Path A x y) p (\i. compSquare A x y z p q 0 i)
+  = \_. p
+
+comp (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Path A x z
+  = \i. compSquare A x y z p q i i
+
+-- comp (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Path A x z
+--   = \i. hComp 0 i A (p i) [ (i=1) -> j. q j ]
+
+unit-l (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (comp A x x y (\_. x) p) p
+  = \j i. compSquare A x x y (\_. x) p (j \/ i) i -- extract lower triangle
+
+unit-r (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) p (comp A x y y p (\_. y))
+  = \j i. compSquare A x y y p (\_. y) (j /\ i) i -- extract upper triangle
+
+
+-- QUESTION: can we build a similar cube, where every path is p . q . r?
+
+-- g-----------h
+-- | \       / |
+-- |   c---d   |
+-- |   |   |   |
+-- |   a---b   |
+-- | /       \ |
+-- e-----------f
+Cube (A : U)
+  -- vertices
+  (a b c d e f g h : A)
+  -- edges
+  (ab : Path A a b) (cd : Path A c d) (ac : Path A a c) (bd : Path A b d) -- bottom
+  (ef : Path A e f) (gh : Path A g h) (eg : Path A e g) (fh : Path A f h) -- top
+  (ae : Path A a e) (bf : Path A b f) -- front
+  (cg : Path A c g) (dh : Path A d h) -- back
+                                      -- left -- right
+  (bot : Square A a b c d ab cd ac bd)
+  (top : Square A e f g h ef gh eg fh)
+  (frt : Square A a b e f ab ef ae bf)
+  (bck : Square A c d g h cd gh cg dh)
+  (lft : Square A a c e g ac eg ae cg)
+  (rgt : Square A b d f h bd fh bf dh)
+
+  : U
+  = PathP (i. Square A (ae i) (bf i) (cg i) (dh i) (frt i) (bck i) (lft i) (rgt i)) bot top
+
+CompCube (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w) : U
+  = Cube A
+      x y y z y z z w
+      p q p q q r q r p q q r
+      (compSquare A x y z p q)
+      (compSquare A y z w q r)
+      (compSquare A x y z p q)
+      (compSquare A y z w q r)
+      (compSquare A x y z p q)
+      (compSquare A y z w q r)
+
+-- the 3 squares, splitting the cube we want to built into two triangular prisms each, are of the following form
+cubeDiag1 (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
+  : Square A x z y w (comp A x y z p q) (comp A y z w q r) p r
+  = \j i. hComp 0 i A (compSquare A x y z p q i j)
+            [ (i=1) -> k. compSquare A y z w q r j k
+            , (j=0) -> k. compSquare A x y z p q i k
+            , (j=1) -> k. compSquare A y z w q r i k
+            ]
+
+-- this should be the diagonal of the cube, because the diagonal of the cube
+-- is exactly the diagonal of each of the three squares
+comp3 (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
+  : Path A x w
+  = \i. cubeDiag1 A x y z w p q r i i
+
+-- by overlapping the three versions of the above, we should be able to obtain the desired cube
+
+-- compCube (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
+--   : CompCube A x y z w p q r
+--   = \i j k.
+--        hComp 0 (i /\ j /\ k)
+--          A
+--          (compSquare A x y z p q (i \/ k) (j \/ k)) -- bottom of cube
+--          [ (k=1) -> l. compSquare A y z w q r (i /\ l) (j /\ l)
+--          ]
+
+
