@@ -12,18 +12,16 @@ Square (A : U) (x y z w : A) (p : Path A x y) (q : Path A z w) (r : Path A x z) 
   = PathP (i. Path A (r i) (s i)) p q
 
 
+CompSquare (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : U = Square A x y y z p q p q
+
 -- the diagonal is the composition of the two paths
-compSquare (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Square A x y y z p q p q
+compSquare (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : CompSquare A x y z p q
   = \i j. hComp 0 (i /\ j) A (p (i \/ j)) [ (i=1) -> k. q (k /\ j) , (j=1) -> k. q (k /\ i) ]
 
 -- the above square is symmetric by definition
 compSquareSym (A : U) (x y z : A) (p : Path A x y) (q : Path A y z)
-  : Path (Square A x y y z p q p q) (compSquare A x y z p q) (\i j. compSquare A x y z p q j i)
+  : Path (CompSquare A x y z p q) (compSquare A x y z p q) (\i j. compSquare A x y z p q j i)
   = \_. compSquare A x y z p q
-
-compSquareBot (A : U) (x y z : A) (p : Path A x y) (q : Path A y z)
-  : Path (Path A x y) p (\i. compSquare A x y z p q 0 i)
-  = \_. p
 
 comp (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : Path A x z
   = \i. compSquare A x y z p q i i
@@ -38,7 +36,62 @@ unit-r (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) p (comp A x y y p 
   = \j i. compSquare A x y y p (\_. y) (j /\ i) i -- extract upper triangle
 
 
--- QUESTION: can we build a similar cube, where every path is p . q . r?
+--------------------------------------------------------------------------------
+---- Inverses
+
+-- we can define a similar square, to define (right) inverses
+--
+--      p⁻¹
+--   y-------x
+--   |     / |
+-- p |   /   | p⁻¹   where the diagonal is refl
+--   | /     |
+--   x-------y
+--       p
+
+data I2 : U = sqAt <i j> []
+
+invSquare' (A : U) (x y : A) (p : Path A x y) : I2 -> A = split
+  sqAt i j -> hComp 0 (i \/ j) A x [ (i=0) -> k. p (k /\ j), (i=j) -> k. x, (j=0) -> k. p (k /\ i), ]
+
+inv (A : U) (x y : A) (p : Path A x y) : Path A y x
+  = \i. invSquare' A x y p (sqAt i 1) -- = sqAt 1 i
+
+invSquare (A : U) (x y : A) (p : Path A x y) : Square A x y y x p (inv A x y p) p (inv A x y p)
+  = \i j. invSquare' A x y p (sqAt i j)
+
+invSquare-diag (A : U) (x y : A) (p : Path A x y) : Path (Path A x x) (\i. invSquare A x y p i i) (\_. x)
+  = \_ _. x
+
+-- inverse laws now should be easy, as we only have to scale between two squares and extract the diagonal
+
+data I3 : U = cbAt <i j k> []
+
+--  = \i j. hComp 0 (i /\ j) A (p (i \/ j)) [ (i=1) -> k. q (k /\ j) , (j=1) -> k. q (k /\ i) ]
+
+invCube (A : U) (x y : A) (p : Path A x y) : I3 -> A = split
+  cbAt l i j ->
+      hComp 0 j A (p i)
+        [ (l=0) -> k. invSquare A x y p i (j /\ k)
+        , (l=1) -> k. compSquare A x y x p (inv A x y p) i (j /\ k)
+        , (i=0) -> k. p (j /\ k)
+        , (i=1) -> k. inv A x y p (j /\ k)
+        ]
+
+-- one inverse law follows essentially by definition
+comp-inv-right (A : U) (x y : A) (p : Path A x y) : Path (Path A x x) (\_. x) (comp A x y x p (inv A x y p))
+  = \i j. foo A x y p (cbAt i j j)
+
+-- can we built the full cube with comp and inv squares on all 6 sides?
+
+
+
+--------------------------------------------------------------------------------
+---- Associativity
+
+-- QUESTION:
+-- 1. can we build a similar cube, where every path is p . q . r?
+-- 2. can we extract a proof of associativity from it?
 
 -- g-----------h
 -- | \       / |
@@ -102,5 +155,3 @@ comp3 (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
 --          (compSquare A x y z p q (i \/ k) (j \/ k)) -- bottom of cube
 --          [ (k=1) -> l. compSquare A y z w q r (i /\ l) (j /\ l)
 --          ]
-
-
