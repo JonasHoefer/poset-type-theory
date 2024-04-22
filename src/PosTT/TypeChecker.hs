@@ -219,8 +219,8 @@ check = flip $ \ty -> atArgPos $ \case
       Right (a, a₀, a₁) -> do
         let i = x
         (t', vt) <- bindIntVar i (\vi -> checkAndEval t (a $$ vi))
-        convTC (TypeErrorEndpoint i I0) a₀ (vt @ (0 `for` i))
-        convTC (TypeErrorEndpoint i I1) a₁ (vt @ (1 `for` i))
+        convTC (TypeErrorEndpoint (readBack ty) i I0) a₀ (vt @ (0 `for` i))
+        convTC (TypeErrorEndpoint (readBack ty) i I1) a₁ (vt @ (1 `for` i))
         return $ BPLam i t' (readBack a₀) (readBack a₁)
   P.Pair _ s t -> do
     (a, b) <- isSigma ty
