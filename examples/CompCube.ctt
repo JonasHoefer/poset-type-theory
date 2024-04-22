@@ -7,10 +7,12 @@ module CompCube where
 -- |       |
 -- x---p---y
 --
-Square (A : U) (x y z w : A) (p : Path A x y) (q : Path A z w) (r : Path A x z) (s : Path A y w)
-  : U
+Square (A : U) (x y z w : A) (p : Path A x y) (q : Path A z w) (r : Path A x z) (s : Path A y w) : U
   = PathP (i. Path A (r i) (s i)) p q
 
+
+--------------------------------------------------------------------------------
+---- Binary Composition
 
 CompSquare (A : U) (x y z : A) (p : Path A x y) (q : Path A y z) : U = Square A x y y z p q p q
 
@@ -80,7 +82,7 @@ invCube (A : U) (x y : A) (p : Path A x y) : I3 -> A = split
 
 -- one inverse law follows essentially by definition
 comp-inv-right (A : U) (x y : A) (p : Path A x y) : Path (Path A x x) (\_. x) (comp A x y x p (inv A x y p))
-  = \i j. foo A x y p (cbAt i j j)
+  = \i j. invCube A x y p (cbAt i j j)
 
 -- can we built the full cube with comp and inv squares on all 6 sides?
 
@@ -146,11 +148,12 @@ comp3 (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
   = \i. cubeDiag1 A x y z w p q r i i
 
 -- by overlapping the three versions of the above, we should be able to obtain the desired cube
+-- (i /\ j) \/ (i /\ k) \/ (j /\ k) = (i \/ j) /\ (i \/ k) /\ (j \/ k)
 
 -- compCube (A : U) (x y z w : A) (p : Path A x y) (q : Path A y z) (r : Path A z w)
 --   : CompCube A x y z w p q r
 --   = \i j k.
---        hComp 0 (i /\ j /\ k)
+--        hComp 0 ((i /\ j) \/ (i /\ k) \/ (j /\ k))
 --          A
 --          (compSquare A x y z p q (i \/ k) (j \/ k)) -- bottom of cube
 --          [ (k=1) -> l. compSquare A y z w q r (i /\ l) (j /\ l)
