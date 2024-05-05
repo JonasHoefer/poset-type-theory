@@ -1,0 +1,256 @@
+module Prelude where
+
+import Nat.Base
+
+
+Fib (A B : U) (f : A -> B) (y : B) : U
+  = (x : A) * Path B y (f x)
+
+is-contr (A : U) : U
+  = (x : A) * ((y : A) -> Path A x y)
+
+is-equiv (A B : U) (f : A -> B) : U
+  = (y : B) -> is-contr (Fib A B f y)
+
+Equiv (A B : U) : U
+  = (e : A -> B) * is-equiv A B e
+
+refl (A : U) (x : A) : Path A x x
+  = \i. x
+  
+id (A : U) (x : A) : A
+  = x
+
+Singl (A : U) (x : A) : U
+  = Fib A A (id A) x
+
+Singl/is-contr (A : U) (x : A) : is-contr (Singl A x)
+  = ((x, refl A x), \v z. (v.2 z, \z'. v.2 (z /\ z')))
+
+id/is-equiv (A : U) : is-equiv A A (id A)
+  = Singl/is-contr A
+
+IdEquiv (A : U) : Equiv A A
+  = (id A, id/is-equiv A)
+
+equiv-to-path (A B : U) (e : Equiv A B) : Path U A B
+  = \i. Ext B [ (i=0) -> (A, e.1, e.2), (i=1) -> (B, id B, id/is-equiv B) ]
+
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y)
+  = \i. f (p i)
+
+tr (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : P y
+  = coe 0 1 (i. P (p i)) u
+
+tr/path (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : PathP (i. P (p i)) u (tr A x y p P u)
+  = \j. coe 0 j (i. P (p i)) u
+
+J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
+  = tr (Singl A x) (x , refl A x) (y , p) ((Singl/is-contr A x).2 (y , p)) (\s. M s.1 s.2) m
+
+J/comp' (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) m (J A x M m x (refl A x))
+  = tr/path (Singl A x) (x , refl A x) (x , refl A x) ((Singl/is-contr A x).2 (x , refl A x)) (\s. M s.1 s.2) m
+
+
+--------------------------------------------------------------------------------
+---- Paths
+
+inv (A : U) (x : A) : (y : A) -> Path A x y -> Path A y x
+  = J A x (\y _. Path A y x) (refl A x)
+
+J/comp (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) (J A x M m x (refl A x)) m
+  = inv (M x (refl A x)) m (J A x M m x (refl A x)) (J/comp' A x M m)
+
+inv/refl (A : U) (x : A) : Path (Path A x x) (inv A x x (refl A x)) (refl A x)
+  = J/comp A x (\y _. Path A y x) (refl A x)
+
+comp (A : U) (x : A) : (y : A) -> Path A x y -> (z : A) -> Path A y z -> Path A x z
+  = J A x (\y _. (z : A) -> Path A y z -> Path A x z) (\_ q. q)
+
+comp/ident-l (A : U) (x z : A) (q : Path A x z) : Path (Path A x z) (comp A x x (refl A x) z q) q
+  = \i. J/comp A x (\y _. (z' : A) -> Path A y z' -> Path A x z') (\_ q'. q') i z q
+
+comp/ident-l' (A : U) (x z : A) (q : Path A x z) : Path (Path A x z) q (comp A x x (refl A x) z q)
+  = \i. J/comp' A x (\y _. (z' : A) -> Path A y z' -> Path A x z') (\_ q'. q') i z q
+
+comp/ident-r (A : U) (x : A) : (y : A) (p : Path A x y) -> Path (Path A x y) (comp A x y p y (refl A y)) p
+  = J A x (\y p. Path (Path A x y) (comp A x y p y (refl A y)) p) (comp/ident-l A x x (refl A x))
+
+
+
+comp-n/type (A : U) (x : A) : Nat -> A -> U = split
+  zero  -> \z. Path A x z
+  suc n -> \z. (y : A) (p : Path A z y) -> comp-n/type A x n y
+
+comp-n/impl (A : U) (x : A) : (n : Nat) (z : A) -> Path A x z -> comp-n/type A x n z = split
+  zero  -> \_ p. p 
+  suc n -> \y p z q. comp-n/impl A x n z (comp A x y p z q)
+
+-- | comp-n A n x0 x1 p1 x2 p2 x3 p3 ... where pi : Path A x(i-1) xi and all xi : A
+comp-n (A : U) : (n : Nat) -> (x : A) -> comp-n/type A x n x = split
+  zero  -> \x. refl A x
+  suc n -> \x. comp-n/impl A x n -- avoid unnecessary refl composition
+
+
+
+-- | (refl * q) * r = refl * (q * r)
+comp/assoc/refl (A : U) (x : A) (z : A) (q : Path A x z) (w : A) (r : Path A z w)
+  : Path (Path A x w) (comp A x z (comp A x x (refl A x) z q) w r) (comp A x x (refl A x) w (comp A x z q w r))
+  = comp-n (Path A x w) (suc (suc zero))
+      (comp A x z (comp A x x (refl A x) z q) w r)
+      (comp A x z q w r)                           (\i. (comp A x z ((comp/ident-l A x z q) i) w r))
+      (comp A x x (refl A x) w (comp A x z q w r)) (comp/ident-l' A x w (comp A x z q w r))
+
+-- | (p * q) * r = p * (q * r)
+comp/assoc (A : U) (x : A) : (y : A) (p : Path A x y) (z : A) (q : Path A y z) (w : A) (r : Path A z w)
+  -> Path (Path A x w) (comp A x z (comp A x y p z q) w r) (comp A x y p w (comp A y z q w r))
+  = J A x
+      (\y p. (z : A) (q : Path A y z) (w : A) (r : Path A z w) -> Path (Path A x w) (comp A x z (comp A x y p z q) w r) (comp A x y p w (comp A y z q w r)))
+      (comp/assoc/refl A x)
+
+-- | inv refl * refl = refl
+comp/inv-l/refl (A : U) (x : A) : Path (Path A x x) (comp A x x (inv A x x (refl A x)) x (refl A x)) (refl A x)
+  = comp-n (Path A x x) (suc (suc zero))
+      (comp A x x (inv A x x (refl A x)) x (refl A x))
+      (comp A x x (refl A x) x (refl A x))             (\i. (comp A x x ((inv/refl A x) i) x (refl A x)))
+      (refl A x)                                       (comp/ident-l A x x (refl A x))
+
+-- | inv p * p = refl
+comp/inv-l (A : U) (x : A) : (y : A) (p : Path A x y) -> Path (Path A y y) (comp A y x (inv A x y p) y p) (refl A y)
+  = J A x (\y p. Path (Path A y y) (comp A y x (inv A x y p) y p) (refl A y)) (comp/inv-l/refl A x)
+
+
+--------------------------------------------------------------------------------
+---- Path Over
+
+PathO (A : U) (x y : A) (p : Path A x y) (B : A -> U) (u : B x) (v : B y) : U
+  = Path (B y) (tr A x y p B u) v
+
+-- similar to CCHM but we can built the filler for transport directly
+PathP-eq-PathO (A : U) (x y : A) (p : Path A x y) (B : A -> U) (u : B x) (v : B y)
+  : Path U (PathP (i. B (p i)) u v) (PathO A x y p B u v)
+  = \i. PathP (j. B (p (i \/ j))) (coe 0 i (j. B (p (i /\ j))) u) v
+
+
+--------------------------------------------------------------------------------
+---- Homotopies
+
+Pi (A : U) (B : A -> U) : U = (x : A) -> B x
+
+Htpy (A : U) (B : A -> U) (f g : Pi A B) : U = (x : A) -> Path (B x) (f x) (g x)
+
+Htpy' (A B : U) : (f g : A -> B) -> U = Htpy A (\_. B)
+
+
+--------------------------------------------------------------------------------
+---- Bi Invertible Maps
+
+-- is-bi-inv (A B : U) (f : A -> B) : U
+--   = _
+
+
+--------------------------------------------------------------------------------
+---- Isomorphism
+
+Iso (A B : U) : U
+  = (f : A -> B)
+  * (g : B -> A)
+  * Htpy' B B (\y. f (g y)) (id B)
+  * Htpy' A A (\x. g (f x)) (id A)
+
+
+--------------------------------------------------------------------------------
+---- Sigma Paths
+
+Sg (A : U) (B : A -> U) : U = (x : A) * B x
+
+SgPathP (A : U) (B : A -> U) (u v : Sg A B) : U
+  = (p : Path A u.1 v.1) * PathP (i. B (p i)) u.2 v.2
+
+SgPathO (A : U) (B : A -> U) (u v : Sg A B) : U
+  = (p : Path A u.1 v.1) * PathO A u.1 v.1 p B u.2 v.2
+
+SgPathP-eq-SgPathO (A : U) (B : A -> U) (u v : Sg A B)
+  : Path U (SgPathP A B u v) (SgPathO A B u v)
+  = \i. (p : Path A u.1 v.1) * PathP-eq-PathO A u.1 v.1 p B u.2 v.2 i
+
+SgPathP->PathSg (A : U) (B : A -> U) (u v : Sg A B) (p : SgPathP A B u v) : Path (Sg A B) u v
+  = \i. (p.1 i, p.2 i)
+
+PathSg->SgPathP (A : U) (B : A -> U) (u v : Sg A B) (p : Path (Sg A B) u v) : SgPathP A B u v
+  = (\i. (p i).1, \i. (p i).2)
+
+PathSg-equiv-SgPathP (A : U) (B : A -> U) (u v : Sg A B) : Equiv (Path (Sg A B) u v) (SgPathP A B u v)
+  = (PathSg->SgPathP A B u v -- a strict iso is almost directly a contractible map
+    , \pq. ((SgPathP->PathSg A B u v pq , refl (SgPathP A B u v) pq)
+           , \f i. ( SgPathP->PathSg A B u v (f.2 i) , \j. f.2 (i /\ j))
+           )
+    )
+
+PathSg-eq-SgPathP (A : U) (B : A -> U) (u v : Sg A B) : Path U (Path (Sg A B) u v) (SgPathP A B u v)
+  = equiv-to-path (Path (Sg A B) u v) (SgPathP A B u v) (PathSg-equiv-SgPathP A B u v)
+
+PathSg-eq-SgPathO (A : U) (B : A -> U) (u v : Sg A B) : Path U (Path (Sg A B) u v) (SgPathO A B u v)
+  = comp U (Path (Sg A B) u v) (SgPathP A B u v) (PathSg-eq-SgPathP A B u v) (SgPathO A B u v) (SgPathP-eq-SgPathO A B u v)
+
+SgPathO->PathSg (A : U) (B : A -> U) (u v : Sg A B) : SgPathO A B u v -> Path (Sg A B) u v
+  = coe 1 0 (i. PathSg-eq-SgPathO A B u v i)
+
+
+--------------------------------------------------------------------------------
+---- HLevels
+
+is-of-lvl : Nat -> U -> U = split
+  zero  -> is-contr
+  suc n -> \A. (x y : A) -> is-of-lvl n (Path A x y)
+
+is-prop (A : U) : U
+  = (x y : A) -> Path A x y
+
+is-set (A : U) : U
+  = (x y : A) -> is-prop (Path A x y)
+  
+is-prop/fam (A : U) (B : A -> U) : U
+  = (x : A) -> is-prop (B x)
+
+is-prop/fam-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) : U
+  = (x : A) (y : B x) -> is-prop (C x y)
+
+is-prop/sg (A : U) (B : A -> U) (p : is-prop A) (q : is-prop/fam A B) : is-prop (Sg A B)
+  = \u v. SgPathO->PathSg A B u v (p u.1 v.1, q v.1 (tr A u.1 v.1 (p u.1 v.1) B u.2) v.2)
+
+is-prop/ass-inh (A : U) (lem : A -> is-prop A) : is-prop A
+  = \x. lem x x
+
+is-prop/pi (A : U) (B : A -> U) (q : is-prop/fam A B) : is-prop (Pi A B)
+  = \f g i x. q x (f x) (g x) i
+
+is-prop/pi-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) (q : is-prop/fam-2 A B C) : is-prop ((x : A) (y : B x) -> C x y)
+  = is-prop/pi A (\x. (y : B x) -> C x y) (\x. is-prop/pi (B x) (C x) (q x))
+
+-- Given (c, C) we built inv (C x) * C y
+is-contr->is-prop (A : U) (cntr : is-contr A) : is-prop A
+  = \x y. comp A x cntr.1 (inv A cntr.1 x (cntr.2 x)) y (cntr.2 y)
+
+is-contr/closed-upwards (A : U) (cntr : is-contr A) (x y : A) : is-contr (Path A x y) =
+  let is-contr/closed-upwards/path : (p : Path A x y) -> Path (Path A x y) (is-contr->is-prop A cntr x y) p
+        = J A x (\y' p'. Path (Path A x y') (is-contr->is-prop A cntr x y') p') (comp/inv-l A cntr.1 x (cntr.2 x)) y
+  in  (is-contr->is-prop A cntr x y, is-contr/closed-upwards/path)
+
+is-contr->is-set (A : U) (cntr : is-contr A) : is-set A
+  = \x y. is-contr->is-prop (Path A x y) (is-contr/closed-upwards A cntr x y)
+
+is-contr/is-prop (A : U) : is-prop (is-contr A)
+  = is-prop/ass-inh (is-contr A)
+      (\cntr. is-prop/sg A (\c. (y : A) -> Path A c y)
+         (is-contr->is-prop A cntr)
+         (\c. is-prop/pi A (\y. Path A c y)
+           (is-contr->is-set A cntr c)))
+
+is-of-lvl/closed-upwards (A : U) : (n : Nat) -> is-of-lvl n A -> is-of-lvl (suc n) A = split
+  zero  -> is-contr/closed-upwards A
+  suc n -> \lvl x y. is-of-lvl/closed-upwards (Path A x y) n (lvl x y)
+
+is-of-lvl/is-prop (A : U) : (n : Nat) -> is-prop (is-of-lvl n A) = split
+  zero  -> is-contr/is-prop A
+  suc n -> is-prop/pi-2 A (\_. A) (\x y. is-of-lvl n (Path A x y)) (\x y. is-of-lvl/is-prop (Path A x y) n)

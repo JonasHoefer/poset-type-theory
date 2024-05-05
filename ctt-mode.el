@@ -47,15 +47,15 @@
   (regexp-opt ctt-special 'words)
   "Regexp that recognizes special operators.")
 
-(defvar ctt-def-regexp "^[[:word:]'-]+"
+(defvar ctt-def-regexp "^[[:word:]'-/<>]+"
   "Regexp that recognizes the beginning of a definition.")
 
 (defvar ctt-font-lock-keywords
   `((,ctt-keywords-regexp . font-lock-keyword-face)
+    (,ctt-def-regexp . font-lock-function-name-face)
     (,ctt-operations-regexp . font-lock-builtin-face)
     (,ctt-operators-regexp . font-lock-variable-name-face)
-    (,ctt-special-regexp . font-lock-warning-face)
-    (,ctt-def-regexp . font-lock-function-name-face))
+    (,ctt-special-regexp . font-lock-warning-face))
   "Font-lock information, assigning each class of keyword a face.")
 
 (defvar ctt-syntax-table
