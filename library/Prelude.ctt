@@ -139,14 +139,55 @@ Pi (A : U) (B : A -> U) : U = (x : A) -> B x
 
 Htpy (A : U) (B : A -> U) (f g : Pi A B) : U = (x : A) -> Path (B x) (f x) (g x)
 
+Htpy/comp (A : U) (B : A -> U) (f g h : Pi A B) (H1 : Htpy A B f g) (H2 : Htpy A B g h) : Htpy A B f h
+  = \x. comp (B x) (f x) (g x) (H1 x) (h x) (H2 x)
+
 Htpy' (A B : U) : (f g : A -> B) -> U = Htpy A (\_. B)
+
+Htpy'/comp (A B : U) : (f g h : A -> B) -> Htpy' A B f g -> Htpy' A B g h -> Htpy' A B f h
+  = Htpy/comp A (\_. B)
+
+Htpy'/whisker (A B C D : U) (g1 g2 : B -> C) (f : C -> D) (H : Htpy' B C g1 g2) (h : A -> B)
+  : Htpy' A D (\x. f (g1 (h x))) (\x. f (g2 (h x)))
+  = \x i. f (H (h x) i)
+
+
+--------------------------------------------------------------------------------
+---- Sections and Retractions
+
+---- Sections
+
+is-section (A B : U) (f : A -> B) (g : B -> A) : U
+  = Htpy' B B (\x. f (g x)) (id B)
+
+Sec (A B : U) (f : A -> B) : U
+  = (s : B -> A) * is-section A B f s
+
+Sec/left-factor (A B C : U) (f : B -> C) (g : A -> B) (sec : Sec A C (\x. f (g x))) : Sec B C f
+  = (\c. g (sec.1 c), sec.2)
+
+Sec/comp (B C : U) (f2 : B -> C) (s2 : Sec B C f2) (A : U) (f1 : A -> B) (s1 : Sec A B f1) : Sec A C (\x. f2 (f1 x))
+  = (\z. s1.1 (s2.1 z)
+    , Htpy'/comp C C (\z. f2 (f1 (s1.1 (s2.1 z)))) (\z. f2 (s2.1 z)) (id C)
+        (Htpy'/whisker C B B C (\x. f1 (s1.1 x)) (id B) f2 s1.2 s2.1)
+        s2.2
+    )
+
+---- Retractions
+
+is-retraction (A B : U) (f : A -> B) (g : B -> A) : U
+  = Htpy' A A (\x. g (f x)) (id A)
+
+Ret (A B : U) (f : A -> B) : U
+  = (r : B -> A) * is-retraction A B f r
 
 
 --------------------------------------------------------------------------------
 ---- Bi Invertible Maps
 
--- is-bi-inv (A B : U) (f : A -> B) : U
---   = _
+is-bi-inv (A B : U) (f : A -> B) : U = Sec A B f * Ret A B f
+
+BiInv (A B : U) : U = (f : A -> B) * is-bi-inv A B f
 
 
 --------------------------------------------------------------------------------
@@ -228,7 +269,7 @@ is-prop/pi (A : U) (B : A -> U) (q : is-prop/fam A B) : is-prop (Pi A B)
 is-prop/pi-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) (q : is-prop/fam-2 A B C) : is-prop ((x : A) (y : B x) -> C x y)
   = is-prop/pi A (\x. (y : B x) -> C x y) (\x. is-prop/pi (B x) (C x) (q x))
 
--- Given (c, C) we built inv (C x) * C y
+-- Given (c, C) we built: inv (C x) * C y
 is-contr->is-prop (A : U) (cntr : is-contr A) : is-prop A
   = \x y. comp A x cntr.1 (inv A cntr.1 x (cntr.2 x)) y (cntr.2 y)
 
