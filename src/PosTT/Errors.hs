@@ -15,6 +15,7 @@ data ScopeError where
   NotBoundError :: String -> ((Int, Int), (Int, Int)) -> ScopeError
   CyclicDependency :: [String] -> ScopeError
   DuplicateLabel :: SrcSpan -> Name -> ScopeError
+  IllformedTelescopeBinder :: SrcSpan -> ScopeError
 deriving instance Show ScopeError
 
 data TypeError where

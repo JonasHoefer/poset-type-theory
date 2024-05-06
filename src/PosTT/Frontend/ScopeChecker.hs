@@ -11,6 +11,8 @@ import           Data.Either.Extra (mapLeft)
 import           Data.Function (on)
 import           Data.Functor.Adjunction (uncozipL)
 import           Data.List (isPrefixOf, sort, sortBy, sortOn, group)
+import           Data.List.NonEmpty (NonEmpty(..), (<|), singleton)
+import qualified Data.List.NonEmpty as NE (reverse)
 import           Data.String (IsString(..))
 import           Data.Tuple.Extra (uncurry3)
 import qualified Data.Graph as G
@@ -76,15 +78,16 @@ checkALams :: [(SrcSpan, Name, PTm)] -> Exp -> ScopeChecker PTm
 checkALams ((ss,id,t):ids) u = P.Lam ss id (Just t) <$> checkALams ids u
 checkALams []              u = checkExp u
 
--- TODO: PTele(s) cases are missing some check (or should not be CPSed)
--- I think Sigmas and Pis need to use bindAIdent as-well.
 checkPTele :: PTele -> ([(SrcSpan, Name, PTy)] -> ScopeChecker a) -> ScopeChecker a
-checkPTele (PTele ss ids ty) = checkTele (Tele ss id' ids' ty)
+checkPTele (PTele ss ids ty) k = do
+    (id' :| ids') <- NE.reverse <$> unHackIds ids
+    checkTele (Tele ss id' ids' ty) k
   where
-    (id':ids') = unHackIds ids
-
-    unHackIds (App _ (Var _ id) e) = id : unHackIds e
-    unHackIds (Var _ id)           = [id]
+    unHackIds :: Exp -> ScopeChecker (NonEmpty AIdent)
+    unHackIds = \case
+      (App _ e (Var _ id)) -> (id <|) <$> unHackIds e
+      (Var _ id)           -> return (singleton id)
+      e                    -> error (show e) -- throwError (IllformedTelescopeBinder ss)
 
 checkPTeles :: [PTele] -> ([(SrcSpan, Name, PTy)] -> ScopeChecker a) -> ScopeChecker a
 checkPTeles []     k = k []
