@@ -17,7 +17,7 @@ Equiv (A B : U) : U
 
 refl (A : U) (x : A) : Path A x x
   = \i. x
-  
+
 id (A : U) (x : A) : A
   = x
 
@@ -42,14 +42,23 @@ ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y)
 tr (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : P y
   = coe 0 1 (i. P (p i)) u
 
-tr/path (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : PathP (i. P (p i)) u (tr A x y p P u)
+tr/path' (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : PathP (i. P (p i)) u (tr A x y p P u)
   = \j. coe 0 j (i. P (p i)) u
+
+tr/refl' (A : U) (x : A) (P : A -> U) : Path (P x -> P x) (id (P x)) (tr A x x (refl A x) P)
+  = \j. coe 0 j (i. P x)
 
 J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
   = tr (Singl A x) (x , refl A x) (y , p) ((Singl/is-contr A x).2 (y , p)) (\s. M s.1 s.2) m
 
 J/comp' (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) m (J A x M m x (refl A x))
-  = tr/path (Singl A x) (x , refl A x) (x , refl A x) ((Singl/is-contr A x).2 (x , refl A x)) (\s. M s.1 s.2) m
+  = tr/path' (Singl A x) (x , refl A x) (x , refl A x) ((Singl/is-contr A x).2 (x , refl A x)) (\s. M s.1 s.2) m
+
+tr/is-equiv/refl (A : U) (x : A) (P : A -> U) : is-equiv (P x) (P x) (tr A x x (refl A x) P)
+  = tr (P x -> P x) (id (P x)) (tr A x x (refl A x) P) (tr/refl' A x P) (is-equiv (P x) (P x)) (id/is-equiv (P x))
+
+tr/is-equiv (A : U) (x y : A) (p : Path A x y) (P : A -> U) : is-equiv (P x) (P y) (tr A x y p P)
+  = J A x (\y' p'. is-equiv (P x) (P y') (tr A x y' p' P)) (tr/is-equiv/refl A x P) y p
 
 
 --------------------------------------------------------------------------------
@@ -57,6 +66,12 @@ J/comp' (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x))
 
 inv (A : U) (x : A) : (y : A) -> Path A x y -> Path A y x
   = J A x (\y _. Path A y x) (refl A x)
+
+tr' (A : U) (x y : A) (p : Path A y x) : (P : A -> U) -> P x -> P y
+  = tr A x y (inv A y x p)
+
+tr/refl (A : U) (x : A) (P : A -> U) : Path (P x -> P x) (tr A x x (refl A x) P) (id (P x))
+  = inv (P x -> P x)  (id (P x)) (tr A x x (refl A x) P) (tr/refl' A x P)
 
 J/comp (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) (J A x M m x (refl A x)) m
   = inv (M x (refl A x)) m (J A x M m x (refl A x)) (J/comp' A x M m)
@@ -83,7 +98,7 @@ comp-n/type (A : U) (x : A) : Nat -> A -> U = split
   suc n -> \z. (y : A) (p : Path A z y) -> comp-n/type A x n y
 
 comp-n/impl (A : U) (x : A) : (n : Nat) (z : A) -> Path A x z -> comp-n/type A x n z = split
-  zero  -> \_ p. p 
+  zero  -> \_ p. p
   suc n -> \y p z q. comp-n/impl A x n z (comp A x y p z q)
 
 -- | comp-n A n x0 x1 p1 x2 p2 x3 p3 ... where pi : Path A x(i-1) xi and all xi : A
@@ -183,6 +198,30 @@ Ret (A B : U) (f : A -> B) : U
 
 
 --------------------------------------------------------------------------------
+---- Retracts
+
+retract-of (A B : U) : U = (i : A -> B) * Ret A B i
+
+-- retract-of/closed-upwards (A B : U) (ret : retract-of A B) (x y : A)
+--   : retract-of (Path A x y) (Path B (ret.1 x) (ret.1 y))
+  -- = ( (\p i. ret.1 (p i)) -- in theory the cubical version should be straight forward
+  --   , hComp A 0 1
+  --   , U
+  --   )
+--  = ( ap A B ret.1 x y
+--    , comp-n A (suc (suc (suc zero)))
+--        _
+--        _ p
+--        _ p
+--        _ p
+--    , U
+--    )
+
+retract-ind (A B : U) (P : A -> U) (ret : retract-of A B) (p : (b : B) -> P (ret.2.1 b)) (a : A) : P a
+  = tr A (ret.2.1 (ret.1 a)) a (ret.2.2 a) P (p (ret.1 a))
+
+
+--------------------------------------------------------------------------------
 ---- Bi Invertible Maps
 
 is-bi-inv (A B : U) (f : A -> B) : U = Sec A B f * Ret A B f
@@ -198,6 +237,28 @@ Iso (A B : U) : U
   * (g : B -> A)
   * Htpy' B B (\y. f (g y)) (id B)
   * Htpy' A A (\x. g (f x)) (id A)
+
+
+--------------------------------------------------------------------------------
+---- Propositions and sets
+
+is-prop (A : U) : U
+  = (x y : A) -> Path A x y
+
+Prop : U = (P : U) * is-prop U
+
+is-prop/fam (A : U) (B : A -> U) : U
+  = (x : A) -> is-prop (B x)
+
+PropFam (A : U) : U = (B : A -> U) * is-prop/fam A B
+
+is-prop/fam-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) : U
+  = (x : A) (y : B x) -> is-prop (C x y)
+
+is-set (A : U) : U
+  = (x y : A) -> is-prop (Path A x y)
+
+Set : U = (P : U) * is-set U
 
 
 --------------------------------------------------------------------------------
@@ -224,7 +285,7 @@ PathSg->SgPathP (A : U) (B : A -> U) (u v : Sg A B) (p : Path (Sg A B) u v) : Sg
 PathSg-equiv-SgPathP (A : U) (B : A -> U) (u v : Sg A B) : Equiv (Path (Sg A B) u v) (SgPathP A B u v)
   = (PathSg->SgPathP A B u v -- a strict iso is almost directly a contractible map
     , \pq. ((SgPathP->PathSg A B u v pq , refl (SgPathP A B u v) pq)
-           , \f i. ( SgPathP->PathSg A B u v (f.2 i) , \j. f.2 (i /\ j))
+           , \f i. (SgPathP->PathSg A B u v (f.2 i) , \j. f.2 (i /\ j))
            )
     )
 
@@ -237,6 +298,9 @@ PathSg-eq-SgPathO (A : U) (B : A -> U) (u v : Sg A B) : Path U (Path (Sg A B) u 
 SgPathO->PathSg (A : U) (B : A -> U) (u v : Sg A B) : SgPathO A B u v -> Path (Sg A B) u v
   = coe 1 0 (i. PathSg-eq-SgPathO A B u v i)
 
+SgPath-prop (A : U) (B : A -> U) (prop : is-prop/fam A B) (u v : Sg A B) (p : Path A u.1 v.1) : Path (Sg A B) u v
+  = SgPathO->PathSg A B u v (p, prop v.1 (tr A u.1 v.1 p B u.2) v.2)
+
 
 --------------------------------------------------------------------------------
 ---- HLevels
@@ -244,18 +308,6 @@ SgPathO->PathSg (A : U) (B : A -> U) (u v : Sg A B) : SgPathO A B u v -> Path (S
 is-of-lvl : Nat -> U -> U = split
   zero  -> is-contr
   suc n -> \A. (x y : A) -> is-of-lvl n (Path A x y)
-
-is-prop (A : U) : U
-  = (x y : A) -> Path A x y
-
-is-set (A : U) : U
-  = (x y : A) -> is-prop (Path A x y)
-  
-is-prop/fam (A : U) (B : A -> U) : U
-  = (x : A) -> is-prop (B x)
-
-is-prop/fam-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) : U
-  = (x : A) (y : B x) -> is-prop (C x y)
 
 is-prop/sg (A : U) (B : A -> U) (p : is-prop A) (q : is-prop/fam A B) : is-prop (Sg A B)
   = \u v. SgPathO->PathSg A B u v (p u.1 v.1, q v.1 (tr A u.1 v.1 (p u.1 v.1) B u.2) v.2)
@@ -269,6 +321,7 @@ is-prop/pi (A : U) (B : A -> U) (q : is-prop/fam A B) : is-prop (Pi A B)
 is-prop/pi-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) (q : is-prop/fam-2 A B C) : is-prop ((x : A) (y : B x) -> C x y)
   = is-prop/pi A (\x. (y : B x) -> C x y) (\x. is-prop/pi (B x) (C x) (q x))
 
+
 -- Given (c, C) we built: inv (C x) * C y
 is-contr->is-prop (A : U) (cntr : is-contr A) : is-prop A
   = \x y. comp A x cntr.1 (inv A cntr.1 x (cntr.2 x)) y (cntr.2 y)
@@ -277,6 +330,10 @@ is-contr/closed-upwards (A : U) (cntr : is-contr A) (x y : A) : is-contr (Path A
   let is-contr/closed-upwards/path : (p : Path A x y) -> Path (Path A x y) (is-contr->is-prop A cntr x y) p
         = J A x (\y' p'. Path (Path A x y') (is-contr->is-prop A cntr x y') p') (comp/inv-l A cntr.1 x (cntr.2 x)) y
   in  (is-contr->is-prop A cntr x y, is-contr/closed-upwards/path)
+
+is-contr/closed-retract (A B : U) (ret : retract-of A B) (cntr : is-contr B) : is-contr A =
+  let c : A = ret.2.1 cntr.1
+  in  (c, retract-ind A B (\a. Path A c a) ret (\b i. ret.2.1 (cntr.2 b i)))
 
 is-contr->is-set (A : U) (cntr : is-contr A) : is-set A
   = \x y. is-contr->is-prop (Path A x y) (is-contr/closed-upwards A cntr x y)
@@ -295,3 +352,52 @@ is-of-lvl/closed-upwards (A : U) : (n : Nat) -> is-of-lvl n A -> is-of-lvl (suc 
 is-of-lvl/is-prop (A : U) : (n : Nat) -> is-prop (is-of-lvl n A) = split
   zero  -> is-contr/is-prop A
   suc n -> is-prop/pi-2 A (\_. A) (\x y. is-of-lvl n (Path A x y)) (\x y. is-of-lvl/is-prop (Path A x y) n)
+
+-- is-of-lvl/closed-retract (A B : U) : (n : Nat) -> retract-of A B -> is-of-lvl n B -> is-of-lvl n A = split
+--   zero  -> is-contr/closed-retract A B
+--   suc n -> U
+
+
+--------------------------------------------------------------------------------
+---- Univalence
+
+is-equiv/is-prop (A B : U) (f : A -> B) : is-prop (is-equiv A B f)
+  = is-prop/pi B (\b. is-contr (Fib A B f b)) (\b. is-contr/is-prop (Fib A B f b))
+
+path-to-equiv (A B : U) (p : Path U A B) : Equiv A B
+  = (tr U A B p (id U), tr/is-equiv U A B p (id U))
+
+path-to-equiv/refl (A : U) : Path (Equiv A A) (path-to-equiv A A (refl U A)) (IdEquiv A)
+  = SgPath-prop (A -> A) (is-equiv A A) (is-equiv/is-prop A A) (path-to-equiv A A (refl U A)) (IdEquiv A)
+      (tr/refl U A (id U))
+
+-- this relies on coe in Ext types
+-- an alternative would be to show that Ext types yield that (A : U) * Path U A B has
+-- an extension operation and is thus contractible, yielding univalence by the
+-- fundamental theorem of Id types
+equiv-to-path/comp/fun (A B : U) (e : Equiv A B)
+  : Path (A -> B) (tr U A B (equiv-to-path A B e) (id U)) e.1
+  = \i a. hComp i 1 B (coe i 1 (_. B) (e.1 a)) []
+
+equiv-to-path/comp (A B : U) (e : Equiv A B)
+  : Path (Equiv A B) (path-to-equiv A B (equiv-to-path A B e)) e
+  = SgPath-prop (A -> B) (is-equiv A B) (is-equiv/is-prop A B) (path-to-equiv A B (equiv-to-path A B e)) e
+      (equiv-to-path/comp/fun A B e)
+
+equiv-to-path/IdEquiv (A : U) : Path (Path U A A) (equiv-to-path A A (IdEquiv A)) (refl U A)
+  = \j i. Ext A
+      [ (i=0) -> (A, id A, id/is-equiv A)
+      , (i=1) -> (A, id A, id/is-equiv A)
+      , (j=1) -> (A, id A, id/is-equiv A)
+      ]
+
+equiv-to-path/unique (A : U) : (B : U) (p : Path U A B) -> Path (Path U A B) (equiv-to-path A B (path-to-equiv A B p)) p
+  = J U A (\B p. Path (Path U A B) (equiv-to-path A B (path-to-equiv A B p)) p)
+      (comp (Path U A A)
+        (equiv-to-path A A (path-to-equiv A A (refl U A)))
+        (equiv-to-path A A (IdEquiv A))                    (\i. equiv-to-path A A ((path-to-equiv/refl A) i))
+        (refl U A)                                         (equiv-to-path/IdEquiv A)
+      )
+
+univalence/Iso (A B : U) : Iso (Equiv A B) (Path U A B)
+  = (equiv-to-path A B, path-to-equiv A B, equiv-to-path/unique A B, equiv-to-path/comp A B)
