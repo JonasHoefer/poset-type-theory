@@ -1,0 +1,28 @@
+module EquivariantCoe where
+
+data I4 : U = at <i j k l> []
+
+data I2 : U = at <i j> []
+
+Sq (A : U) : U = I2 -> A
+
+flipSq (A : U) (sq : Sq A) : Sq A = split
+  at i j -> sq (at j i)
+
+coe2/type (A : U) (sq : Sq U) : (i : I4) -> U = split
+  at i j k l -> sq (at i j) -> sq (at k l)
+
+coe2 (A : U) (sq : Sq U) : (i : I4) -> coe2/type A sq i = split
+  at r0 s0 r1 s1 -> \a0.
+    coe 0 1 (k. sq (at (r1 /\ k) (s1 /\ k))) 
+      (coe 1 0 (k. sq (at (r0 /\ k) (s0 /\ k))) a0)
+
+coe2/respects-flip/type (A : U) (sq : Sq U) : (i : I4) -> U = split
+  at r0 s0 r1 s1 ->
+    (a0 : sq (at r0 s0)) ->
+      Path (sq (at r1 s1)) 
+        (coe2 A (flipSq U sq) (at s0 r0 s1 r1) a0)
+        (coe2 A sq            (at r0 s0 r1 s1) a0)
+
+coe2/respects-flip (A : U) (sq : Sq U) : (i : I4) -> coe2/respects-flip/type A sq i = split
+  at r0 s0 r1 s1 -> \a0 _. coe2 A sq (at r0 s0 r1 s1) a0
