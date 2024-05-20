@@ -1,0 +1,7 @@
+resolver: lts-21.25
+
+extra-deps:
+- github: JonasHoefer/bnfc
+  commit: '85232841a6db9475bf89cb7af4e5d9eb39d223e5'
+  subdirs:
+  - source
