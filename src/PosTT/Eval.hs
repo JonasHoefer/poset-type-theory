@@ -569,6 +569,7 @@ unConSys c tb = mapSysM tb $ \case
   (force -> TrIntClosure i (VCon c' as) IdRestr)
     | c == c' -> Just (flip (TrIntClosure i) IdRestr <$> as)
     | c /= c' -> Nothing
+  _stuckLine  -> Nothing -- the value remains neutral after forcing => cannot unCon
 
 
 -- Telescopes
