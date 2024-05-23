@@ -103,6 +103,8 @@ instance Conv Neu where
       -> (r₀, s₀, TrIntClosure z₀ (VHSum d₀ lbl₀) α₀, k₀) `conv` (r₁, s₁, TrIntClosure z₁ (VHSum d₁ lbl₁) α₁, k₁)
     (NHCompSum r₀ s₀ d₀ lbl₀ k₀ tb₀ , NHCompSum r₁ s₁ d₁ lbl₁ k₁ tb₁ )
       -> (r₀, s₀, VSum d₀ lbl₀, k₀, tb₀) `conv` (r₁, s₁, VSum d₁ lbl₁, k₁, tb₁)
+    (NNonConstHCompSum r₀ s₀ d₀ lbl₀ c₀ as₀ tb₀ , NNonConstHCompSum r₁ s₁ d₁ lbl₁ c₁ as₁ tb₁)
+      -> (r₀, s₀, VSum d₀ lbl₀, VCon c₀ as₀, tb₀) `conv` (r₁, s₁, VSum d₁ lbl₁, VCon c₁ as₁, tb₁)
     (k₀                             , k₁                             ) -> Left $ ConvErrorTm (readBack k₀) (readBack k₁)
 
 instance Conv a => Conv (VSys a) where
