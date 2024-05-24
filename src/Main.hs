@@ -147,7 +147,7 @@ replCompletion :: CompletionFunc (StateT ReplState IO)
 replCompletion input@(s, _)
   | ":load" `isPrefixOf` reverse s = completeFilename input -- also for unfold?
   | ":"     `isPrefixOf` reverse s = completeWord Nothing [] (return . cmdSearch) input
-  | otherwise                      = completeWord' Nothing (\c -> not (isAlphaNum c || c == '-')) nameSearch input
+  | otherwise                      = completeWord' Nothing (\c -> not (isAlphaNum c || c `elem` ("-/\\<>"::String))) nameSearch input
   where
     cmdSearch :: String -> [Completion]
     cmdSearch s = map simpleCompletion $ filter (s `isPrefixOf`) replCmdStrings
