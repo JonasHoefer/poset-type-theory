@@ -88,7 +88,7 @@ data HLabel = HLabel SrcSpan Name Tel [Gen] (Sys PTm) deriving Show
 
 data Sys a = Sys SrcSpan [([(ITm, ITm)], a)] deriving Show
 
-data Decl = Decl SrcSpan Name PTm PTy | DeclLock SrcSpan [Name] [Decl]
+data Decl = Decl SrcSpan Name PTm PTy | DeclLock SrcSpan [Name] | DeclUnlock SrcSpan [Name]
 
 app :: SrcSpan -> PTm -> PTm -> PTm
 app _  (Con ss c as)  v = Con ss c (as ++ [v])

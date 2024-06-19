@@ -1,12 +1,19 @@
 module Lock where
 
+Pt : U = (X : U) * X
+
+lock Pt
+
+foo (A : Pt) : U = U
+
+bar (B : Pt) (_ : foo B) : U = U
+
+unlock Pt
+
+
+
 x : U = U
-w : U = U
 
-lock x w for
-  y : U = x
-  q : Path U y x = \_. x
-  -- q : Path U U x = \_. x -- does not type check
+lock x
 
-
-p : Path U x U = \_. U
+-- p : Path U U x = \_. x

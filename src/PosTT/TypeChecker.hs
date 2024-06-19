@@ -1,11 +1,13 @@
 module PosTT.TypeChecker where
 
+import           Control.Applicative
 import           Control.Monad.Reader
 import           Control.Monad.Writer (MonadWriter(..), Writer, runWriter)
 import           Control.Monad.Except
 
 import           Data.Bifunctor (first)
 import           Data.Either (fromRight)
+import           Data.Either.Extra (maybeToEither)
 import           Data.List (sortOn)
 import           Data.Tuple.Extra (uncurry3, first3, second3)
 
@@ -14,7 +16,7 @@ import           PosTT.Conversion
 import           PosTT.Errors
 import           PosTT.Eval
 import qualified PosTT.Frontend.PreTerms as P
-import           PosTT.Frontend.PreTerms (PTm)
+import           PosTT.Frontend.PreTerms (PTm, PTy)
 import           PosTT.Poset
 import           PosTT.Pretty
 import           PosTT.Quotation
@@ -32,7 +34,7 @@ emptyCxt :: Cxt
 emptyCxt = Cxt EmptyEnv [] [] Nothing
 
 newtype TypeChecker a = TypeChecker { unTypeChecker :: ReaderT Cxt (ExceptT TypeError (Writer [String])) a }
-  deriving (Functor, Applicative, Monad, MonadReader Cxt, MonadWriter [String], MonadError TypeError)
+  deriving (Functor, Applicative, Alternative, Monad, MonadReader Cxt, MonadWriter [String], MonadError TypeError)
 
 instance MonadFail TypeChecker where
   fail :: String -> TypeChecker a
@@ -46,11 +48,8 @@ runTC cxt ma = bindStage terminalStage $ runWriter $ runExceptT $ runReaderT (un
 ---- Utility Functions
 
 -- | Extends context Γ with a definition to a context Γ,(x=t:a)
-extDef :: (Name, Tm, Ty, VTy) -> Cxt -> Cxt
-extDef (x, t, a, va) (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ((x, va):ts) is pos
-
-extLock :: Name -> Cxt -> Cxt
-extLock x (Cxt ρ ts is pos) = Cxt (EnvLock ρ x) ts is pos
+extDef :: (Name, Tm, Ty) -> Cxt -> Cxt
+extDef (x, t, a) (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ts is pos
 
 -- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)
 extFib :: Name -> Val -> VTy -> Cxt -> Cxt
@@ -97,10 +96,20 @@ checkIntVar i = asks (elem i . intVars) >>= \case
   True  -> return (IVar i)
   False -> fail $ show i ++ " is not an interval variable!"
 
-checkFibVar :: Name -> TypeChecker VTy
-checkFibVar x = asks (lookup x . types) >>= \case
+lookupFibVar :: AtStage (Name -> TypeChecker VTy)
+lookupFibVar x = asks (lookup x . types) >>= \case
   Just t  -> return t
-  Nothing -> fail $ show x ++ " is not a fibrant variable!"
+  Nothing -> fail $ show x ++ " is not a fibrant definition!"
+
+lookupDefType :: AtStage (Name -> TypeChecker VTy)
+lookupDefType x = asks env >>= (`go` x)
+  where
+    go (EnvDef ρ y _ t) x | y == x = return (eval ρ t)
+    go (EnvCons ρ _ _)  x = go ρ x
+    go EmptyEnv         x = fail $ show x ++ " is not a fibrant (non-definition) variable!"
+
+checkFibVar :: AtStage (Name -> TypeChecker VTy)
+checkFibVar x = lookupFibVar x <|> lookupDefType x
 
 
 ---- Evaluation and Quotation using context
@@ -175,7 +184,7 @@ check = flip $ \ty -> atArgPos $ \case
   P.Let _ x s a t -> do
     (a', va) <- checkAndEval a VU
     s' <- check s va
-    Let x s' a' <$> local (extDef (x, s', a', va)) (check t ty)
+    Let x s' a' <$> local (extDef (x, s', a')) (check t ty)
   P.U _ -> do
     () <- isU ty
     return U
@@ -440,8 +449,8 @@ checkAndEvalCof eqs = do
 --------------------------------------------------------------------------------
 ---- Checking lists of declarations
 
-checkDecl :: AtStage (P.Decl -> TypeChecker [(Name, Tm, Ty, VTy)])
-checkDecl (P.Decl _ x b t) = do
+checkDecl :: AtStage (Name -> PTm -> PTy -> TypeChecker (Name, Tm, Ty))
+checkDecl x b t = do
   tell ["\nChecking Definition: " ++ show x]
 
   (t', vt) <- checkAndEval t VU
@@ -450,15 +459,15 @@ checkDecl (P.Decl _ x b t) = do
   tell [prettyVal vt]
   tell [pretty b']
 
-  return [(x, b', t', vt)]
-checkDecl (P.DeclLock _ ids decls) =
-  local (\cxt -> foldr extLock cxt ids) (checkDecls decls)
+  return (x, b', t')
 
-checkDecls :: AtStage ([P.Decl] -> TypeChecker [(Name, Tm, Ty, VTy)])
-checkDecls []     = return []
-checkDecls (d:ds) = do
-  decls <- checkDecl d
-  (decls ++) <$> local (flip (foldr extDef) decls) (checkDecls ds)
+checkDecls :: AtStage ([P.Decl] -> TypeChecker [(Name, Tm, Ty)])
+checkDecls []                     = return []
+checkDecls (P.DeclLock   _ xs:ds) = lock xs (checkDecls ds)
+checkDecls (P.DeclUnlock _ xs:ds) = unlock xs (checkDecls ds)
+checkDecls (P.Decl _ x b t:ds)    = do
+  d <- checkDecl x b t
+  (d:) <$> local (extDef d) (checkDecls ds)
 
 checkDeclsCxt :: [P.Decl] -> (Either TypeError Cxt, [String])
 checkDeclsCxt decls = runTC emptyCxt $ asks (foldr extDef) <*> checkDecls decls

@@ -1,15 +1,17 @@
 -- | Representations of Values
 module PosTT.Values where
 
-import Algebra.Lattice
+import           Algebra.Lattice
 
-import Data.Bifunctor
-import Data.List (uncons)
-import Data.Either (isRight)
+import           Data.Bifunctor
+import           Data.Either (isRight)
+import           Data.List (uncons)
+import           Data.Set (Set)
+import qualified Data.Set as S
 
-import PosTT.Common
-import PosTT.Terms
-import PosTT.Errors
+import           PosTT.Common
+import           PosTT.Terms
+import           PosTT.Errors
 import qualified PosTT.Common as M
 
 
@@ -225,10 +227,10 @@ instance InfSemilattice VCof where
 
 ---- Stages
 
-data Stage = Stage { gens :: !NameStore, cof :: !VCof, names :: !NameStore }
+data Stage = Stage { gens :: !NameStore, cof :: !VCof, names :: !NameStore, lockedNames :: !(Set Name) }
 
 terminalStage :: Stage
-terminalStage = Stage M.emptyStore top M.emptyStore
+terminalStage = Stage M.emptyStore top M.emptyStore S.empty
 
 type AtStage a = (?s :: Stage) => a
 
@@ -244,6 +246,12 @@ sExtGen n s = s { gens = addNameStore n (gens s) }
 sExtCof :: VCof -> Stage -> Stage
 sExtCof φ s = s { cof = φ /\ cof s}
 
+sLock :: Name -> Stage -> Stage
+sLock x s = s { lockedNames = S.insert x (lockedNames s) }
+
+sUnlock :: Name -> Stage -> Stage
+sUnlock x s = s { lockedNames = S.delete x (lockedNames s) }
+
 extName :: AtStage (Name -> AtStage a -> a)
 extName n = bindStage (sExtName n ?s)
 
@@ -252,6 +260,15 @@ extGen n = bindStage (sExtGen n ?s)
 
 extCof :: AtStage (VCof -> AtStage a -> a)
 extCof φ = bindStage (sExtCof φ ?s)
+
+lock :: AtStage ([Name] -> AtStage a -> a)
+lock xs = bindStage (foldr sLock ?s xs)
+
+unlock :: AtStage ([Name] -> AtStage a -> a)
+unlock xs = bindStage (foldr sUnlock ?s xs)
+
+locked :: AtStage (Name -> Bool)
+locked x = x `S.member` lockedNames ?s
 
 
 ---- Fresh Names/Generators
@@ -305,7 +322,7 @@ re = (@ IdRestr)
 
 type Env = [(Name, EnvEntry)]
 
-data EnvEntry = EntryDef !Tm !Ty | EntryFib !Val | EntryInt !VI | EntryLock
+data EnvEntry = EntryDef !Tm !Ty | EntryFib !Val | EntryInt !VI
 
 pattern EmptyEnv :: Env
 pattern EmptyEnv = []
@@ -315,9 +332,6 @@ pattern EnvCons rho x e <- (uncons -> Just ((x, e), rho))
   where EnvCons rho x e = (x,e):rho
 
 {-# COMPLETE EmptyEnv, EnvCons #-}
-
-pattern EnvLock :: Env -> Name -> Env
-pattern EnvLock rho x = (x, EntryLock):rho
 
 pattern EnvFib :: Env -> Name -> Val -> Env
 pattern EnvFib rho x v   = (x, EntryFib v):rho

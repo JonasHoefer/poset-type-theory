@@ -29,3 +29,14 @@ data TypeError where
   TypeErrorConArgCount :: SrcSpan -> Name -> Int -> Int -> TypeError
   TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError
   TypeErrorHSplitCompat :: Tm -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
+  TypeErrorCollection :: [TypeError] -> TypeError
+
+instance Semigroup TypeError where
+  TypeErrorCollection es <> TypeErrorCollection es' = TypeErrorCollection (es ++ es')
+  TypeErrorCollection es <> e                       = TypeErrorCollection (es ++ [e])
+  e                      <> TypeErrorCollection es' = TypeErrorCollection (e  :  es')
+  e                      <> e'                      = TypeErrorCollection [e, e']
+
+instance Monoid TypeError where
+  mempty = TypeErrorCollection []
+  

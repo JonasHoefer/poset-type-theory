@@ -263,10 +263,12 @@ checkDecl (DeclData ss id ts cs) = do
       let bd = foldr (\(ss', x, _) -> P.Lam ss' x Nothing) d ts'
 
       return ((id', (idss, Variable)):[ (c, (ssC, Constructor)) | (c, ssC) <- cs' ], P.Decl ss id' bd ty)
-checkDecl (DeclLock ss ids decls) = do
+checkDecl (DeclLock ss ids) = do
   ids' <- mapM checkDef ids
-  (env, decls') <- checkDecls decls
-  return (env, P.DeclLock ss ids' decls')
+  asks (, P.DeclLock ss ids')
+checkDecl (DeclUnlock ss ids) = do
+  ids' <- mapM checkDef ids
+  asks (, P.DeclUnlock ss ids')
 
 bindDecl :: Decl -> (P.Decl -> ScopeChecker a) -> ScopeChecker a
 bindDecl d k = checkDecl d >>= \(ids, d') -> local (ids ++) (k d')

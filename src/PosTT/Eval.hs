@@ -26,7 +26,6 @@ import PosTT.Poset
 lookupFib :: AtStage (Env -> Name -> Val)
 lookupFib (EnvFib _ y v)     x | y == x = v
 lookupFib ρ@(EnvDef _ y t _) x | y == x = eval ρ t -- recursive definition
-lookupFib (EnvLock _ y)      x | y == x = VVar x
 lookupFib (EnvCons ρ _ _)    x = lookupFib ρ x
 
 lookupInt :: Env -> Gen -> VI
@@ -47,7 +46,7 @@ closedEval = bindStage terminalStage $ eval EmptyEnv
 eval :: AtStage (Env -> Tm -> Val)
 eval rho = \case
   U            -> VU
-  Var x        -> rho `lookupFib` x
+  Var x        -> if locked x then VVar x else rho `lookupFib` x
   Let d t ty s -> eval (EnvDef rho d t ty) s
 
   Pi a b  -> VPi (eval rho a) (evalBinder rho b)
@@ -716,7 +715,6 @@ instance Restrictable EnvEntry where
     EntryFib v    -> EntryFib (v @ f)
     EntryDef t ty -> EntryDef t ty
     EntryInt r    -> EntryInt (r @ f)
-    EntryLock     -> EntryLock
 
 instance Restrictable a => Restrictable [a] where
   type Alt [a] = [Alt a]

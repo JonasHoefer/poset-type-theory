@@ -3,7 +3,7 @@ entrypoints Module, Exp ;
 comment "--" ;
 comment "{-" "-}" ;
 
-layout "where", "let", "split", "for";
+layout "where", "let", "split";
 layout stop "in" ;
 -- Do not use layout toplevel as it makes pExp fail!
 
@@ -12,10 +12,11 @@ Module.   Module ::= "module" MIdent "where" "{" [Imp] [Decl] "}" ;
 Import.   Imp ::= "import" MIdent ;
 separator Imp ";" ;
 
-DeclDef.   Decl ::= AIdent [Tele] ":" Exp "=" Body ;
-DeclData.  Decl ::= "data" AIdent [Tele] ":" "U" "=" [Label] ;
-DeclLock.  Decl ::= "lock" [AIdent] "for" "{" [Decl] "}" ;
-separator  Decl ";" ;
+DeclDef.    Decl ::= AIdent [Tele] ":" Exp "=" Body ;
+DeclData.   Decl ::= "data" AIdent [Tele] ":" "U" "=" [Label] ;
+DeclLock.   Decl ::= "lock" [AIdent] ;
+DeclUnlock. Decl ::= "unlock" [AIdent] ;
+separator   Decl ";" ;
 
 NoSplit. Body ::= ExpWhere ;
 Split.   Body ::= "split" "{" [Branch] "}" ;
