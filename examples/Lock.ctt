@@ -1,0 +1,12 @@
+module Lock where
+
+x : U = U
+w : U = U
+
+lock x w for
+  y : U = x
+  q : Path U y x = \_. x
+  -- q : Path U U x = \_. x -- does not type check
+
+
+p : Path U x U = \_. U

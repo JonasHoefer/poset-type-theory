@@ -46,8 +46,11 @@ runTC cxt ma = bindStage terminalStage $ runWriter $ runExceptT $ runReaderT (un
 ---- Utility Functions
 
 -- | Extends context Γ with a definition to a context Γ,(x=t:a)
-extDef :: Name -> Tm -> Ty -> VTy -> Cxt -> Cxt
-extDef x t a va (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ((x, va):ts) is pos
+extDef :: (Name, Tm, Ty, VTy) -> Cxt -> Cxt
+extDef (x, t, a, va) (Cxt ρ ts is pos) = Cxt (EnvDef ρ x t a) ((x, va):ts) is pos
+
+extLock :: Name -> Cxt -> Cxt
+extLock x (Cxt ρ ts is pos) = Cxt (EnvLock ρ x) ts is pos
 
 -- | Extends context Γ with a (fibrant) value to a context Γ,(x=v:a)
 extFib :: Name -> Val -> VTy -> Cxt -> Cxt
@@ -172,7 +175,7 @@ check = flip $ \ty -> atArgPos $ \case
   P.Let _ x s a t -> do
     (a', va) <- checkAndEval a VU
     s' <- check s va
-    Let x s' a' <$> local (extDef x s' a' va) (check t ty)
+    Let x s' a' <$> local (extDef (x, s', a', va)) (check t ty)
   P.U _ -> do
     () <- isU ty
     return U
@@ -437,7 +440,7 @@ checkAndEvalCof eqs = do
 --------------------------------------------------------------------------------
 ---- Checking lists of declarations
 
-checkDecl :: AtStage (P.Decl -> TypeChecker (Name, Tm, Ty, VTy))
+checkDecl :: AtStage (P.Decl -> TypeChecker [(Name, Tm, Ty, VTy)])
 checkDecl (P.Decl _ x b t) = do
   tell ["\nChecking Definition: " ++ show x]
 
@@ -447,16 +450,18 @@ checkDecl (P.Decl _ x b t) = do
   tell [prettyVal vt]
   tell [pretty b']
 
-  return (x, b', t', vt)
+  return [(x, b', t', vt)]
+checkDecl (P.DeclLock _ ids decls) =
+  local (\cxt -> foldr extLock cxt ids) (checkDecls decls)
+
+checkDecls :: AtStage ([P.Decl] -> TypeChecker [(Name, Tm, Ty, VTy)])
+checkDecls []     = return []
+checkDecls (d:ds) = do
+  decls <- checkDecl d
+  (decls ++) <$> local (flip (foldr extDef) decls) (checkDecls ds)
 
 checkDeclsCxt :: [P.Decl] -> (Either TypeError Cxt, [String])
-checkDeclsCxt decls = runTC emptyCxt (go decls)
-  where
-    go :: AtStage ([P.Decl] -> TypeChecker Cxt)
-    go []     = ask
-    go (d:ds) = do
-      (x, b, t, vt) <- checkDecl d
-      local (extDef x b t vt) (go ds)
+checkDeclsCxt decls = runTC emptyCxt $ asks (foldr extDef) <*> checkDecls decls
 
 checkDeclsEnv :: [P.Decl] -> (Either TypeError Env, [String])
 checkDeclsEnv = first (fmap env) . checkDeclsCxt

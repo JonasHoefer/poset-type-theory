@@ -305,7 +305,7 @@ re = (@ IdRestr)
 
 type Env = [(Name, EnvEntry)]
 
-data EnvEntry = EntryDef !Tm !Ty | EntryFib !Val | EntryInt !VI
+data EnvEntry = EntryDef !Tm !Ty | EntryFib !Val | EntryInt !VI | EntryLock
 
 pattern EmptyEnv :: Env
 pattern EmptyEnv = []
@@ -315,6 +315,9 @@ pattern EnvCons rho x e <- (uncons -> Just ((x, e), rho))
   where EnvCons rho x e = (x,e):rho
 
 {-# COMPLETE EmptyEnv, EnvCons #-}
+
+pattern EnvLock :: Env -> Name -> Env
+pattern EnvLock rho x = (x, EntryLock):rho
 
 pattern EnvFib :: Env -> Name -> Val -> Env
 pattern EnvFib rho x v   = (x, EntryFib v):rho

@@ -20,7 +20,7 @@
 ;;;; Syntax
 
 (defvar ctt-keywords
-  '("inductive" "higher" "import" "let" "in" "where" "module")
+  '("inductive" "higher" "import" "let" "in" "where" "module" "lock" "for")
   "Keywords.")
 
 (defvar ctt-operations

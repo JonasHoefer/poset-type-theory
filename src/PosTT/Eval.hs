@@ -26,6 +26,7 @@ import PosTT.Poset
 lookupFib :: AtStage (Env -> Name -> Val)
 lookupFib (EnvFib _ y v)     x | y == x = v
 lookupFib ρ@(EnvDef _ y t _) x | y == x = eval ρ t -- recursive definition
+lookupFib (EnvLock _ y)      x | y == x = VVar x
 lookupFib (EnvCons ρ _ _)    x = lookupFib ρ x
 
 lookupInt :: Env -> Gen -> VI

@@ -61,7 +61,7 @@ mIdentToString (MIdentExt _ (AIdent (_, p)) n) = p ++ "." ++ mIdentToString n
 --------------------------------------------------------------------------------
 ---- Scope Checker
 
-data SymKind = Variable | Constructor deriving Eq -- | HigherConstructor
+data SymKind = Variable | Constructor | Definition deriving Eq -- | HigherConstructor
 
 type ScopingEnv = [(Name, (((Int, Int), (Int, Int)), SymKind))]
 
@@ -156,9 +156,15 @@ checkExp e                     = error $ "[ScopeChecker] Missing Case: " ++ prin
 checkVar :: AIdent -> ScopeChecker PTm
 checkVar (AIdent (ss, id)) = asks (\ids -> guard (not $ "_" `isPrefixOf` id) *> fromString id `lookup` ids) >>= \case
   Nothing                     -> throwError $ NotBoundError id ss
+  Just (_, Definition)        -> return $ P.Var (Just ss) (fromString id)
   Just (_, Variable)          -> return $ P.Var (Just ss) (fromString id)
   Just (_, Constructor)       -> return $ P.Con (Just ss) (fromString id) []
 --  Just (_, HigherConstructor) -> return $ P.HCon (Just ss) (fromString id) []
+
+checkDef :: AIdent -> ScopeChecker Name
+checkDef (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
+  Just (_, Definition) -> return $ fromString id
+  _                    -> throwError $ NotBoundError id ss
 
 checkCon :: AIdent -> ScopeChecker Name
 checkCon (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
@@ -240,10 +246,11 @@ checkDecl :: Decl -> ScopeChecker (ScopingEnv, P.Decl)
 checkDecl (DeclDef ss id ts ty bd) = do
   checkTeles ts $ \ts' -> do
     bindAIdent' id $ \id' idss -> do
+      -- TODO: here the name is not bound as a definition; should this be the case? I.e. should a rec def view itself as definition?
       let ty' = flip (foldr (\(ss', x, t) -> P.Pi ss' x t)) ts' <$> checkExp ty
           -- We could type annotate here, but then we would check the same type twice.
       let bd' = flip (foldr (\(ss', x, _) -> P.Lam ss' x Nothing)) ts' <$> checkBody id' bd
-      ([(id', (idss, Variable))],) <$> (P.Decl ss id' <$> bd' <*> ty')
+      ([(id', (idss, Definition))],) <$> (P.Decl ss id' <$> bd' <*> ty')
 checkDecl (DeclData ss id ts cs) = do
   checkTeles ts $ \ts' ->
     bindAIdent' id $ \id' idss -> do
@@ -256,6 +263,10 @@ checkDecl (DeclData ss id ts cs) = do
       let bd = foldr (\(ss', x, _) -> P.Lam ss' x Nothing) d ts'
 
       return ((id', (idss, Variable)):[ (c, (ssC, Constructor)) | (c, ssC) <- cs' ], P.Decl ss id' bd ty)
+checkDecl (DeclLock ss ids decls) = do
+  ids' <- mapM checkDef ids
+  (env, decls') <- checkDecls decls
+  return (env, P.DeclLock ss ids' decls')
 
 bindDecl :: Decl -> (P.Decl -> ScopeChecker a) -> ScopeChecker a
 bindDecl d k = checkDecl d >>= \(ids, d') -> local (ids ++) (k d')
