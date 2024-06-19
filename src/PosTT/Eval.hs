@@ -716,6 +716,7 @@ instance Restrictable EnvEntry where
     EntryFib v    -> EntryFib (v @ f)
     EntryDef t ty -> EntryDef t ty
     EntryInt r    -> EntryInt (r @ f)
+    EntryLock     -> EntryLock
 
 instance Restrictable a => Restrictable [a] where
   type Alt [a] = [Alt a]
