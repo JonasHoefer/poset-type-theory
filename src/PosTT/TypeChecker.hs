@@ -7,8 +7,7 @@ import           Control.Monad.Except
 
 import           Data.Bifunctor (first)
 import           Data.Either (fromRight)
-import           Data.Either.Extra (maybeToEither)
-import           Data.List (sortOn)
+import           Data.List (sortOn, foldl')
 import           Data.Tuple.Extra (uncurry3, first3, second3)
 
 import           PosTT.Common
@@ -470,7 +469,7 @@ checkDecls (P.Decl _ x b t:ds)    = do
   (d:) <$> local (extDef d) (checkDecls ds)
 
 checkDeclsCxt :: [P.Decl] -> (Either TypeError Cxt, [String])
-checkDeclsCxt decls = runTC emptyCxt $ asks (foldr extDef) <*> checkDecls decls
+checkDeclsCxt decls = runTC emptyCxt $ asks (foldl' (flip extDef)) <*> checkDecls decls
 
 checkDeclsEnv :: [P.Decl] -> (Either TypeError Env, [String])
 checkDeclsEnv = first (fmap env) . checkDeclsCxt
