@@ -245,7 +245,7 @@ Iso (A B : U) : U
 is-prop (A : U) : U
   = (x y : A) -> Path A x y
 
-Prop : U = (P : U) * is-prop U
+Prop : U = (P : U) * is-prop P
 
 is-prop/fam (A : U) (B : A -> U) : U
   = (x : A) -> is-prop (B x)
@@ -258,7 +258,7 @@ is-prop/fam-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) : U
 is-set (A : U) : U
   = (x y : A) -> is-prop (Path A x y)
 
-Set : U = (P : U) * is-set U
+Set : U = (P : U) * is-set P
 
 
 --------------------------------------------------------------------------------
