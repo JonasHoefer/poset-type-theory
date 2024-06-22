@@ -7,7 +7,7 @@ import           Control.Monad.Except
 
 import           Data.Bifunctor (first)
 import           Data.Either (fromRight)
-import           Data.List (sortOn, foldl')
+import           Data.List (sortOn)
 import           Data.Tuple.Extra (uncurry3, first3, second3)
 
 import           PosTT.Common
@@ -460,16 +460,16 @@ checkDecl x b t = do
 
   return (x, b', t')
 
-checkDecls :: AtStage ([P.Decl] -> TypeChecker [(Name, Tm, Ty)])
-checkDecls []                     = return []
+checkDecls :: AtStage ([P.Decl] -> TypeChecker Cxt)
+checkDecls []                     = ask
 checkDecls (P.DeclLock   _ xs:ds) = lock xs (checkDecls ds)
 checkDecls (P.DeclUnlock _ xs:ds) = unlock xs (checkDecls ds)
 checkDecls (P.Decl _ x b t:ds)    = do
   d <- checkDecl x b t
-  (d:) <$> local (extDef d) (checkDecls ds)
+  local (extDef d) (checkDecls ds)
 
 checkDeclsCxt :: [P.Decl] -> (Either TypeError Cxt, [String])
-checkDeclsCxt decls = runTC emptyCxt $ asks (foldl' (flip extDef)) <*> checkDecls decls
+checkDeclsCxt decls = runTC emptyCxt (checkDecls decls)
 
 checkDeclsEnv :: [P.Decl] -> (Either TypeError Env, [String])
 checkDeclsEnv = first (fmap env) . checkDeclsCxt
