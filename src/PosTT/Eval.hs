@@ -14,9 +14,6 @@ import PosTT.Terms
 import PosTT.Values
 import PosTT.Poset
 
--- import Debug.Trace
--- import {-# SOURCE #-} PosTT.Pretty -- only for debugging
-
 
 --------------------------------------------------------------------------------
 ---- Utilities
@@ -502,7 +499,10 @@ doCoeHSum r₀ r₁ i d lbl f (VHCon c vs is sys) | Just tel <- lookup c lbl =
         (mapSys sys (doCoeHSum (re r₀) (re r₁) i d lbl f))
       -- we do not restrict the line (λHSum d lbl)f because this formally yields (λHSum d lbl)fη
       -- where η only projects onto the quotient with the additional equation.
-doCoeHSum r₀ r₁ i d lbl f (VNeu k)            = VNeuCoeHSum r₀ r₁ i d lbl f k
+doCoeHSum r₀ r₁ i d lbl f (VHCompHSum r r' _ _ u₀ sys) =  -- the two d lbl should be equal
+  let ℓ = TrIntClosure i (VHSum d lbl) f
+  in  doHComp r r' (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀) (mapSys sys $ rebindI $ \_ -> doCoe (re r₀) (re r₁) (re ℓ))
+doCoeHSum r₀ r₁ i d lbl f (VNeu k)                     = VNeuCoeHSum r₀ r₁ i d lbl f k
 
 
 --------------------------------------------------------------------------------
