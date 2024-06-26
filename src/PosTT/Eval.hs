@@ -430,6 +430,7 @@ doCoePartial r0 r1 = go False
     go forced l@(TrIntClosure i a _) = case a of
       VU{}     -> identity VU
       VSum{}   -> VCoePartial r0 r1 l
+      VHSum{}  -> VCoePartial r0 r1 l
       VPi{}    -> VCoePartial r0 r1 l
       VSigma{} -> VCoePartial r0 r1 l
       VPath{}  -> VCoePartial r0 r1 l
