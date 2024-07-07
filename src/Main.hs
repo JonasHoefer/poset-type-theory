@@ -15,7 +15,7 @@ import           Control.Monad.State.Strict
 
 import           System.Console.Haskeline
 import           System.Directory
-import           System.FilePath (stripExtension, (</>), (-<.>), stripExtension, splitFileName, splitDirectories, joinPath)
+import           System.FilePath (stripExtension, (</>), (-<.>), stripExtension, splitDirectories, joinPath)
 
 import           Options.Applicative as O
 

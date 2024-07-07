@@ -87,7 +87,7 @@ checkPTele (PTele ss ids ty) k = do
     unHackIds = \case
       (App _ e (Var _ id)) -> (id <|) <$> unHackIds e
       (Var _ id)           -> return (singleton id)
-      e                    -> error (show e) -- throwError (IllformedTelescopeBinder ss)
+      _                    -> throwError (IllformedTelescopeBinder ss)
 
 checkPTeles :: [PTele] -> ([(SrcSpan, Name, PTy)] -> ScopeChecker a) -> ScopeChecker a
 checkPTeles []     k = k []
@@ -103,6 +103,7 @@ checkLets :: [Decl] -> Exp -> ScopeChecker PTm
 checkLets []     u = checkExp u
 checkLets (d:ds) u = bindDecl d $ \case
   P.Decl ss id v ty -> P.Let ss id v ty <$> checkLets ds u
+  -- TODO: which declarations should be allowed in lets and wheres?
 
 checkSys :: Sys -> ScopeChecker (P.Sys PTm)
 checkSys (Sys ss sys) = P.Sys ss <$> traverse checkSide sys
