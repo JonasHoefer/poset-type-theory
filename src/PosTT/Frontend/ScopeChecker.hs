@@ -13,6 +13,7 @@ import           Data.Functor.Adjunction (uncozipL)
 import           Data.List (isPrefixOf, sort, sortBy, sortOn, group)
 import           Data.List.NonEmpty (NonEmpty(..), (<|), singleton)
 import qualified Data.List.NonEmpty as NE (reverse)
+import qualified Data.Map.Strict as M
 import           Data.String (IsString(..))
 import           Data.Tuple.Extra (uncurry3)
 import qualified Data.Graph as G
@@ -63,12 +64,12 @@ mIdentToString (MIdentExt _ (AIdent (_, p)) n) = p ++ "." ++ mIdentToString n
 
 data SymKind = Variable | Constructor | Definition deriving Eq -- | HigherConstructor
 
-type ScopingEnv = [(Name, (((Int, Int), (Int, Int)), SymKind))]
+type ScopingEnv = M.Map Name (((Int, Int), (Int, Int)), SymKind)
 
 type ScopeChecker a = ReaderT ScopingEnv (Either ScopeError) a
 
 runScopeChecker :: ScopeChecker a -> Either ScopeError a
-runScopeChecker ss = runReaderT ss []
+runScopeChecker ss = runReaderT ss M.empty
 
 checkLams :: SrcSpan -> [AIdent] -> Exp -> ScopeChecker PTm
 checkLams ss (id:ids) u = bindAIdent id $ \id' -> P.Lam ss id' Nothing <$> checkLams ss ids u
@@ -87,7 +88,7 @@ checkPTele (PTele ss ids ty) k = do
     unHackIds = \case
       (App _ e (Var _ id)) -> (id <|) <$> unHackIds e
       (Var _ id)           -> return (singleton id)
-      _                    -> throwError (IllformedTelescopeBinder ss)
+      _BadTele             -> throwError (IllformedTelescopeBinder ss)
 
 checkPTeles :: [PTele] -> ([(SrcSpan, Name, PTy)] -> ScopeChecker a) -> ScopeChecker a
 checkPTeles []     k = k []
@@ -155,7 +156,7 @@ checkExp (Dir _ (Dir1 ss))     = return $ P.One ss
 checkExp e                     = error $ "[ScopeChecker] Missing Case: " ++ printTree e
 
 checkVar :: AIdent -> ScopeChecker PTm
-checkVar (AIdent (ss, id)) = asks (\ids -> guard (not $ "_" `isPrefixOf` id) *> fromString id `lookup` ids) >>= \case
+checkVar (AIdent (ss, id)) = asks (\ids -> guard (not $ "_" `isPrefixOf` id) *> fromString id `M.lookup` ids) >>= \case
   Nothing                     -> throwError $ NotBoundError id ss
   Just (_, Definition)        -> return $ P.Var (Just ss) (fromString id)
   Just (_, Variable)          -> return $ P.Var (Just ss) (fromString id)
@@ -163,27 +164,27 @@ checkVar (AIdent (ss, id)) = asks (\ids -> guard (not $ "_" `isPrefixOf` id) *> 
 --  Just (_, HigherConstructor) -> return $ P.HCon (Just ss) (fromString id) []
 
 checkDef :: AIdent -> ScopeChecker Name
-checkDef (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
+checkDef (AIdent (ss, id)) = asks (fromString id `M.lookup`) >>= \case
   Just (_, Definition) -> return $ fromString id
   _                    -> throwError $ NotBoundError id ss
 
 checkCon :: AIdent -> ScopeChecker Name
-checkCon (AIdent (ss, id)) = asks (fromString id `lookup`) >>= \case
+checkCon (AIdent (ss, id)) = asks (fromString id `M.lookup`) >>= \case
   Just (_, Constructor) -> return $ fromString id
   _                     -> throwError $ NotBoundError id ss
 
 checkFreshAIdent :: AIdent -> ScopeChecker (Name, ((Int, Int), (Int, Int)))
 checkFreshAIdent (AIdent (ss, "_")) = return ("_", ss)
-checkFreshAIdent (AIdent (ss, id))  = asks (lookup (fromString id)) >>= \case
+checkFreshAIdent (AIdent (ss, id))  = asks (M.lookup (fromString id)) >>= \case
   Nothing                 -> return (fromString id, ss)
   Just (_  , Constructor) -> return (fromString id, ss)
   Just (ss',_           ) -> throwError $ ReboundError id ss' ss
 
 bindAIdent' :: AIdent -> (Name -> ((Int, Int), (Int, Int)) -> ScopeChecker a) -> ScopeChecker a
-bindAIdent' id k = checkFreshAIdent id >>= \(id', ss) -> local ((id', (ss, Variable)):) (k id' ss)
+bindAIdent' id k = checkFreshAIdent id >>= \(id', ss) -> local (M.insert id' (ss, Variable)) (k id' ss)
 
 bindHCon :: AIdent -> (Name -> ((Int, Int), (Int, Int)) -> ScopeChecker a) -> ScopeChecker a
-bindHCon id k = checkFreshAIdent id >>= \(id', ss) -> local ((id', (ss, Constructor)):) (k id' ss)
+bindHCon id k = checkFreshAIdent id >>= \(id', ss) -> local (M.insert id' (ss, Constructor)) (k id' ss)
 
 bindAIdent :: AIdent -> (Name -> ScopeChecker a) -> ScopeChecker a
 bindAIdent id k = bindAIdent' id (\id' _ -> k id')
@@ -251,7 +252,7 @@ checkDecl (DeclDef ss id ts ty bd) = do
       let ty' = flip (foldr (\(ss', x, t) -> P.Pi ss' x t)) ts' <$> checkExp ty
           -- We could type annotate here, but then we would check the same type twice.
       let bd' = flip (foldr (\(ss', x, _) -> P.Lam ss' x Nothing)) ts' <$> checkBody id' bd
-      ([(id', (idss, Definition))],) <$> (P.Decl ss id' <$> bd' <*> ty')
+      (M.fromList [(id', (idss, Definition))],) <$> (P.Decl ss id' <$> bd' <*> ty')
 checkDecl (DeclData ss id ts cs) = do
   checkTeles ts $ \ts' ->
     bindAIdent' id $ \id' idss -> do
@@ -263,7 +264,7 @@ checkDecl (DeclData ss id ts cs) = do
       let ty = foldr (\(ss', x, t) -> P.Pi ss' x t) (P.U ss) ts' -- a data declaration always yields a value in U
       let bd = foldr (\(ss', x, _) -> P.Lam ss' x Nothing) d ts'
 
-      return ((id', (idss, Variable)):[ (c, (ssC, Constructor)) | (c, ssC) <- cs' ], P.Decl ss id' bd ty)
+      return (M.fromList $ (id', (idss, Variable)):[ (c, (ssC, Constructor)) | (c, ssC) <- cs' ], P.Decl ss id' bd ty)
 checkDecl (DeclLock ss ids) = do
   ids' <- mapM checkDef ids
   asks (, P.DeclLock ss ids')
@@ -272,7 +273,7 @@ checkDecl (DeclUnlock ss ids) = do
   asks (, P.DeclUnlock ss ids')
 
 bindDecl :: Decl -> (P.Decl -> ScopeChecker a) -> ScopeChecker a
-bindDecl d k = checkDecl d >>= \(ids, d') -> local (ids ++) (k d')
+bindDecl d k = checkDecl d >>= \(ids, d') -> local (ids `M.union`) (k d')
 
 checkDecls :: [Decl] -> ScopeChecker (ScopingEnv, [P.Decl])
 checkDecls []     = asks (,[])
