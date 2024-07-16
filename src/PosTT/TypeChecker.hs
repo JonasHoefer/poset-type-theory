@@ -66,9 +66,9 @@ bindFibVar :: AtStage (Name -> VTy -> AtStage (Val -> TypeChecker a) -> TypeChec
 bindFibVar x a k = extName x (local (extFib x (VVar x) a) (k (VVar x)))
 
 bindFibVars :: AtStage ([Name] -> VTel -> AtStage ([Val] -> TypeChecker a) -> TypeChecker a)
-bindFibVars []     VTelNil     k = k []
-bindFibVars (x:xs) tel         k =
-  bindFibVar x (headVTel tel) (\v -> bindFibVars xs (tailVTel tel v) (\vs -> k (v:vs)))
+bindFibVars []     VTelNil          k = k []
+bindFibVars (x:xs) (VTelCons a tel) k =
+  bindFibVar x a (\v -> bindFibVars xs (tel v) (\vs -> k (v:vs)))
 bindFibVars _      _           _ = impossible "bindFibVars: Names and telescope do not match!"
 
 -- | Extends the context Γ with a free variable to a context Γ,(i=i:I)
@@ -338,7 +338,7 @@ infer = atArgPos $ \case
     () <- either (\_ -> return ()) compatible vtb'
 
     return (HComp r'₀ r'₁ a' u'₀ tb', va)
-  _ -> fail $ "Could not infer type!"
+  _ -> fail "Could not infer type!"
 
 inferAndEval :: AtStage (PTm -> TypeChecker (Tm, Val, VTy))
 inferAndEval t = do
@@ -359,10 +359,10 @@ checkTel ((_, x, a):tel) k = do
   bindFibVar x va (\_ -> checkTel tel (k . telCons x a'))
 
 checkConArgs :: AtStage ([PTm] -> VTel -> TypeChecker [Tm])
-checkConArgs []     (VTel [] _) = return []
-checkConArgs (t:ts) tel         = do
-   (t', vt) <- checkAndEval t (headVTel tel)
-   (t':) <$> checkConArgs ts (tailVTel tel vt)
+checkConArgs []     VTelNil          = return []
+checkConArgs (t:ts) (VTelCons a tel) = do
+   (t', vt) <- checkAndEval t a
+   (t':) <$> checkConArgs ts (tel vt)
 checkConArgs _      _           = impossible "checkConArgs: Argument numbers do not match"
 
 checkBranch :: AtStage (Closure -> P.Branch -> VTel -> TypeChecker Branch)

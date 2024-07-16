@@ -192,12 +192,6 @@ rebindIs k cs@((TrIntClosure i _ _):_) =
 --------------------------------------------------------------------------------
 ---- Telescope Utilities
 
-headVTel :: AtStage (VTel -> VTy)
-headVTel (VTel ((_, a):_) ρ) = eval ρ a
-
-tailVTel :: VTel -> Val -> VTel
-tailVTel (VTel ((x, _):tel) ρ) v = VTel tel (EnvFib ρ x v)
-
 unConsVTel :: AtStage (VTel -> Maybe (VTy, Val -> VTel))
 unConsVTel (VTel ((x, a):tel) ρ) = Just (eval ρ a, VTel tel . EnvFib ρ x)
 unConsVTel _                     = Nothing
@@ -208,19 +202,11 @@ pattern VTelCons a tel <- (unConsVTel -> Just (a, tel))
 pattern VTelNil :: VTel
 pattern VTelNil <- VTel [] _
 
--- headVHTel :: AtStage (VHTel -> Maybe VTy)
--- headVHTel (VHTel ((_, a):_) _     _ ρ) = Just (eval ρ a)
--- headVHTel (VHTel _          (_:_) _ _) = Nothing -- I
---
--- tailVHTel :: VHTel -> Either Val VI -> VHTel
--- tailVHTel (VHTel ((x, _):tel) is     sys ρ) (Left v)  = VHTel tel is sys (EnvFib ρ x v)
--- tailVHTel (VHTel []           (i:is) sys ρ) (Right v) = VHTel []  is sys (EnvInt ρ i v)
-
 unConsVHTel :: AtStage (VHTel -> Either (Either Val (VSys Val)) (Either (VTy, Val -> VHTel) (VI -> VHTel)))
 unConsVHTel = \case
   VHTel []          []     sys ρ -> Left (evalSys eval ρ sys)
-  VHTel ((x, a):xs) is     sys ρ -> Right $ Left $ (eval ρ a, VHTel xs is sys . EnvFib ρ x)
-  VHTel []          (i:is) sys ρ -> Right $ Right $ (VHTel [] is sys . EnvInt ρ i)
+  VHTel ((x, a):xs) is     sys ρ -> Right $ Left (eval ρ a, VHTel xs is sys . EnvFib ρ x)
+  VHTel []          (i:is) sys ρ -> Right $ Right (VHTel [] is sys . EnvInt ρ i)
 
 pattern VHTelNil :: (?s :: Stage) => Either Val (VSys Val) -> VHTel
 pattern VHTelNil vtel <- (unConsVHTel -> Left vtel)
