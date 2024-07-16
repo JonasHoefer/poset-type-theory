@@ -397,9 +397,10 @@ checkHConArgs [] (VHTelNil (Right sys)) = return ([], [], readBack sys)
 checkHConArgs _  _                      = impossible "checkHConArgs: Argument numbers do not match"
 
 checkAndEvalHBranch :: AtStage (Closure -> P.Branch -> VHTel -> TypeChecker (Branch, VBranch))
-checkAndEvalHBranch b (P.Branch _ c as t) tel = do
+checkAndEvalHBranch b (P.Branch _ c as t) tel | length as == lengthVHTel tel = do
   b' <- BBranch c as <$> bindFibIntVars as tel (\as' is' sys -> check t (b $$ VHCon c as' is' sys))
   (b',) <$> evalTC evalBranch b'
+checkAndEvalHBranch _ (P.Branch ss c as _) tel = throwError $ TypeErrorSplitArgCount ss c (length as) (lengthVHTel tel)
 
 
 ---- Interval
