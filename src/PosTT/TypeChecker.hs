@@ -366,9 +366,9 @@ checkConArgs (t:ts) tel         = do
 checkConArgs _      _           = impossible "checkConArgs: Argument numbers do not match"
 
 checkBranch :: AtStage (Closure -> P.Branch -> VTel -> TypeChecker Branch)
-checkBranch b (P.Branch _ c as t) argTys =
+checkBranch b (P.Branch _  c as t) argTys | length as == lengthVTel argTys =
   BBranch c as <$> bindFibVars as argTys (\as' -> check t (b $$ VCon c as'))
-
+checkBranch _ (P.Branch ss c as _) argTys = throwError $ TypeErrorSplitArgCount ss c (length as) (lengthVTel argTys)
 
 ---- Higher inductive types
 

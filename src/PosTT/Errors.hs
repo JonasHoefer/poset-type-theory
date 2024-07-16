@@ -27,6 +27,7 @@ data TypeError where
   TypeErrorExtElmCompat :: SrcSpan -> Tm -> Tm -> ConvError -> TypeError
   TypeErrorMissingCon :: SrcSpan -> Name -> Tm -> TypeError
   TypeErrorConArgCount :: SrcSpan -> Name -> Int -> Int -> TypeError
+  TypeErrorSplitArgCount :: SrcSpan -> Name -> Int -> Int -> TypeError
   TypeErrorInvalidSplit :: SrcSpan -> Tm -> [Name] -> [Name] -> TypeError
   TypeErrorHSplitCompat :: Tm -> SrcSpan -> Tm -> Tm -> ConvError -> TypeError
   TypeErrorCollection :: [TypeError] -> TypeError
@@ -39,4 +40,3 @@ instance Semigroup TypeError where
 
 instance Monoid TypeError where
   mempty = TypeErrorCollection []
-  
