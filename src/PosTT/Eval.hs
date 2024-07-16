@@ -319,7 +319,7 @@ wid' a isContrA = either id (wid a isContrA)
 
 doComp :: AtStage (VI -> VI -> TrIntClosure -> Val -> VSys TrIntClosure -> Val)
 doComp r₀ r₁ ℓ u₀ tb = doHComp r₀ r₁ (ℓ $$ r₁) (doCoe r₀ r₁ ℓ u₀)
-  $ mapSys tb $ rebindI $ \z -> doCoe (re r₁) (iVar z) (re ℓ)
+  $ mapSys tb $ rebindI $ \z -> doCoe (iVar z) (re r₁) (re ℓ)
 
 
 --------------------------------------------------------------------------------
@@ -589,7 +589,7 @@ doHCompTel r₀ r₁ (unConsVTel -> Just (a, tel)) (u₀:u₀s) tbs =
 -- | Compositions in a telescopes, where λz.ℓ is a line of telescopes (with no delayed restriction)
 doCompTel :: AtStage (VI -> VI -> Name -> VTel -> [Val] -> VSys [TrIntClosure] -> [Val])
 doCompTel r₀ r₁ z ℓ u₀s tbs = doHCompTel r₀ r₁ (ℓ @ (r₁ `for` z)) (doCoeTel r₀ r₁ z ℓ u₀s)
-  $ mapSys tbs $ rebindIs $ \i vs -> doCoeTel (re r₀) (iVar i) z (extGen z (re ℓ)) vs
+  $ mapSys tbs $ rebindIs $ \i vs -> doCoeTel (iVar i) (re r₁) z (extGen z (re ℓ)) vs
 
 
 --------------------------------------------------------------------------------
