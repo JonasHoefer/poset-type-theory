@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import           PosTT.Common
 import           PosTT.Eval
 import           PosTT.Quotation ()
+import           PosTT.Poset
 import           PosTT.Terms
 import           PosTT.Values
 
@@ -87,7 +88,28 @@ singleReductionNeu δ = \case
   NHCompSum r₀ r₁ d lbl k tb -> (\v -> doHCompSum r₀ r₁ d lbl v tb) <$> singleReductionNeu δ k
   NSplit f bs k              -> doSplit f bs <$> singleReductionNeu δ k
   NHSplit f d bs k           -> doHSplit f d bs <$> singleReductionNeu δ k
-  NNonConstHCompSum{}        -> impossible "Non-constant tubes for HComp in sum type during closed evaluation"
+  -- by cubical cannonicity, at least one of the entries in the tube is neutral
+  NNonConstHCompSum r₀ r₁ d lbl c as tb -> doHComp r₀ r₁ (VSum d lbl) (VCon c as) <$> singleReductionSysTrIntClosure δ tb
+
+singleReductionSysTrIntClosure :: AtStage (AtStage (Name -> Val) -> VSys TrIntClosure -> (Name, VSys TrIntClosure))
+singleReductionSysTrIntClosure δ (VSys sys) = VSys <$> go sys
+  where
+    go :: [(VCof, TrIntClosure)] -> (Name, [(VCof, TrIntClosure)])
+    go ((φ, c):bs) = case extCof φ (stepCl c) of
+      Left (n, c') -> (n, (φ,c'):bs)
+      Right c'     -> ((φ,c'):) <$> go bs
+    go [] = impossible "No branch was neutral! The system should have been reduced!"
+
+    stepCl :: AtStage (TrIntClosure -> Either (Name, TrIntClosure) TrIntClosure)
+    stepCl (force -> c) = case c of
+      -- We have to inline some things to extract the name; change to more flexible closre representation?
+      TrIntClosure i (VNeu k) _ ->
+        let (i', (x, k'')) = refreshGen i $ \i' -> (i',) $ case k @ (iVar i' `for` i) of
+              VNeu k'                  -> singleReductionNeu δ k'
+              _renamingForcedReduction -> impossible "Renaming a variable to a fresh name forced a reduction!"
+        in  Left (x, TrIntClosure i' k'' IdRestr)
+      TrIntClosure _ (VCon _ _) _ -> Right c
+      _nonConValue -> impossible "A closed term of sum type with blocked variables is neither neutral nor constructor"
 
 singleReductionTrNeuIntClosure :: AtStage (AtStage (Name -> Val) -> TrNeuIntClosure -> (Name, TrIntClosure))
 singleReductionTrNeuIntClosure δ (TrNeuIntClosure i k) =
