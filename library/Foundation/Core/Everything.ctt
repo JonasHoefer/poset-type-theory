@@ -1,0 +1,19 @@
+-- This file exports all the definitions of Foundation.Core.
+
+module Foundation.Core.Everything where
+
+import Foundation.Core.Primitives
+import Foundation.Core.BiInvertibleMaps
+import Foundation.Core.ContractibleTypes
+import Foundation.Core.DependentPairEquality
+import Foundation.Core.FunctionExtensionality
+import Foundation.Core.Homotopies
+import Foundation.Core.HomotopyTypes
+import Foundation.Core.IsomorphicMaps
+import Foundation.Core.InvertibleMaps
+import Foundation.Core.Paths
+import Foundation.Core.Retractions
+import Foundation.Core.Sections
+import Foundation.Core.SigmaTypes
+import Foundation.Core.Sorry
+import Foundation.Core.Univalence  

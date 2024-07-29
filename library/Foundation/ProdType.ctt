@@ -1,0 +1,87 @@
+-- The product type is built-in.
+-- However, we still show some things about it.  
+
+module Foundation.ProdType where
+
+import Foundation.PathsProperties
+import Foundation.ContractibleMaps
+
+-- Induction principle.
+ind-Prod (A B : U) (P : (A * B) -> U) (f : (x : A) (y : B) -> P (x, y)) (z : A * B) : P z =
+  f z.1 z.2
+
+-- Equality of product.
+Eq-prod (A B : U) (x y : A * B) : U = (Path A x.1 y.1) * (Path B x.2 y.2)
+
+Eq-prod/refl (A B : U) (x : A * B) : Eq-prod A B x x = (refl A x.1, refl B x.2)
+
+Eq-prod/map (A B : U) (x y : A * B) (p : Path (A * B) x y) : Eq-prod A B x y =
+  J (A * B) x (\ z _. Eq-prod A B x z) (Eq-prod/refl A B x) y p
+
+Eq-prod/inv-map/refl (A B : U) (x : A) (y : B) : Path (A * B) (x, y) (x, y) =
+  refl (A * B) (x, y)
+
+Eq-prod/inv-map (A B : U) (t u : A * B) (p : Eq-prod A B t u) : Path (A * B) t u =
+  J A t.1
+    ( \ x _. Path (A * B) t (x, u.2))
+    ( J B t.2
+        ( \ y _. Path (A * B) t (t.1, y))
+        ( Eq-prod/inv-map/refl A B t.1 t.2) u.2 p.2) u.1 p.1
+
+Eq-prod/eq : (A B : U) -> (x y : A * B) -> Eq-prod A B x y -> Path (A * B) x y = Eq-prod/inv-map
+
+Eq-prod/right-htpy/refl (A B : U) (x : A) (y : B)
+                             : Path (Eq-prod A B (x, y) (x, y))
+                                    (Eq-prod/map A B (x, y) (x, y) (Eq-prod/inv-map A B (x, y) (x, y) (refl A x, refl B y))) (refl A x, refl B y) =
+  comp-n
+    ( Eq-prod A B (x, y) (x, y)) three-Nat
+    ( Eq-prod/map A B (x, y) (x, y) (Eq-prod/inv-map A B (x, y) (x, y) (refl A x, refl B y)))
+    ( J (A * B) (x, y) (\ z _. Eq-prod A B (x, y) z) (Eq-prod/refl A B (x, y)) (x, y) (J B y (\ y' _. Path (A * B) (x, y) (x, y')) (Eq-prod/inv-map/refl A B x y) y (refl B y)))
+    ( ap (Path (A * B) (x, y) (x, y)) (Eq-prod A B (x, y) (x, y)) (Eq-prod/map A B (x, y) (x, y))
+      ( Eq-prod/inv-map A B (x, y) (x, y) (refl A x, refl B y))
+      ( J B y (\ y' _. Path (A * B) (x, y) (x, y)) (Eq-prod/inv-map/refl A B x y) y (refl B y))
+      ( J/comp A x (\ x' _. Path (A * B) (x, y) (x', y)) (J B y (\ y' _. Path (A * B) (x, y) (x, y')) (Eq-prod/inv-map/refl A B x y) y (refl B y))))
+    ( J (A * B) (x, y) (\ z _. Eq-prod A B (x, y) z) (Eq-prod/refl A B (x, y)) (x, y) (refl (A * B) (x, y)))
+    ( ap (Path (A * B) (x, y) (x, y)) (Eq-prod A B (x, y) (x, y)) (\ p. J (A * B) (x, y) (\ z _. Eq-prod A B (x, y) z) (Eq-prod/refl A B (x, y)) (x, y) p)
+      ( J B y (\ y' _. Path (A * B) (x, y) (x, y')) (Eq-prod/inv-map/refl A B x y) y (refl B y))
+      ( refl (A * B) (x, y)) (J/comp B y (\ y' _. Path (A * B) (x, y) (x, y')) (refl (A * B) (x, y))))
+    (refl A x, refl B y)
+    ( J/comp (A * B) (x, y) (\ t _. Eq-prod A B (x, y) t) (refl A x, refl B y))
+
+Eq-prod/right-htpy (A B : U) (t u : A * B) (p : Eq-prod A B t u)
+                        : Path (Eq-prod A B t u)
+                               (Eq-prod/map A B t u (Eq-prod/inv-map A B t u p)) p =
+  J A t.1
+    ( \ x q. Path (Eq-prod A B t (x, u.2)) (Eq-prod/map A B t (x, u.2) (Eq-prod/inv-map A B t (x, u.2) (q, p.2))) (q, p.2))
+    ( J B t.2
+      ( \ y r. Path (Eq-prod A B t (t.1, y)) (Eq-prod/map A B t (t.1, y) (Eq-prod/inv-map A B t (t.1, y) (refl A t.1, r))) (refl A t.1, r))
+      ( Eq-prod/right-htpy/refl A B t.1 t.2) u.2 p.2) u.1 p.1
+
+Eq-prod/left-htpy/refl (A B : U) (x : A) (y : B)
+                            : Path (Path (A * B) (x, y) (x, y)) (Eq-prod/inv-map A B (x, y) (x, y) (Eq-prod/map A B (x, y) (x, y) (refl (A * B) (x, y)))) (refl (A * B) (x, y)) =
+  comp-n
+    ( Path (A * B) (x, y) (x, y)) three-Nat
+    ( Eq-prod/inv-map A B (x, y) (x, y) (Eq-prod/map A B (x, y) (x, y) (refl (A * B) (x, y))))
+    ( Eq-prod/inv-map A B (x, y) (x, y) (refl A x, refl B y))
+    ( ap (Eq-prod A B (x, y) (x, y)) (Path (A * B) (x, y) (x, y)) (Eq-prod/inv-map A B (x, y) (x, y)) (Eq-prod/map A B (x, y) (x, y) (refl (A * B) (x, y))) (refl A x, refl B y)
+      ( J/comp (A * B) (x, y) (\ t _. Eq-prod A B (x, y) t) (refl A x, refl B y)))
+    ( J B y (\ y' _. Path (A * B) (x, y) (x, y')) (refl (A * B) (x, y)) y (refl B y))
+    ( J/comp A x (\ x' _. Path (A * B) (x, y) (x', y)) (J B y (\ y' _. Path (A * B) (x, y) (x, y')) (refl (A * B) (x, y)) y (refl B y)))
+    ( refl (A * B) (x, y))
+    ( J/comp B y (\ y' _. Path (A * B) (x, y) (x, y')) (refl (A * B) (x, y)))
+
+Eq-prod/left-htpy (A B : U) (t u : A * B) (p : Path (A * B) t u)
+                        : Path (Path (A * B) t u)
+                               (Eq-prod/inv-map A B t u (Eq-prod/map A B t u p)) p =
+  J (A * B) t
+    ( \ v q. Path (Path (A * B) t v) (Eq-prod/inv-map A B t v (Eq-prod/map A B t v q)) q)
+    ( Eq-prod/left-htpy/refl A B t.1 t.2) u p
+
+Eq-prod/Equiv (A B : U) (t u : (A * B)) : Equiv (Path (A * B) t u) (Eq-prod A B t u) =
+  has-inverse/Equiv
+    ( Path (A * B) t u)
+    ( Eq-prod A B t u)
+    ( Eq-prod/map A B t u)
+    ( Eq-prod/inv-map A B t u,
+      ( Eq-prod/right-htpy A B t u,
+        Eq-prod/left-htpy A B t u))

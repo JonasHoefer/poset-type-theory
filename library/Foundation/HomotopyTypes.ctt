@@ -1,0 +1,287 @@
+-- This file defines additional properties on truncation types.
+
+module Foundation.HomotopyTypes where
+
+import Foundation.Core.Paths
+import Foundation.Core.HomotopyTypes
+
+import Foundation.DependentPairEquality
+import Foundation.NaturalNumbers
+import Foundation.PathsProperties
+import Foundation.UnitType
+import Foundation.Equivalences
+
+-- General h-levels
+is-of-lvl : Nat -> U -> U = split
+  zero  -> is-contr
+  suc n -> \A. (x y : A) -> is-of-lvl n (Path A x y)
+
+-- Closure of propositions for type formers
+is-prop/ass-inh (A : U) (lem : A -> is-prop A) : is-prop A
+  = \x. lem x x
+
+is-prop/pi (A : U) (B : A -> U) (q : is-prop/fam A B) : is-prop (Pi A B)
+  = \f g i x. q x (f x) (g x) i
+
+is-prop/pi-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) (q : is-prop/fam-2 A B C) : is-prop ((x : A) (y : B x) -> C x y)
+  = is-prop/pi A (\x. (y : B x) -> C x y) (\x. is-prop/pi (B x) (C x) (q x))
+
+-- This implies closure property for Σ-type former
+is-prop/sg (A : U) (B : A -> U) (p : is-prop A) (q : is-prop/fam A B) : is-prop (Sg A B)
+  = \u v. SgPathO->PathSg A B u v (p u.1 v.1, q v.1 (tr A u.1 v.1 (p u.1 v.1) B u.2) v.2)
+
+is-contr/is-prop (A : U) : is-prop (is-contr A)
+  = is-prop/ass-inh (is-contr A)
+      (\cntr. is-prop/sg A (\c. (y : A) -> Path A c y)
+         (is-contr->is-prop A cntr)
+         (\c. is-prop/pi A (\y. Path A c y)
+           (is-contr->is-set A cntr c)))
+
+-- Properties for h-level k.
+is-of-lvl/closed-upwards (A : U) : (n : Nat) -> is-of-lvl n A -> is-of-lvl (suc n) A = split
+  zero  -> is-contr/closed-upwards A
+  suc n -> \lvl x y. is-of-lvl/closed-upwards (Path A x y) n (lvl x y)
+
+is-of-lvl/is-prop (A : U) : (n : Nat) -> is-prop (is-of-lvl n A) = split
+  zero  -> is-contr/is-prop A
+  suc n -> is-prop/pi-2 A (\_. A) (\x y. is-of-lvl n (Path A x y)) (\x y. is-of-lvl/is-prop (Path A x y) n)
+
+is-of-lvl/closed-equiv (A B : U) (e : Equiv A B) : (k : Nat) -> (H : is-of-lvl k B) -> is-of-lvl k A = split
+  zero -> \ H. is-contr/is-contr-equiv A B e H
+  suc k ->
+    let f : A -> B = Equiv/map A B e in
+    \ H x y. is-of-lvl/closed-equiv (Path A x y) (Path B (f x) (f y)) (Equiv/Equiv-id A B e x y) k (H (f x) (f y))
+
+is-of-lvl/closed-equiv' (A B : U) (e : Equiv A B) (k : Nat) (H : is-of-lvl k A) : is-of-lvl k B =
+  is-of-lvl/closed-equiv B A (Equiv/sym A B e) k H
+
+
+-- Sets and universe of sets
+axiom-K (A : U) : U =
+  (x : A) -> (p : Path A x x) -> Path (Path A x x) (refl A x) p
+
+is-set/axiom-K (A : U) (s : is-set A) : axiom-K A =
+  \ x. s x x (refl A x)
+
+axiom-K/is-set (A : U) (ax : axiom-K A) : is-set A =
+  \ x y p q.
+    let a : Path A x y = comp A x y p y (refl A y)
+        b : Path A x y = comp A x y p y (comp A y x (inv A x y q) y q)
+        c : Path A x y = comp A x x (comp A x y p x (inv A x y q)) y q
+        d : Path A x y = comp A x x (refl A x) y q in
+  comp-n (Path A x y) five-Nat p a (refl/comp-r A x y p)
+                                 b (ap (Path A y y) (Path A x y) (\ r. comp A x y p y r) (refl A y) (comp A y x (inv A x y q) y q)
+                                       (comp/inv-l' A x y q))
+                                 c (comp/assoc' A x y p x (inv A x y q) y q)
+                                 d (ap (Path A x x) (Path A x y) (\ r. comp A x x r y q) (comp A x y p x (inv A x y q)) (refl A x)
+                                       (inv (Path A x x) (refl A x) (comp A x y p x (inv A x y q)) (ax x (comp A x y p x (inv A x y q)))))
+                                 q (comp/ident-l A x y q)
+
+Set/type (A : Set) : U = A.1
+
+Set/is-set (A : Set) : is-set (Set/type A) = A.2  
+
+Set/hom (A B : Set) : U = (Set/type A) -> (Set/type B)
+
+-- squares filling (important for set-like things)
+square/dependent-fill/refl (A : U) (B : A -> Set) (x : A) (x' : A) (p : Path A x x') (y : Set/type (B x)) (y' : Set/type (B x'))
+                           (p' q' : PathP (i. Set/type (B (p i))) y y') : Path (PathP (i. Set/type (B (p i))) y y') p' q' =
+  J A x
+    ( \ x0 q. (y0 : Set/type (B x)) -> (y1 : Set/type (B x0)) -> (p0 q0 : PathP (i. Set/type (B (q i))) y0 y1) -> Path (PathP (i. Set/type (B (q i))) y0 y1) p0 q0)
+    ( Set/is-set (B x)) x' p y y' p' q'
+
+square/dependent-fill (A : U) (B : A -> Set) (x x' : A) (p : Path A x x') : (q : Path A x x') -> (spq : Path (Path A x x') p q) ->
+                      (y : Set/type (B x)) -> (y' : Set/type (B x')) -> (p' : PathP (i. Set/type (B (p i))) y y') -> (q' : PathP (i. Set/type (B (q i))) y y')
+                      -> PathP (i. PathP (j. Set/type (B (spq i j))) y y') p' q' =
+  J ( Path A x x') p
+    ( \ q'' spq0. (y0 : Set/type (B x)) -> (y1 : Set/type (B x')) -> (p0 : PathP (i. Set/type (B (p i))) y0 y1) -> (q0 : PathP (i. Set/type (B (q'' i))) y0 y1)
+                 -> PathP (i. PathP (j. Set/type (B (spq0 i j))) y0 y1) p0 q0)
+    ( square/dependent-fill/refl A B x x' p)
+
+-- Being an equivalence is a proposition.
+is-equiv/is-prop (A B : U) (f : A -> B) : is-prop (is-equiv A B f)
+  = is-prop/pi B (\b. is-contr (Fib A B f b)) (\b. is-contr/is-prop (Fib A B f b))
+
+-- Unit is set
+Unit/is-set : is-set Unit =
+  is-contr->is-set Unit Unit/is-contr
+
+Unit/id-is-contr (x y : Unit) : is-contr (Path Unit x y) =
+  (Unit/is-prop x y, \ q. Unit/is-set x y (Unit/is-prop x y) q)
+
+-- Different formulations of being a property
+is-proof-irrelevant (A : U) : U =
+  A -> is-contr A
+
+is-subterminal (A : U) : U =
+  Equiv A Unit
+
+has-contr-eq (A : U) : U =
+  (x y : A) -> is-contr (Path A x y)
+
+is-prop/is-proof-irrelevant (A : U) (p : is-prop A) : is-proof-irrelevant A =
+  \ x. (x, p x)
+
+const-star (A : U) : A -> Unit = \ _. star
+
+is-proof-irrelevant/contr-center (A : U) (x : A) (f : is-proof-irrelevant A) (y : Unit) : Fib A Unit (const-star A) y =
+  ((f x).1, Unit/is-prop y (const-star A (f x).1))
+
+is-proof-irrelevant/contr-contr (A : U) (x : A) (f : is-proof-irrelevant A) (y : Unit) (v : Fib A Unit (const-star A) y)
+  : Path (Fib A Unit (const-star A) y) (is-proof-irrelevant/contr-center A x f y) v =
+      let u : Fib A Unit (const-star A) y = (is-proof-irrelevant/contr-center A x f y)
+          p : Path A u.1 v.1 = (f x).2 v.1
+          r : (Path Unit y (const-star A v.1)) = (tr A u.1 v.1 p (\ z. Path Unit y (const-star A z)) u.2)
+          q : Path (Path Unit y (const-star A v.1)) r v.2 =
+                    Unit/is-set y (const-star A v.1) r v.2
+      in
+      SgPathO->PathSg A (\ z. Path Unit y (const-star A z)) u v (p, q)
+
+is-proof-irrelevant/is-equiv-const-star (A : U) (x : A) (f : is-proof-irrelevant A) : is-equiv A Unit (const-star A) =
+  \ y.
+    let c : Fib A Unit (const-star A) y = is-proof-irrelevant/contr-center A x f y
+        contr : (H : Fib A Unit (const-star A) y) -> Path (Fib A Unit (const-star A) y) c H =
+                    is-proof-irrelevant/contr-contr A x f y
+    in (c, contr)
+
+is-proof-irrelevant/is-subterminal (A : U) (x : A) (f : is-proof-irrelevant A) : is-subterminal A =
+  (const-star A, is-proof-irrelevant/is-equiv-const-star A x f)
+
+is-subterminal/has-contr-eq (A : U) (e : is-subterminal A) : has-contr-eq A =
+  \ x y. is-contr/is-contr-equiv (Path A x y) (Path Unit (e.1 x) (e.1 y))
+                                (Equiv/Equiv-id A Unit e x y)
+                                (Unit/id-is-contr (Equiv/map A Unit e x) (Equiv/map A Unit e y))
+
+has-contr-eq/is-prop (A : U) (c : has-contr-eq A) : is-prop A =
+  \ x y. (center (Path A x y) (c x y))
+
+is-prop/is-subterminal (A : U) (p : is-prop A) (x : A) : is-subterminal A =
+  is-proof-irrelevant/is-subterminal A x (is-prop/is-proof-irrelevant A p)
+
+is-prop/has-contr-eq' (A : U) (p : is-prop A) (x : A) : has-contr-eq A =
+  is-subterminal/has-contr-eq A (is-prop/is-subterminal A p x)
+
+is-prop/has-contr-eq (A : U) (p : is-prop A) : has-contr-eq A =
+  \ x y. (p x y,
+         \ q. 
+          let H : is-contr (Path A x y) = is-prop/has-contr-eq' A p x x y in
+          comp (Path A x y) (p x y) (H.1) (inv (Path A x y) (H.1) (p x y) (H.2 (p x y)))
+                            q (H.2 q))
+
+is-proof-irrelevant/has-contr-eq (A : U) (x : A) (f : is-proof-irrelevant A) : has-contr-eq A =
+  is-subterminal/has-contr-eq A (is-proof-irrelevant/is-subterminal A x f)
+
+is-proof-irrelevant/is-prop (A : U) (x : A) (f : is-proof-irrelevant A) : is-prop A =
+  has-contr-eq/is-prop A (is-proof-irrelevant/has-contr-eq A x f)
+
+is-subterminal/is-prop (A : U) (e : is-subterminal A) : is-prop A =
+  has-contr-eq/is-prop A (is-subterminal/has-contr-eq A e)
+
+is-subterminal/is-proof-irrelevant (A : U) (e : is-subterminal A) : is-proof-irrelevant A =
+  is-prop/is-proof-irrelevant A (is-subterminal/is-prop A e)
+
+has-contr-eq/is-proof-irrelevant (A : U) (c : has-contr-eq A) : is-proof-irrelevant A =
+  is-prop/is-proof-irrelevant A (has-contr-eq/is-prop A c)
+
+has-contr-eq/is-subterminal (A : U) (x : A) (c : has-contr-eq A) : is-subterminal A =
+  is-proof-irrelevant/is-subterminal A x (has-contr-eq/is-proof-irrelevant A c)
+
+Prop/type (A : Prop) : U = A.1
+
+Prop/is-prop (A : Prop) : is-prop (Prop/type A) = A.2  
+
+Prop/hom (A B : Prop) : U = (Prop/type A) -> (Prop/type B)
+
+-- is-prop is closed under equivalences.
+is-prop/closed-equiv (A B : U) (e : Equiv A B) (H : is-prop B) : is-prop A =
+  has-contr-eq/is-prop A (is-of-lvl/closed-equiv A B e one-Nat (is-prop/has-contr-eq B H))
+
+is-prop/closed-equiv' (A B : U) (e : Equiv A B) (H : is-prop A) : is-prop B =
+  has-contr-eq/is-prop B (is-of-lvl/closed-equiv' A B e one-Nat (is-prop/has-contr-eq A H))
+
+-- is-set is closed under equivalences.
+is-set/closed-equiv (A B : U) (e : Equiv A B) (H : is-set B) : is-set A =
+  let f : A -> B = Equiv/map A B e in
+  \ x y. is-prop/closed-equiv (Path A x y) (Path B (f x) (f y)) (Equiv/Equiv-id A B e x y) (H (f x) (f y))
+
+is-set/closed-equiv' (A B : U) (e : Equiv A B) (H : is-set A) : is-set B =
+  is-set/closed-equiv B A (Equiv/sym A B e) H
+
+-- a proposition is a set
+is-prop/is-set (A : U) (is-prop-A : is-prop A) : is-set A =
+  \ x y. is-contr->is-prop (Path A x y) (is-prop/has-contr-eq A is-prop-A x y)
+
+-- is-prop is a proposition
+is-prop/is-prop (A : U) : is-prop (is-prop A) =
+  is-prop/ass-inh
+    ( is-prop A)
+    ( \ is-prop-A.
+        is-prop/pi-2 A
+          ( \ _. A)
+          ( \ x y. Path A x y)
+          ( is-prop/is-set A is-prop-A))
+
+is-set/is-prop (A : U) : is-prop (is-set A) =
+  is-prop/ass-inh
+    ( is-set A)
+    ( \ is-set-A.
+        is-prop/pi-2 A
+          ( \ _. A)
+          ( \ x y. is-prop (Path A x y))
+          ( \ x y. is-prop/is-prop (Path A x y)))
+
+is-set/Prop (A : U) : Prop =
+  ( is-set A,
+    is-set/is-prop A)
+
+-- for e : A ∼ B, (e⁻¹)⁻¹ is e.
+lock has-inverse/is-equiv
+
+Equiv/sym/sym (A B : U) (e : Equiv A B)
+                   : Path (Equiv A B) (Equiv/inv-equiv B A (Equiv/inv-equiv A B e)) e =
+  SgPath-prop
+    ( A -> B)
+    ( is-equiv A B)
+    ( is-equiv/is-prop A B)
+    ( Equiv/inv-equiv B A (Equiv/inv-equiv A B e)) e
+    ( eq-htpy' A B
+        ( Equiv/map A B
+          ( Equiv/inv-equiv B A
+            ( Equiv/inv-equiv A B e)))
+        ( Equiv/map A B e)
+        ( \ x.
+            let e' : Equiv B A = Equiv/inv-equiv A B e
+                e'' : Equiv A B = Equiv/inv-equiv B A e'
+                f : A -> B = Equiv/map A B e
+                f' : B -> A = Equiv/map B A e'
+                f'' : A -> B = Equiv/map A B e''
+            in
+            comp B
+              ( f'' x)
+              ( f'' (f' (f x)))
+              ( ap A B f'' x
+                ( f' (f x))
+                ( inv A
+                  ( f' (f x)) x
+                  ( Equiv/inv-left-htpy A B e x)))
+              ( f x)
+              ( Equiv/inv-left-htpy B A e' (f x))))
+
+
+Equiv/sym/sym' (A B : U) (e : Equiv A B)
+                   : Path (Equiv A B) e (Equiv/inv-equiv B A (Equiv/inv-equiv A B e)) =
+  inv
+    ( Equiv A B)
+    ( Equiv/inv-equiv B A
+      ( Equiv/inv-equiv A B e)) e
+    ( Equiv/sym/sym A B e)
+
+unlock has-inverse/is-equiv
+
+-- Empty is a proposition
+Empty/is-prop : is-prop (Empty) =
+  \ x y. ex-falso (Path Empty x y) x
+
+Empty/Prop : Prop =
+  ( Empty,
+    Empty/is-prop)

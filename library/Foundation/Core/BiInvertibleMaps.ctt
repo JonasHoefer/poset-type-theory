@@ -1,0 +1,49 @@
+-- This file defines bi-invertible maps, and shows some properties about them.
+
+module Foundation.Core.BiInvertibleMaps where  
+
+import Foundation.Core.Retractions
+import Foundation.Core.Sections
+import Foundation.Core.Paths
+
+-- Definition
+
+is-bi-inv (A B : U) (f : A -> B) : U = Sec A B f * Ret A B f
+
+BiInv (A B : U) : U = (f : A -> B) * is-bi-inv A B f
+
+-- Accessors 
+
+is-bi-inv/right-inv (A B : U) (f : A -> B) (b : is-bi-inv A B f) : B -> A =
+  b.1.1
+
+is-bi-inv/left-inv (A B : U) (f : A -> B) (b : is-bi-inv A B f) : B -> A =
+  b.2.1
+
+is-bi-inv/right-htpy (A B : U) (f : A -> B) (b : is-bi-inv A B f)
+  : Htpy' B B (\ y. f (is-bi-inv/right-inv A B f b y)) (id B) =
+  b.1.2
+
+is-bi-inv/left-htpy (A B : U) (f : A -> B) (b : is-bi-inv A B f)
+  : Htpy' A A (\ x. (is-bi-inv/left-inv A B f b (f x))) (id A) =
+  b.2.2
+
+BiInv/map (A B : U) (b : BiInv A B) : A -> B =
+  b.1
+
+BiInv/is-bi-inv (A B : U) (b : BiInv A B) : is-bi-inv A B (BiInv/map A B b) =
+  b.2
+
+BiInv/right-inv (A B : U) (b : BiInv A B) : B -> A =
+  is-bi-inv/right-inv A B (BiInv/map A B b) (BiInv/is-bi-inv A B b)
+
+BiInv/left-inv (A B : U) (b : BiInv A B) : B -> A =
+  is-bi-inv/left-inv A B (BiInv/map A B b) (BiInv/is-bi-inv A B b)
+
+BiInv/right-htpy (A B : U) (b : BiInv A B)
+  : Htpy' B B (\ y. (BiInv/map A B b (BiInv/right-inv A B b y))) (id B) =
+  is-bi-inv/right-htpy A B (BiInv/map A B b) (BiInv/is-bi-inv A B b)
+
+BiInv/left-htpy (A B : U) (b : BiInv A B)
+  : Htpy' A A (\ x. (BiInv/left-inv A B b (BiInv/map A B b x))) (id A) =
+  is-bi-inv/left-htpy A B (BiInv/map A B b) (BiInv/is-bi-inv A B b)

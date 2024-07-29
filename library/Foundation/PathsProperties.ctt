@@ -1,0 +1,307 @@
+-- This file defines utility functions about paths.
+-- It defines the nᵗʰ composition.
+
+module Foundation.PathsProperties where
+
+import Foundation.Core.Paths
+import Foundation.Core.Homotopies
+import Foundation.Core.BiInvertibleMaps
+
+import Foundation.NaturalNumbers
+
+-- Composing paths n times.
+comp-n/type (A : U) (x : A) : Nat -> A -> U = split
+  zero  -> \z. Path A x z
+  suc n -> \z. (y : A) (p : Path A z y) -> comp-n/type A x n y
+
+comp-n/impl (A : U) (x : A) : (n : Nat) (z : A) -> Path A x z -> comp-n/type A x n z = split
+  zero  -> \_ p. p
+  suc n -> \y p z q. comp-n/impl A x n z (comp A x y p z q)
+
+-- | comp-n A n x0 x1 p1 x2 p2 x3 p3 ... where pi : Path A x(i-1) xi and all xi : A
+comp-n (A : U) : (n : Nat) -> (x : A) -> comp-n/type A x n x = split
+  zero  -> \x. refl A x
+  suc n -> \x. comp-n/impl A x n -- avoid unnecessary refl composition
+
+-- Properties about paths. Definitions are in Foundation.Core.Paths
+-- | (refl * q) * r = refl * (q * r)
+comp/assoc/refl (A : U) (x : A) (z : A) (q : Path A x z) (w : A) (r : Path A z w)
+  : Path (Path A x w) (comp A x z (comp A x x (refl A x) z q) w r) (comp A x x (refl A x) w (comp A x z q w r))
+  = comp-n (Path A x w) (suc (suc zero))
+      (comp A x z (comp A x x (refl A x) z q) w r)
+      (comp A x z q w r)                           (\i. (comp A x z ((comp/ident-l A x z q) i) w r))
+      (comp A x x (refl A x) w (comp A x z q w r)) (comp/ident-l' A x w (comp A x z q w r))
+
+-- | (p * q) * r = p * (q * r)
+comp/assoc (A : U) (x : A) : (y : A) (p : Path A x y) (z : A) (q : Path A y z) (w : A) (r : Path A z w)
+  -> Path (Path A x w) (comp A x z (comp A x y p z q) w r) (comp A x y p w (comp A y z q w r))
+  = J A x
+      (\y p. (z : A) (q : Path A y z) (w : A) (r : Path A z w) -> Path (Path A x w) (comp A x z (comp A x y p z q) w r) (comp A x y p w (comp A y z q w r)))
+      (comp/assoc/refl A x)
+
+comp/inv-r/refl (A : U) (x : A) : Path (Path A x x) (comp A x x (refl A x) x (inv A x x (refl A x))) (refl A x)
+  = comp-n (Path A x x) two-Nat
+      (comp A x x (refl A x) x (inv A x x (refl A x)))
+      (comp A x x (refl A x) x (refl A x))             (\i. (comp A x x (refl A x) x ((inv/refl A x) i)))
+      (refl A x)                                       (comp/ident-r A x x (refl A x))
+
+comp/inv-r (A : U) (x : A) : (y : A) (p : Path A x y) -> Path (Path A x x) (comp A x y p x (inv A x y p)) (refl A x) =
+  J A x (\ y p. Path (Path A x x) (comp A x y p x (inv A x y p)) (refl A x)) (comp/inv-r/refl A x)
+
+comp/inv-r' (A : U) (x y : A) (p : Path A x y) : Path (Path A x x) (refl A x) (comp A x y p x (inv A x y p)) =
+  inv (Path A x x) (comp A x y p x (inv A x y p)) (refl A x) (comp/inv-r A x y p)
+
+comp/inv-l' (A : U) (x y : A) (p : Path A x y) : Path (Path A y y) (refl A y) (comp A y x (inv A x y p) y p) =
+  inv (Path A y y) (comp A y x (inv A x y p) y p) (refl A y) (comp/inv-l A x y p)
+
+refl/comp-r (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) p (comp A x y p y (refl A y)) =
+  inv (Path A x y) (comp A x y p y (refl A y)) p (comp/ident-r A x y p)
+
+refl/sym (A : U) (x : A) : Path (Path A x x) (refl A x) (inv A x x (refl A x)) =
+  (inv (Path A x x) (inv A x x (refl A x)) (refl A x) (inv/refl A x))
+
+comp/assoc' (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (w : A) (r : Path A z w)
+               : Path (Path A x w) (comp A x y p w (comp A y z q w r)) (comp A x z (comp A x y p z q) w r) =
+  inv (Path A x w) (comp A x z (comp A x y p z q) w r) (comp A x y p w (comp A y z q w r)) (comp/assoc A x y p z q w r)
+
+inv/concat/refl (A : U) (x : A) (z : A) (q : Path A x z) (r : Path A x z) (s : Path (Path A x z) (comp A x x (refl A x) z q) r)
+                   : Path (Path A x z) q (comp A x x (inv A x x (refl A x)) z r) =
+  comp-n
+    ( Path A x z) four-Nat q
+    ( comp A x x (refl A x) z q)
+    ( comp/ident-l' A x z q) r s
+    ( comp A x x (refl A x) z r)
+    ( comp/ident-l' A x z r)
+    ( comp A x x (inv A x x (refl A x)) z r)
+    ( ap (Path A x x) (Path A x z) (\ p. comp A x x p z r) (refl A x) (inv A x x (refl A x))
+      ( refl/sym A x))
+
+
+inv/concat (A : U) (x y : A) (p : Path A x y) (z : A) (q : Path A y z) (r : Path A x z) (s : Path (Path A x z) (comp A x y p z q) r)
+              : Path (Path A y z) q (comp A y x (inv A x y p) z r) =
+  J A x
+    ( \ y' p'. (q' : Path A y' z) -> (s' : Path (Path A x z) (comp A x y' p' z q') r) -> Path (Path A y' z) q' (comp A y' x (inv A x y' p') z r))
+    ( \ q' s'. inv/concat/refl A x z q' r s') y p q s
+
+-- Some more properties about transport
+tr/right-inv/refl (A : U) (B : A -> U) (x : A) (y : B x)
+                     :  Path (B x) (tr A x x (refl A x) B (tr A x x (inv A x x (refl A x)) B y)) y =
+  comp-n (B x) three-Nat (tr A x x (refl A x) B (tr A x x (inv A x x (refl A x)) B y)) (tr A x x (inv A x x (refl A x)) B y)
+    (tr/refl-path A x B (tr A x x (inv A x x (refl A x)) B y)) (tr A x x (refl A x) B y)
+    (ap (Path A x x) (B x) (\ p. (tr A x x p B y)) (inv A x x (refl A x)) (refl A x)
+        (inv/refl A x))
+    y (tr/refl-path A x B y)
+
+tr/right-inv (A : U) (B : A -> U) (u v : Sg A B) (p : Path A u.1 v.1)
+                : Path (B v.1) (tr A u.1 v.1 p B (tr A v.1 u.1 (inv A u.1 v.1 p) B v.2)) v.2 =
+  J A u.1 (\ x q. (y : B x) -> Path (B x) (tr A u.1 x q B (tr A x u.1 (inv A u.1 x q) B y)) y)
+    (\ y. tr/right-inv/refl A B u.1 y) v.1 p v.2
+
+-- Properties about inverse paths.
+inv/involutive (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (inv A y x (inv A x y p)) p =
+  J A x (\ z q. Path (Path A x z) (inv A z x (inv A x z q)) q)
+        (comp (Path A x x) (inv A x x (inv A x x (refl A x))) (inv A x x (refl A x))
+              (ap (Path A x x) (Path A x x) (\ q. inv A x x q) (inv A x x (refl A x)) (refl A x) (inv/refl A x))
+              (refl A x) (inv/refl A x)) y p
+
+inv/involutive' (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) p (inv A y x (inv A x y p)) =
+  inv (Path A x y) (inv A y x (inv A x y p)) p (inv/involutive A x y p)
+
+-- Dependent AP & properties about AP
+apd (A : U) (B : A -> U) (f : (x : A) -> B x) (x y : A) (p : Path A x y) : Path (B y) (tr A x y p B (f x)) (f y) =
+  J A x (\ z q. Path (B z) (tr A x z q B (f x)) (f z)) (tr/refl-path A x B (f x)) y p
+
+ap/id (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) p (ap A A (id A) x y p) =
+  J A x (\ y' q. Path (Path A x y') q (ap A A (id A) x y' q))
+        (refl (Path A x x) (refl A x)) y p
+
+ap/id' (A : U) (x y : A) (p : Path A x y) : Path (Path A x y) (ap A A (id A) x y p) p =
+  inv (Path A x y) p (ap A A (id A) x y p) (ap/id A x y p)
+
+is-bi-inv/ap-id-inv-htpy (A : U) (x y : A) : Htpy' (Path A x y) (Path A x y) (\ p. (ap A A (id A) x y) (ap A A (id A) x y p)) (id (Path A x y)) =
+  \ p. comp (Path A x y) ((ap A A (id A) x y) (ap A A (id A) x y p)) (ap A A (id A) x y p)
+                        (ap/id' A x y (ap A A (id A) x y p)) p (ap/id' A x y p)
+
+is-bi-inv/ap-id-is-bi-inv (A : U) (x y : A) : is-bi-inv (Path A x y) (Path A x y) (ap A A (id A) x y) =
+  ((ap A A (id A) x y, is-bi-inv/ap-id-inv-htpy A x y), (ap A A (id A) x y, is-bi-inv/ap-id-inv-htpy A x y))
+
+is-bi-inv/ap-eq-id (A : U) (f : A -> A) (p : Path (A -> A) (id A) f) (x y : A)
+                      : is-bi-inv (Path A x y) (Path A (f x) (f y)) (ap A A f x y) =
+  tr (A -> A) (id A) f p (\ h. is-bi-inv (Path A x y) (Path A (h x) (h y)) (ap A A h x y))
+    (is-bi-inv/ap-id-is-bi-inv A x y)
+
+ap/comp (A B C : U) (f : A -> B) (g : B -> C) (x y : A) (p : Path A x y)
+               : Path (Path C (g (f x)) (g (f y))) (ap B C g (f x) (f y) (ap A B f x y p)) (ap A C (\ z. g (f z)) x y p) =
+  J A x (\ z q. Path (Path C (g (f x)) (g (f z))) (ap B C g (f x) (f z) (ap A B f x z q)) (ap A C (\ x'. g (f x')) x z q))
+        (refl (Path C (g (f x)) (g (f x))) (refl C (g (f x)))) y p
+
+ap/comp' (A B C : U) (f : A -> B) (g : B -> C) (x y : A) (p : Path A x y)
+               : Path (Path C (g (f x)) (g (f y))) (ap A C (\ z. g (f z)) x y p) (ap B C g (f x) (f y) (ap A B f x y p)) =
+  inv (Path C (g (f x)) (g (f y))) (ap B C g (f x) (f y) (ap A B f x y p)) (ap A C (\ z. g (f z)) x y p) (ap/comp A B C f g x y p)
+
+ap/refl/refl (A B : U) (f : A -> B) (x : A) : Path (Path B (f x) (f x)) (ap A B f x x (inv A x x (refl A x)))
+                                                                       (ap A B f x x (refl A x)) =
+  ap (Path A x x) (Path B (f x) (f x)) (ap A B f x x) (inv A x x (refl A x)) (refl A x) (inv/refl A x)
+
+ap/inv (A B : U) (f : A -> B) (x y : A) (p : Path A x y)
+            : Path (Path B (f y) (f x)) (ap A B f y x (inv A x y p)) (inv B (f x) (f y) (ap A B f x y p)) =
+  J A x (\ z q. Path (Path B (f z) (f x)) (ap A B f z x (inv A x z q)) (inv B (f x) (f z) (ap A B f x z q)))
+        (comp (Path B (f x) (f x)) (ap A B f x x (inv A x x (refl A x)))
+                                   (ap A B f x x (refl A x)) (ap/refl/refl A B f x)
+                                   (inv B (f x) (f x) (refl B (f x))) (refl/sym B (f x))) y p
+
+ap/eq (A B : U) (f g : A -> B) (p : Path (A -> B) f g) (x y : A) : Path ((Path A x y) -> Path B (g x) (g y)) (tr (A -> B) f g p (\ h. Path A x y -> Path B (h x) (h y)) (ap A B f x y))
+                                                                      (ap A B g x y) =
+  apd (A -> B) (\ h. Path A x y -> Path B (h x) (h y)) (\ h. ap A B h x y) f g p
+
+ap/concat (A B : U) (f : A -> B) (x y z : A) (p : Path A x y) (q : Path A y z)
+               : Path (Path B (f x) (f z)) (ap A B f x z (comp A x y p z q))
+                                         (comp B (f x) (f y) (ap A B f x y p) (f z) (ap A B f y z q)) =
+  J A y (\ t r. Path (Path B (f x) (f t)) (ap A B f x t (comp A x y p t r))
+                                          (comp B (f x) (f y) (ap A B f x y p) (f t) (ap A B f y t r)))
+            (comp (Path B (f x) (f y)) (ap A B f x y (comp A x y p y (refl A y)))
+                                       (ap A B f x y p) (ap (Path A x y) (Path B (f x) (f y)) (ap A B f x y) (comp A x y p y (refl A y)) p (comp/ident-r A x y p))
+                                       (comp B (f x) (f y) (ap A B f x y p) (f y) (refl B (f y))) (refl/comp-r B (f x) (f y) (ap A B f x y p)))
+    z q
+
+-- Naturality square
+naturality (A B : U) (f g : A -> B) (H : Htpy' A B f g) (x y : A) (p : Path A x y)
+                : Path (Path B (f x) (g y)) (comp B (f x) (g x) (H x) (g y) (ap A B g x y p))
+                                            (comp B (f x) (f y) (ap A B f x y p) (g y) (H y)) =
+  J A x (\ z q. Path (Path B (f x) (g z)) (comp B (f x) (g x) (H x) (g z) (ap A B g x z q))
+                                         (comp B (f x) (f z) (ap A B f x z q) (g z) (H z)))
+        (comp (Path B (f x) (g x)) (comp B (f x) (g x) (H x) (g x) (refl B (g x))) (H x)
+                                   (comp/ident-r B (f x) (g x) (H x)) (comp B (f x) (f x) (refl B (f x)) (g x) (H x))
+                                   (comp/ident-l' B (f x) (g x) (H x))) y p
+
+naturality' (A B : U) (f g : A -> B) (H : Htpy' A B f g) (x y : A) (p : Path A x y)
+                 : Path (Path B (f x) (g y)) (comp B (f x) (f y) (ap A B f x y p) (g y) (H y))
+                                             (comp B (f x) (g x) (H x) (g y) (ap A B g x y p)) =
+  inv (Path B (f x) (g y)) (comp B (f x) (g x) (H x) (g y) (ap A B g x y p)) (comp B (f x) (f y) (ap A B f x y p) (g y) (H y))
+      (naturality A B f g H x y p)
+
+square (A : U) (x y1 y2 z : A) (p-left : Path A x y1) (p-bottom : Path A y1 z) (p-top : Path A x y2) (p-right : Path A y2 z) : U =
+  Path (Path A x z)
+    ( comp A x y1 p-left z p-bottom)
+    ( comp A x y2 p-top z p-right)
+
+square-top (A : U) (x y1 y2 z : A) (p1 : Path A x y1) (q1 : Path A y1 z) (p2 : Path A x y2) (p2' : Path A x y2) (s : Path (Path A x y2) p2 p2') (q2 : Path A y2 z)
+           (sq : square A x y1 y2 z p1 q1 p2 q2) : square A x y1 y2 z p1 q1 p2' q2 =
+  J
+    ( Path A x y2) p2
+    ( \ p _. square A x y1 y2 z p1 q1 p q2) sq p2' s
+
+nat-htpy (A : U) (f : A -> A) (H : Htpy' A A f (id A)) (x : A)
+            : Path (Path A (f (f x)) (f x))
+                   (H (f x)) (ap A A f (f x) x (H x)) =
+  comp-n
+    ( Path A (f (f x)) (f x)) eight-Nat
+    ( H (f x)) (comp A (f (f x)) (f x) (H (f x)) (f x) (refl A (f x)))
+    ( refl/comp-r A (f (f x)) (f x) (H (f x)))
+    ( comp A (f (f x)) (f x) (H (f x)) (f x) (comp A (f x) x (H x) (f x) (inv A (f x) x (H x))))
+    ( ap (Path A (f x) (f x)) (Path A (f (f x)) (f x)) (\ p. (comp A (f (f x)) (f x) (H (f x)) (f x) p)) (refl A (f x)) (comp A (f x) x (H x) (f x) (inv A (f x) x (H x)))
+      ( comp/inv-r' A (f x) x (H x)))
+    ( comp A (f (f x)) x (comp A (f (f x)) (f x) (H (f x)) x (H x)) (f x) (inv A (f x) x (H x)))
+    ( comp/assoc' A (f (f x)) (f x) (H (f x)) x (H x) (f x) (inv A (f x) x (H x)))
+    ( comp A (f (f x)) x (comp A (f (f x)) (f x) (H (f x)) x (ap A A (id A) (f x) x (H x))) (f x) (inv A (f x) x (H x)))
+    ( ap (Path A (f x) x) (Path A (f (f x)) (f x)) (\ p. comp A (f (f x)) x (comp A (f (f x)) (f x) (H (f x)) x p) (f x) (inv A (f x) x (H x))) (H x) (ap A A (id A) (f x) x (H x))
+      ( ap/id A (f x) x (H x)))
+    ( comp A (f (f x)) x (comp A (f (f x)) (f x) (ap A A f (f x) x (H x)) x (H x)) (f x) (inv A (f x) x (H x)))
+    ( ap (Path A (f (f x)) x) (Path A (f (f x)) (f x)) (\ p. comp A (f (f x)) x p (f x) (inv A (f x) x (H x)))
+      ( comp A (f (f x)) (f x) (H (f x)) x (ap A A (id A) (f x) x (H x))) (comp A (f (f x)) (f x) (ap A A f (f x) x (H x)) x (H x))
+      ( naturality A A f (id A) H (f x) x (H x)))
+    ( comp A (f (f x)) (f x) (ap A A f (f x) x (H x)) (f x) (comp A (f x) x (H x) (f x) (inv A (f x) x (H x))))
+    ( comp/assoc A (f (f x)) (f x) (ap A A f (f x) x (H x)) x (H x) (f x) (inv A (f x) x (H x)))
+    ( comp A (f (f x)) (f x) (ap A A f (f x) x (H x)) (f x) (refl A (f x)))
+    ( ap (Path A (f x) (f x)) (Path A (f (f x)) (f x)) (\ p. comp A (f (f x)) (f x) (ap A A f (f x) x (H x)) (f x) p) (comp A (f x) x (H x) (f x) (inv A (f x) x (H x))) (refl A (f x))
+      ( comp/inv-r A (f x) x (H x)))
+    ( ap A A f (f x) x (H x))
+    ( comp/ident-r A (f (f x)) (f x) (ap A A f (f x) x (H x)))
+
+nat-htpy' (A : U) (f : A -> A) (H : Htpy' A A f (id A)) (x : A)
+             : Path (Path A (f (f x)) (f x))
+                    (ap A A f (f x) x (H x)) (H (f x)) =
+  inv
+    ( Path A (f (f x)) (f x))
+    ( H (f x))
+    ( ap A A f (f x) x (H x))
+    ( nat-htpy A f H x)
+
+-- Some consistency results about bi-invertible maps.
+htpy/half-adjoint/htpy (A B : U) (f : A -> B) (g : B -> A) (G : Htpy' B B (\ y. f (g y)) (id B)) (H : Htpy' A A (\ x. g (f x)) (id A)) (y : B)
+                            : Path B (f (g y)) y =
+  comp B
+    ( f (g y))
+    ( f (g (f (g y))))
+    ( inv B (f (g (f (g y)))) (f (g y)) (G (f (g y)))) y
+    ( comp B
+      ( f (g (f (g y))))
+      ( f (g y))
+      ( ap A B f (g (f (g y))) (g y) (H (g y))) y
+      ( G y))
+
+htpy/half-adjoint (A B : U) (f : A -> B) (g : B -> A) (G : Htpy' B B (\ y. f (g y)) (id B)) (H : Htpy' A A (\ x. g (f x)) (id A)) (x : A)
+                       : Path (Path B (f (g (f x))) (f x)) (ap A B f (g (f x)) x (H x)) (htpy/half-adjoint/htpy A B f g G H (f x)) =
+  inv/concat B
+    ( f (g (f (g (f x)))))
+    ( f (g (f x)))
+    ( G (f (g (f x))))
+    ( f x)
+    ( ap A B f (g (f x)) x (H x))
+    ( comp B
+      ( f (g (f (g (f x)))))
+      ( f (g (f x)))
+      ( ap A B f (g (f (g (f x)))) (g (f x)) (H (g (f x))))
+      ( f x)
+      ( G (f x)))
+    ( square-top B
+      ( f (g (f (g (f x)))))
+      ( f (g (f x)))
+      ( f (g (f x)))
+      ( f x)
+      ( G (f (g (f x))))     
+      ( ap A B f (g (f x)) x (H x))
+      ( ap A B (\ z. (f (g (f z)))) (g (f x)) x (H x))
+      ( ap A B f (g (f (g (f x)))) (g (f x)) (H (g (f x))))
+      ( comp 
+        ( Path B (f (g (f (g (f x))))) (f (g (f x))))
+        ( ap A B (\ z. (f (g (f z)))) (g (f x)) x (H x))
+        ( ap A B f (g (f (g (f x)))) (g (f x)) (ap A A (\ z. g (f z)) (g (f x)) x (H x)))
+        ( ap/comp' A A B
+          ( \ z. g (f z)) f
+          ( g (f x)) x
+          ( H x))
+        ( ap A B f (g (f (g (f x)))) (g (f x)) (H (g (f x))))
+        ( ap
+          ( Path A (g (f (g (f x)))) (g (f x)))
+          ( Path B (f (g (f (g (f x))))) (f (g (f x))))
+          ( ap A B f (g (f (g (f x)))) (g (f x)))
+          ( ap A A (\ z. g (f z)) (g (f x)) x (H x))
+          ( H (g (f x)))
+          ( nat-htpy' A (\ z. g (f z)) H x)))
+        ( G (f x))
+        ( naturality A B (\ z. f (g (f z))) f (\ z. G (f z)) (g (f x)) x (H x)))
+
+htpy/half-adjoint' (A B : U) (f : A -> B) (g : B -> A) (G : Htpy' B B (\ y. f (g y)) (id B)) (H : Htpy' A A (\ x. g (f x)) (id A)) (x : A)
+                        : Path (Path B (f (g (f x))) (f x)) (htpy/half-adjoint/htpy A B f g G H (f x)) (ap A B f (g (f x)) x (H x)) =
+  inv 
+    ( Path B (f (g (f x))) (f x))
+    ( ap A B f (g (f x)) x (H x))
+    ( htpy/half-adjoint/htpy A B f g G H (f x))
+    ( htpy/half-adjoint A B f g G H x)
+
+-- Squares 
+tr/ap/refl (A B : U) (f : A -> B) (P : B -> U) (x : A) (u : P (f x))
+                : Path (P (f x)) (tr B (f x) (f x) (ap A B f x x (refl A x)) P u) (tr A x x (refl A x) (\ z. P (f z)) u) =
+  comp
+    ( P (f x)) 
+    ( tr B (f x) (f x) (ap A B f x x (refl A x)) P u) u
+    ( tr/refl-path B (f x) P u)
+    ( tr A x x (refl A x) (\ z. P (f z)) u)
+    ( tr/refl-path' A x (\ z. P (f z)) u)
+
+tr/ap (A B : U) (f : A -> B) (P : B -> U) (x y : A) (p : Path A x y) (u : P (f x))
+           : Path (P (f y)) (tr B (f x) (f y) (ap A B f x y p) P u) (tr A x y p (\ z. P (f z)) u) =
+  J A x
+    ( \ z q. Path (P (f z)) (tr B (f x) (f z) (ap A B f x z q) P u) (tr A x z q (\ z'. P (f z')) u))
+    ( tr/ap/refl A B f P x u) y p

@@ -1,0 +1,38 @@
+-- This file shows the dependent universal property of empty type.
+
+module Foundation.EmptyProperties where
+
+import Foundation.EmptyType
+import Foundation.FunctionExtensionality
+import Foundation.Equivalences
+
+Empty/dependent-property/center (B : Empty -> U) : (x : Empty) -> B x =
+  \ x. ex-falso (B x) x
+
+Empty/dependent-property/contr (B : Empty -> U) (f : (x : Empty) -> B x) : Path ((x : Empty) -> B x) (Empty/dependent-property/center B) f =
+  eq-htpy Empty B
+    ( Empty/dependent-property/center B) f
+    ( \ x. ex-falso
+      ( Path (B x)
+        ( Empty/dependent-property/center B x)
+        ( f x)) x)      
+
+Empty/dependent-property (B : Empty -> U) : is-contr ((x : Empty) -> B x) =
+  ( Empty/dependent-property/center B,
+    Empty/dependent-property/contr B)
+
+Empty/dependent-property-Equiv/center (A : U) (B : A -> U) (e : Equiv A Empty) : (x : A) -> B x =
+  \ x. ex-falso (B x) (Equiv/map A Empty e x)
+
+Empty/dependent-property-Equiv/contr (A : U) (B : A -> U) (e : Equiv A Empty) (f : (x : A) -> B x) : Path ((x : A) -> B x) (Empty/dependent-property-Equiv/center A B e) f =
+  eq-htpy A B
+    ( Empty/dependent-property-Equiv/center A B e) f
+    ( \ x. ex-falso
+      ( Path (B x)
+        ( Empty/dependent-property-Equiv/center A B e x)
+        ( f x))
+      ( Equiv/map A Empty e x))
+
+Empty/universal-dependent-property (A : U) (B : A -> U) (e : Equiv A Empty) : is-contr ((x : A) -> B x) =
+  ( Empty/dependent-property-Equiv/center A B e,
+    Empty/dependent-property-Equiv/contr A B e)

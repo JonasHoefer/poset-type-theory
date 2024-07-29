@@ -1,0 +1,36 @@
+-- This file defines the coproduct type.
+
+module Foundation.CoproductType where
+
+import Foundation.Core.Homotopies
+
+-- Definition as inductive datatype
+data Coprod (A B : U) : U
+  = inl (x : A)
+  | inr (y : B)
+
+-- Induction principle.
+ind-Coprod (A B : U) (P : Coprod A B -> U) (f : (x : A) -> P (inl x)) (g : (y : B) -> P (inr y)) : (z : Coprod A B) -> (P z) = split
+  inl x -> f x
+  inr y -> g y
+
+-- We can map between coproducts.
+Coprod/map (A B A' B' : U) (f : A -> A') (g : B -> B') : (z : Coprod A B) -> (Coprod A' B') =
+  ind-Coprod A B (\ _. Coprod A' B') (\ x. inl (f x)) (\ y. inr (g y))
+
+-- Properties of coproduct.
+Coprod/id-htpy (A B : U) : Htpy' (Coprod A B) (Coprod A B) (Coprod/map A B A B (id A) (id B)) (id (Coprod A B)) = split
+  inl x -> refl (Coprod A B) (inl x)
+  inr y -> refl (Coprod A B) (inr y)
+
+Coprod/comp-fun-htpy (A A' A'' : U) (B B' B'' : U) (f : A -> A') (f' : A' -> A'') (g : B -> B') (g' : B' -> B'')
+                               : Htpy' (Coprod A B) (Coprod A'' B'')
+                                       (Coprod/map A B A'' B'' (\ z. f' (f z)) (\ z. g' (g z)))
+                                       (\ z. (Coprod/map A' B' A'' B'' f' g') (Coprod/map A B A' B' f g z)) = split
+  inl x -> refl (Coprod A'' B'') (inl (f' (f x)))
+  inr y -> refl (Coprod A'' B'') (inr (g' (g y)))
+
+Coprod/copr-htpy (A A' : U) (B B' : U) (f f' : A -> A') (g g' : B -> B') (H : Htpy' A A' f f') (K : Htpy' B B' g g')
+                       : Htpy' (Coprod A B) (Coprod A' B') (Coprod/map A B A' B' f g) (Coprod/map A B A' B' f' g') = split
+  inl x -> ap A' (Coprod A' B') (\ z. inl z) (f x) (f' x) (H x)
+  inr y -> ap B' (Coprod A' B') (\ z. inr z) (g y) (g' y) (K y)

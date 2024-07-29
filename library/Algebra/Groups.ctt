@@ -1,0 +1,644 @@
+-- This file defines what (semi)groups are, as well as homomorphisms between groups.
+-- It characterizes the equality of (semi)groups, that is equivalent to isomorphisms.
+
+module Algebra.Groups where
+
+import Foundation.Everything
+
+is-assoc (X : U) (f : X -> X -> X) : U =
+  (x y z : X) -> Path X (f (f x y) z) (f x (f y z))
+
+has-assoc-op (X : U) : U =
+  Sg (X -> X -> X) (is-assoc X)
+
+is-semi-group (X : Set) : U =
+  has-assoc-op (Set/type X)
+
+Semigroup : U = Sg Set is-semi-group
+
+Semigroup/Set (G : Semigroup) : Set = G.1
+
+Semigroup/is-semi-group (G : Semigroup) : is-semi-group (Semigroup/Set G) = G.2  
+
+Semigroup/type (G : Semigroup) : U = Set/type (Semigroup/Set G)
+
+Semigroup/is-set (G : Semigroup) : is-set (Semigroup/type G) = (Semigroup/Set G).2
+
+Semigroup/op (G : Semigroup) : (Semigroup/type G) -> (Semigroup/type G) -> (Semigroup/type G) =
+  (Semigroup/is-semi-group G).1
+
+Semigroup/is-assoc (G : Semigroup) : is-assoc (Semigroup/type G) (Semigroup/op G) =
+  (Semigroup/is-semi-group G).2
+
+Semigroup/map (G : Semigroup) (H : Semigroup) : U =
+  Semigroup/type G -> Semigroup/type H
+
+left-unit-law (G : Semigroup) (e : Semigroup/type G) : U =
+  (y : Semigroup/type G) -> Path (Semigroup/type G) (Semigroup/op G e y) y
+
+right-unit-law (G : Semigroup) (e : Semigroup/type G) : U =
+  (x : Semigroup/type G) -> Path (Semigroup/type G) (Semigroup/op G x e) x
+
+is-unital (G : Semigroup) : U =
+  Sg (Semigroup/type G) (\ e. (left-unit-law G e) * (right-unit-law G e))
+
+Monoid : U = Sg Semigroup is-unital
+
+Monoid/Semigroup (M : Monoid) : Semigroup = M.1
+
+Monoid/is-unital (M : Monoid) : is-unital (Monoid/Semigroup M) = M.2  
+
+Monoid/Set (M : Monoid) : Set = Semigroup/Set (Monoid/Semigroup M)
+
+Monoid/is-semi-group (M : Monoid) : is-semi-group (Monoid/Set M) = Semigroup/is-semi-group (Monoid/Semigroup M)
+
+Monoid/type (M : Monoid) : U = Set/type (Monoid/Set M)
+
+Monoid/is-set (M : Monoid) : is-set (Monoid/type M) = Set/is-set (Monoid/Set M)
+
+Monoid/op (M : Monoid) : (Monoid/type M) -> (Monoid/type M) -> (Monoid/type M) =
+  (Semigroup/op (Monoid/Semigroup M))
+
+Monoid/is-assoc (M : Monoid) : is-assoc (Monoid/type M) (Monoid/op M) =
+  (Semigroup/is-assoc (Monoid/Semigroup M))
+
+Monoid/unit (M : Monoid) : (Monoid/type M) = (Monoid/is-unital M).1
+
+Monoid/left-unit-law (M : Monoid) : left-unit-law (Monoid/Semigroup M) (Monoid/unit M) = (Monoid/is-unital M).2.1
+
+Monoid/right-unit-law (M : Monoid) : right-unit-law (Monoid/Semigroup M) (Monoid/unit M) = (Monoid/is-unital M).2.2
+
+is-unital/is-prop/sg (X : U) (is-set-X : is-set X) (f : X -> X -> X) (assoc-f : (x y z : X) -> Path X (f (f x y) z) (f x (f y z)))
+                     (e : X) (left-unit : left-unit-law ((X, is-set-X), (f, assoc-f)) e) (right-unit : right-unit-law ((X, is-set-X), (f, assoc-f)) e)
+                     (e' : X) (left-unit' : left-unit-law ((X, is-set-X), (f, assoc-f)) e') (right-unit' : right-unit-law ((X, is-set-X), (f, assoc-f)) e') 
+                         : Path (is-unital ((X, is-set-X), (f, assoc-f))) (e, (left-unit, right-unit)) (e', (left-unit', right-unit')) =
+  let G : Semigroup = ((X, is-set-X), (f, assoc-f)) in
+  SgPath-prop X (\ z. (left-unit-law G z) * (right-unit-law G z))
+    (\ z. is-prop/prod (left-unit-law G z) (right-unit-law G z)
+          (is-prop/pi X (\ y. Path X (f z y) y) (\ y. is-set-X (f z y) y))
+          (is-prop/pi X (\ x. Path X (f x z) x) (\ x. is-set-X (f x z) x)))
+    (e, (left-unit, right-unit)) (e', (left-unit', right-unit'))
+    (comp X e (f e e') (inv X (f e e') e (right-unit' e)) e' (left-unit e'))
+
+is-unital/is-prop (G : Semigroup) : is-prop (is-unital G) =
+  \ x y. is-unital/is-prop/sg (Semigroup/type G) (Set/is-set (Semigroup/Set G)) (Semigroup/op G) (Semigroup/is-assoc G)
+          x.1 x.2.1 x.2.2 y.1 y.2.1 y.2.2
+
+is-invertible-Monoid (M : Monoid) (x : Monoid/type M) : U =
+  Sg (Monoid/type M) (\ y. (Path (Monoid/type M) (Monoid/op M y x) (Monoid/unit M)) * (Path (Monoid/type M) (Monoid/op M x y) (Monoid/unit M)))
+
+is-invertible-Monoid/is-prop/sg (M : Monoid) (x : Monoid/type M) (y : Monoid/type M) (p : Path (Monoid/type M) (Monoid/op M y x) (Monoid/unit M))
+                                (q : Path (Monoid/type M) (Monoid/op M x y) (Monoid/unit M)) (y' : Monoid/type M)
+                                (p' : Path (Monoid/type M) (Monoid/op M y' x) (Monoid/unit M)) (q' : Path (Monoid/type M) (Monoid/op M x y') (Monoid/unit M))
+                                    : Path (is-invertible-Monoid M x) (y, (p, q)) (y', (p', q')) =
+  let X : U = Monoid/type M
+      f : X -> X -> X = Monoid/op M
+      e : X = Monoid/unit M
+  in
+  SgPath-prop X (\ z. (Path X (f z x) e) * (Path X (f x z) e))
+    (\ z. is-prop/prod (Path X (f z x) e) (Path X (f x z) e)
+          (Monoid/is-set M (f z x) e)
+          (Monoid/is-set M (f x z) e))
+    (y, (p, q)) (y', (p', q'))
+    (comp-n X five-Nat y (f e y)
+      (inv X (f e y) y (Monoid/left-unit-law M y))
+      (f (f y' x) y) (ap X X (\ z. f z y) e (f y' x) (inv X (f y' x) e p'))
+      (f y' (f x y)) (Monoid/is-assoc M y' x y)
+      (f y' e) (ap X X (f y') (f x y) e q)
+      y' (Monoid/right-unit-law M y'))
+
+is-invertible-Monoid/is-prop (M : Monoid) (x : Monoid/type M) : is-prop (is-invertible-Monoid M x) =
+  \ y z. is-invertible-Monoid/is-prop/sg M x y.1 y.2.1 y.2.2 z.1 z.2.1 z.2.2
+
+left-inv  (M : Monoid) (x y : Monoid/type M) : U = Path (Monoid/type M) (Monoid/op M y x) (Monoid/unit M)
+right-inv (M : Monoid) (x y : Monoid/type M) : U = Path (Monoid/type M) (Monoid/op M x y) (Monoid/unit M)
+
+is-group' (G : Semigroup) (e : is-unital G) : U =
+  Sg (Semigroup/map G G) (\ i. ((x : Semigroup/type G) -> left-inv (G, e) x (i x)) * ((x : Semigroup/type G) -> right-inv (G, e) x (i x)))
+
+is-group (G : Semigroup) : U = Sg (is-unital G) (is-group' G)
+
+Group : U = Sg Semigroup is-group
+
+Group/Semigroup (G : Group) : Semigroup = G.1
+
+Group/is-group (G : Group) : is-group (Group/Semigroup G) = G.2
+
+Group/Set (G : Group) : Set = Semigroup/Set (Group/Semigroup G)
+
+Group/type (G : Group) : U = Semigroup/type (Group/Semigroup G)
+
+Group/is-set (G : Group) : is-set (Group/type G) = (Group/Set G).2
+
+Group/is-unital (G : Group) : is-unital (Group/Semigroup G) = (Group/is-group G).1
+
+Group/Monoid (G : Group) : Monoid = (Group/Semigroup G, Group/is-unital G)
+
+Group/is-semi-group (G : Group) : is-semi-group (Group/Set G) = Monoid/is-semi-group (Group/Monoid G)
+
+Group/op (G : Group) : (Group/type G) -> (Group/type G) -> (Group/type G) = Semigroup/op (Group/Semigroup G)
+
+Group/is-assoc (G : Group) : is-assoc (Group/type G) (Group/op G) = Semigroup/is-assoc (Group/Semigroup G)
+
+Group/map (G H : Group) : U =
+  Group/type G -> Group/type H
+
+Group/unit (G : Group) : Group/type G = Monoid/unit (Group/Monoid G)
+
+Group/left-unit-law (G : Group) : left-unit-law (Group/Semigroup G) (Group/unit G) =
+  Monoid/left-unit-law (Group/Monoid G)
+
+Group/right-unit-law (G : Group) : right-unit-law (Group/Semigroup G) (Group/unit G) =
+  Monoid/right-unit-law (Group/Monoid G)
+
+Group/inv (G : Group) : Group/map G G = (Group/is-group G).2.1
+
+Group/left-inv (G : Group) : (x : Group/type G) -> left-inv (Group/Monoid G) x (Group/inv G x) =
+  (Group/is-group G).2.2.1
+
+Group/right-inv (G : Group) : (x : Group/type G) -> right-inv (Group/Monoid G) x (Group/inv G x) =
+  (Group/is-group G).2.2.2
+
+is-group'/is-prop/sg (G : Semigroup) (e : Semigroup/type G) (left-unit : left-unit-law G e) (right-unit : right-unit-law G e)
+                    (i : Semigroup/map G G) (left-inv-i : (x : Semigroup/type G) -> left-inv (G, (e, (left-unit, right-unit))) x (i x))
+                                             (right-inv-i : (x : Semigroup/type G) -> right-inv (G, (e, (left-unit, right-unit))) x (i x))
+                    (i' : Semigroup/map G G) (left-inv-i' : (x : Semigroup/type G) -> left-inv (G, (e, (left-unit, right-unit))) x (i' x))
+                                             (right-inv-i' : (x : Semigroup/type G) -> right-inv (G, (e, (left-unit, right-unit))) x (i' x))
+                        : Path (is-group' G (e, (left-unit, right-unit))) (i, (left-inv-i, right-inv-i)) (i', (left-inv-i', right-inv-i')) =
+  let X : U = Semigroup/type G
+      f : X -> X -> X = Semigroup/op G
+  in
+  SgPath-prop (X -> X) (\ g. ((x : X) -> Path X (f (g x) x) e) * ((x : X) -> Path X (f x (g x)) e))
+    (\ g. is-prop/prod ((x : X) -> Path X (f (g x) x) e) ((x : X) -> Path X (f x (g x)) e)
+      (is-prop/pi X (\ x. Path X (f (g x) x) e) (\ x. Semigroup/is-set G (f (g x) x) e))
+      (is-prop/pi X (\ x. Path X (f x (g x)) e) (\ x. Semigroup/is-set G (f x (g x)) e)))
+    (i, (left-inv-i, right-inv-i)) (i', (left-inv-i', right-inv-i'))
+    (eq-htpy' X X i i'
+      (\ x. 
+        (comp-n X five-Nat (i x) (f e (i x))
+          (inv X (f e (i x)) (i x) (left-unit (i x)))
+          (f (f (i' x) x) (i x)) (ap X X (\ z. f z (i x)) e (f (i' x) x) (inv X (f (i' x) x) e (left-inv-i' x)))
+          (f (i' x) (f x (i x))) (Semigroup/is-assoc G (i' x) x (i x))
+          (f (i' x) e) (ap X X (f (i' x)) (f x (i x)) e (right-inv-i x))
+          (i' x) (right-unit (i' x)))))
+
+
+is-group'/is-prop (G : Semigroup) (e : is-unital G) : is-prop (is-group' G e) =
+  \ x y. is-group'/is-prop/sg G e.1 e.2.1 e.2.2 x.1 x.2.1 x.2.2 y.1 y.2.1 y.2.2
+
+is-group/is-prop (G : Semigroup) : is-prop (is-group G) =
+  is-prop/sg (is-unital G) (is-group' G) (is-unital/is-prop G) (is-group'/is-prop G)
+
+preserves-mul (A B : U) (f : A -> B) (g : A -> A -> A) (h : B -> B -> B) : U =
+  (x y : A) -> Path B (f (g x y)) (h (f x) (f y))
+
+Semigroup/preserves-mul (G H : Semigroup) (f : Semigroup/map G H) : U =
+  preserves-mul (Semigroup/type G) (Semigroup/type H) f (Semigroup/op G) (Semigroup/op H)
+
+preserves-mul/is-prop (G H : Semigroup) (f : Semigroup/map G H) : is-prop (Semigroup/preserves-mul G H f) =
+  is-prop/pi (Semigroup/type G) (\ x. (y : Semigroup/type G) -> Path (Semigroup/type H) (f (Semigroup/op G x y)) (Semigroup/op H (f x) (f y)))
+    (\ x. is-prop/pi (Semigroup/type G) (\ y. Path (Semigroup/type H) (f (Semigroup/op G x y)) (Semigroup/op H (f x) (f y)))
+      (\ y. Semigroup/is-set H (f (Semigroup/op G x y)) (Semigroup/op H (f x) (f y))))
+
+Semigroup/hom (G H : Semigroup) : U =
+  Sg (Semigroup/map G H) (Semigroup/preserves-mul G H)
+
+Semigroup/hom/map (G H : Semigroup) (f : Semigroup/hom G H) : Semigroup/map G H = f.1
+
+Semigroup/hom/preserves-mul (G H : Semigroup) (f : Semigroup/hom G H) : Semigroup/preserves-mul G H (Semigroup/hom/map G H f) = f.2
+
+Semigroup/hom/id (G : Semigroup) : Semigroup/hom G G =
+  (id (Semigroup/type G), \ x y. refl (Semigroup/type G) (Semigroup/op G x y))
+
+Semigroup/htpy (G H : Semigroup) (f g : Semigroup/hom G H) : U =
+  Htpy' (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f) (Semigroup/hom/map G H g)
+
+Semigroup/hom/htpy/refl (G H : Semigroup) (f : Semigroup/hom G H) : Semigroup/htpy G H f f =
+  Htpy'/refl (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f)
+
+Semigroup/hom/htpy (G H : Semigroup) (f g : Semigroup/hom G H) (p : Path (Semigroup/hom G H) f g) : Semigroup/htpy G H f g =
+  J (Semigroup/hom G H) f (\ h _. Htpy' (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f) (Semigroup/hom/map G H h))
+    (Semigroup/hom/htpy/refl G H f) g p
+
+Semigroup/hom/htpy/is-contr (G H : Semigroup) (f : Semigroup/hom G H)
+                                  : is-contr (Sg (Semigroup/hom G H) (Semigroup/htpy G H f)) =
+  substructure/is-contr-total-Eq (Semigroup/map G H) (\ g. Htpy' (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f) g) (\ g. Semigroup/preserves-mul G H g)
+    (Htpy/is-contr-total-htpy (Semigroup/type G) (\ _. Semigroup/type H) (Semigroup/hom/map G H f))
+    (preserves-mul/is-prop G H)
+    (Semigroup/hom/map G H f)
+    (Htpy'/refl (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f))
+    (Semigroup/hom/preserves-mul G H f)
+
+Semigroup/hom/htpy/is-equiv (G H : Semigroup) (f : Semigroup/hom G H)
+                                  : (g : Semigroup/hom G H) -> is-equiv (Path (Semigroup/hom G H) f g) (Semigroup/htpy G H f g) (Semigroup/hom/htpy G H f g) =
+  fundamental-theorem-id
+    (Semigroup/hom G H)
+    (Semigroup/htpy G H f)
+    f
+    (Semigroup/hom/htpy G H f)
+    (Semigroup/hom/htpy/is-contr G H f)
+
+Semigroup/hom/htpy/Equiv (G H : Semigroup) (f g : Semigroup/hom G H) : Equiv (Path (Semigroup/hom G H) f g) (Semigroup/htpy G H f g) =
+  (Semigroup/hom/htpy G H f g, Semigroup/hom/htpy/is-equiv G H f g)
+
+Semigroup/hom/Eq (G H : Semigroup) (f g : Semigroup/hom G H)
+                       : (Htpy' (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H f) (Semigroup/hom/map G H g)) -> Path (Semigroup/hom G H) f g =
+  is-equiv/inv-map
+    (Path (Semigroup/hom G H) f g)
+    (Semigroup/htpy G H f g)
+    (Semigroup/hom/htpy G H f g)
+    (Semigroup/hom/htpy/is-equiv G H f g)
+
+Semigroup/hom/is-set (G H : Semigroup) : is-set (Semigroup/hom G H) =
+  \ f g. is-prop/closed-equiv
+    (Path (Semigroup/hom G H) f g)
+    (Semigroup/htpy G H f g)
+    (Semigroup/hom/htpy/Equiv G H f g)
+    (is-prop/pi
+      (Semigroup/type G)
+      (\ x. Path (Semigroup/type H) (Semigroup/hom/map G H f x) (Semigroup/hom/map G H g x))
+      (\ x. Semigroup/is-set H
+            (Semigroup/hom/map G H f x)
+            (Semigroup/hom/map G H g x)))
+
+Semigroup/hom/comp/map (G H K : Semigroup) (g : Semigroup/hom H K) (f : Semigroup/hom G H) : (Semigroup/map G K) =
+  \ z. Semigroup/hom/map H K g (Semigroup/hom/map G H f z)
+
+Semigroup/hom/comp/preserves-mul (G H K : Semigroup) (f : Semigroup/hom G H) (g : Semigroup/hom H K)
+                                         : Semigroup/preserves-mul G K (Semigroup/hom/comp/map G H K g f) =
+  let m : Semigroup/map G H = Semigroup/hom/map G H f
+      m' : Semigroup/map H K = Semigroup/hom/map H K g
+      mg : Semigroup/type G -> Semigroup/type G -> Semigroup/type G = Semigroup/op G
+      mh : Semigroup/type H -> Semigroup/type H -> Semigroup/type H = Semigroup/op H
+      mk : Semigroup/type K -> Semigroup/type K -> Semigroup/type K = Semigroup/op K
+  in
+  \ x y. comp (Semigroup/type K) (Semigroup/hom/comp/map G H K g f (mg x y)) (m' (mh (m x) (m y)))
+    (ap (Semigroup/type H) (Semigroup/type K) m' (m (mg x y)) (mh (m x) (m y))
+        (Semigroup/hom/preserves-mul G H f x y))
+    (mk (m' (m x)) (m' (m y)))
+    (Semigroup/hom/preserves-mul H K g (m x) (m y))
+
+Semigroup/hom/comp (G H K : Semigroup) (g : Semigroup/hom H K) (f : Semigroup/hom G H) : Semigroup/hom G K =
+  (Semigroup/hom/comp/map G H K g f, Semigroup/hom/comp/preserves-mul G H K f g)
+
+Semigroup/hom/left-unit-law (G H : Semigroup) (f : Semigroup/hom G H)
+                                  : Path (Semigroup/hom G H) (Semigroup/hom/comp G H H (Semigroup/hom/id H) f) f =
+  Semigroup/hom/Eq G H (Semigroup/hom/comp G H H (Semigroup/hom/id H) f) f
+    (\ x. refl (Semigroup/type H) (Semigroup/hom/map G H f x))
+
+Semigroup/hom/right-unit-law (G H : Semigroup) (f : Semigroup/hom G H)
+                                   : Path (Semigroup/hom G H) (Semigroup/hom/comp G G H f (Semigroup/hom/id G)) f =
+  Semigroup/hom/Eq G H (Semigroup/hom/comp G G H f (Semigroup/hom/id G)) f
+    (\ x. refl (Semigroup/type H) (Semigroup/hom/map G H f x))
+
+Semigroup/hom/comp/assoc (G H K L : Semigroup) (f : Semigroup/hom G H) (g : Semigroup/hom H K) (h : Semigroup/hom K L)
+                                   : Path (Semigroup/hom G L) (Semigroup/hom/comp G K L h (Semigroup/hom/comp G H K g f))
+                                                               (Semigroup/hom/comp G H L (Semigroup/hom/comp H K L h g) f) =
+  Semigroup/hom/Eq G L (Semigroup/hom/comp G K L h (Semigroup/hom/comp G H K g f)) (Semigroup/hom/comp G H L (Semigroup/hom/comp H K L h g) f)
+    (\ x. refl (Semigroup/type L) (Semigroup/hom/map K L h (Semigroup/hom/map H K g (Semigroup/hom/map G H f x))))
+
+Semigroup/hom/left-inv (G H : Semigroup) (h : Semigroup/hom G H) (h' : Semigroup/hom H G)  : U =
+  Path (Semigroup/hom G G) (Semigroup/hom/comp G H G h' h) (Semigroup/hom/id G)
+
+Semigroup/hom/right-inv (G H : Semigroup) (h : Semigroup/hom G H) (h' : Semigroup/hom H G) : U =
+  Path (Semigroup/hom H H) (Semigroup/hom/comp H G H h h') (Semigroup/hom/id H)
+
+Semigroup/is-iso (G H : Semigroup) (h : Semigroup/hom G H) : U =
+  Sg (Semigroup/hom H G) (\ h'. (Semigroup/hom/left-inv G H h h') * (Semigroup/hom/right-inv G H h h'))
+
+Semigroup/is-iso/hom (G H : Semigroup) (h : Semigroup/hom G H) (i : Semigroup/is-iso G H h) : Semigroup/hom H G = i.1
+
+Semigroup/is-iso/map (G H : Semigroup) (h : Semigroup/hom G H) (i : Semigroup/is-iso G H h) : Semigroup/map H G = Semigroup/hom/map H G (Semigroup/is-iso/hom G H h i)
+
+Semigroup/is-iso/left-htpy (G H : Semigroup) (h : Semigroup/hom G H) (i : Semigroup/is-iso G H h) : Semigroup/hom/left-inv G H h (Semigroup/is-iso/hom G H h i) = i.2.1
+
+Semigroup/is-iso/right-htpy (G H : Semigroup) (h : Semigroup/hom G H) (i : Semigroup/is-iso G H h) : Semigroup/hom/right-inv G H h (Semigroup/is-iso/hom G H h i) = i.2.2
+
+Semigroup/Iso (G H : Semigroup) : U =
+  Sg (Semigroup/hom G H) (Semigroup/is-iso G H)
+
+Semigroup/Iso/hom (G H : Semigroup) (i : Semigroup/Iso G H) : Semigroup/hom G H = i.1
+
+Semigroup/Iso/inv-map (G H : Semigroup) (i : Semigroup/Iso G H) : Semigroup/hom H G = Semigroup/is-iso/hom G H (Semigroup/Iso/hom G H i) i.2
+
+Semigroup/Iso/left-htpy (G H : Semigroup) (i : Semigroup/Iso G H) : Semigroup/hom/left-inv G H (Semigroup/Iso/hom G H i) (Semigroup/Iso/inv-map G H i) =
+  Semigroup/is-iso/left-htpy G H (Semigroup/Iso/hom G H i) i.2
+
+Semigroup/Iso/right-htpy (G H : Semigroup) (i : Semigroup/Iso G H) : Semigroup/hom/right-inv G H (Semigroup/Iso/hom G H i) (Semigroup/Iso/inv-map G H i) =
+  Semigroup/is-iso/right-htpy G H (Semigroup/Iso/hom G H i) i.2
+
+Semigroup/is-iso/is-prop (G H : Semigroup) (h : Semigroup/hom G H) : is-prop (Semigroup/is-iso G H h) =
+  \ k k'.
+    let f : Semigroup/hom H G = Semigroup/is-iso/hom G H h k
+        f' : Semigroup/hom H G = Semigroup/is-iso/hom G H h k'
+    in  
+    SgPath-prop
+      (Semigroup/hom H G)
+      (\ i. (Semigroup/hom/left-inv G H h i) * (Semigroup/hom/right-inv G H h i))
+      (\ i. is-prop/prod
+             (Semigroup/hom/left-inv G H h i)
+             (Semigroup/hom/right-inv G H h i)
+             (Semigroup/hom/is-set G G (Semigroup/hom/comp G H G i h) (Semigroup/hom/id G))
+             (Semigroup/hom/is-set H H (Semigroup/hom/comp H G H h i) (Semigroup/hom/id H)))
+      k k'
+      (comp-n (Semigroup/hom H G) five-Nat f (Semigroup/hom/comp H H G f (Semigroup/hom/id H))
+        (inv (Semigroup/hom H G) (Semigroup/hom/comp H H G f (Semigroup/hom/id H)) f (Semigroup/hom/right-unit-law H G f))
+        (Semigroup/hom/comp H H G f (Semigroup/hom/comp H G H h f'))
+        (ap (Semigroup/hom H H) (Semigroup/hom H G) (\ g. (Semigroup/hom/comp H H G f g)) (Semigroup/hom/id H) (Semigroup/hom/comp H G H h f')
+            (inv (Semigroup/hom H H) (Semigroup/hom/comp H G H h f') (Semigroup/hom/id H) (Semigroup/is-iso/right-htpy G H h k')))
+        (Semigroup/hom/comp H G G (Semigroup/hom/comp G H G f h) f')
+        (Semigroup/hom/comp/assoc H G H G f' h f)
+        (Semigroup/hom/comp H G G (Semigroup/hom/id G) f')
+        (ap (Semigroup/hom G G) (Semigroup/hom H G) (\ g. (Semigroup/hom/comp H G G g f')) (Semigroup/hom/comp G H G f h) (Semigroup/hom/id G)
+            (Semigroup/is-iso/left-htpy G H h k))
+        f'
+        (Semigroup/hom/left-unit-law H G f'))
+
+Semigroup/Iso/id (G : Semigroup) : Semigroup/Iso G G =
+  ( Semigroup/hom/id G,
+    ( Semigroup/hom/id G,
+        ( Semigroup/hom/Eq
+            G G
+            (Semigroup/hom/comp G G G (Semigroup/hom/id G) (Semigroup/hom/id G))
+            (Semigroup/hom/id G)
+            (\ x. refl (Semigroup/type G) x),
+          Semigroup/hom/Eq
+            G G
+            (Semigroup/hom/comp G G G (Semigroup/hom/id G) (Semigroup/hom/id G))
+            (Semigroup/hom/id G)
+            (\ x. refl (Semigroup/type G) x))))
+
+Semigroup/hom/is-iso/is-equiv (G H : Semigroup) (h : Semigroup/hom G H) (i : Semigroup/is-iso G H h)
+                                    : is-equiv (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h) =
+  has-inverse/is-equiv
+    ( Semigroup/type G)
+    ( Semigroup/type H)
+    ( Semigroup/hom/map G H h)
+    ( Semigroup/is-iso/map G H h i,
+      ( Semigroup/hom/htpy
+          H H
+          (Semigroup/hom/comp H G H h (Semigroup/is-iso/hom G H h i))
+          (Semigroup/hom/id H)
+          (Semigroup/is-iso/right-htpy G H h i),
+        Semigroup/hom/htpy
+          G G
+          (Semigroup/hom/comp G H G (Semigroup/is-iso/hom G H h i) h)
+          (Semigroup/hom/id G)
+          (Semigroup/is-iso/left-htpy G H h i)))
+
+Semigroup/hom/is-equiv/is-iso/hom (G H : Semigroup) (h : Semigroup/hom G H) (e : is-equiv (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h))
+                                    : Semigroup/hom H G =
+  let f  : Semigroup/map G H = Semigroup/hom/map G H h
+      h' : Semigroup/map H G = is-equiv/inv-map (Semigroup/type G) (Semigroup/type H) f e
+      muG : Semigroup/type G -> (Semigroup/map G G) = Semigroup/op G
+      muH : Semigroup/type H -> (Semigroup/map H H) = Semigroup/op H
+  in
+  ( h',
+    \ x y.
+      comp-n
+        (Semigroup/type G)
+        four-Nat
+        (h' (muH x y))
+        (h' (muH (f (h' x)) y))
+        (ap (Semigroup/type H) (Semigroup/type G) (\ z. h' (muH z y)) x (f (h' x))
+            (inv (Semigroup/type H) (f (h' x)) x (is-equiv/inv-right-htpy (Semigroup/type G) (Semigroup/type H) f e x)))
+        (h' (muH (f (h' x)) (f (h' y))))
+        (ap (Semigroup/type H) (Semigroup/type G) (\ z. h' (muH (f (h' x)) z)) y (f (h' y))
+            (inv (Semigroup/type H) (f (h' y)) y (is-equiv/inv-right-htpy (Semigroup/type G) (Semigroup/type H) f e y)))
+        (h' (f (muG (h' x) (h' y))))
+        (ap (Semigroup/type H) (Semigroup/type G) h' (muH (f (h' x)) (f (h' y))) (f (muG (h' x) (h' y)))
+            (inv (Semigroup/type H) (f (muG (h' x) (h' y))) (muH (f (h' x)) (f (h' y))) (Semigroup/hom/preserves-mul G H h (h' x) (h' y))))
+        (muG (h' x) (h' y))
+        (is-equiv/inv-left-htpy (Semigroup/type G) (Semigroup/type H) f e (muG (h' x) (h' y))))
+
+Semigroup/hom/is-equiv/is-iso (G H : Semigroup) (h : Semigroup/hom G H) (e : is-equiv (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h))
+                                    : Semigroup/is-iso G H h =
+  let h' : Semigroup/hom H G = Semigroup/hom/is-equiv/is-iso/hom G H h e in
+  ( h',
+    ( Semigroup/hom/Eq
+        G G
+        ( Semigroup/hom/comp G H G h' h)
+        ( Semigroup/hom/id G)
+        ( is-equiv/inv-left-htpy
+            ( Semigroup/type G)
+            ( Semigroup/type H)
+            ( Semigroup/hom/map G H h)
+            e),
+      Semigroup/hom/Eq
+        H H
+        ( Semigroup/hom/comp H G H h h')
+        ( Semigroup/hom/id H)
+        ( is-equiv/inv-right-htpy
+            ( Semigroup/type G)
+            ( Semigroup/type H)
+            ( Semigroup/hom/map G H h)
+            e)))
+
+Semigroup/Iso/Equiv/type (G H : Semigroup) : U =
+  (Sg ( Equiv (Semigroup/type G) (Semigroup/type H))
+     ( \ e. preserves-mul
+         ( Semigroup/type G)
+         ( Semigroup/type H)
+         ( Equiv/map (Semigroup/type G) (Semigroup/type H) e)
+         ( Semigroup/op G)
+         ( Semigroup/op H)))
+
+Semigroup/Iso/Equiv (G H : Semigroup) : Equiv (Semigroup/Iso G H) (Semigroup/Iso/Equiv/type G H) =
+  Equiv/trans
+    ( Semigroup/Iso G H)
+    ( Sg (Semigroup/hom G H) (\ h. is-equiv (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h)))
+    ( Semigroup/Iso/Equiv/type G H)
+    ( subtype/Equiv-tot
+        ( Semigroup/hom G H)
+        ( Semigroup/is-iso G H)
+        ( \ h. is-equiv (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h))
+        ( Semigroup/is-iso/is-prop G H)
+        ( \ h. is-equiv/is-prop (Semigroup/type G) (Semigroup/type H) (Semigroup/hom/map G H h))
+        ( Semigroup/hom/is-iso/is-equiv G H)
+        ( Semigroup/hom/is-equiv/is-iso G H))
+    ( Equiv/assoc-Sg
+        ( Semigroup/map G H)
+        ( Semigroup/preserves-mul G H)
+        ( is-equiv (Semigroup/type G) (Semigroup/type H)))
+
+Semigroup/iso-eq (G H : Semigroup) (p : Path Semigroup G H) : Semigroup/Iso G H =
+  J Semigroup G ( \ K _. Semigroup/Iso G K) ( Semigroup/Iso/id G) H p
+
+preserves-mul-id/type (G : Semigroup) : U =
+  Sg (has-assoc-op (Semigroup/type G)) (\ mu. Semigroup/preserves-mul G (Semigroup/Set G, mu) (id (Semigroup/type G)))
+
+preserves-mul-id/center (G : Semigroup) : preserves-mul-id/type G =
+  ( Semigroup/is-semi-group G, \ x y. refl (Semigroup/type G) (Semigroup/op G x y))
+
+preserves-mul-id/contraction (G : Semigroup) (t : preserves-mul-id/type G) : Path (preserves-mul-id/type G) (preserves-mul-id/center G) t =
+  SgPath-prop
+    ( has-assoc-op (Semigroup/type G))
+    ( \ mu. Semigroup/preserves-mul G (Semigroup/Set G, mu) (id (Semigroup/type G)))
+    ( \ mu. preserves-mul/is-prop G (Semigroup/Set G, mu) (id (Semigroup/type G)))
+    ( preserves-mul-id/center G) t
+    ( SgPath-prop
+      ( Semigroup/type G -> Semigroup/type G -> Semigroup/type G)
+      ( is-assoc (Semigroup/type G))
+      ( \ mu. is-prop/pi
+          ( Semigroup/type G)
+          ( \ x. (y z : Semigroup/type G) -> Path (Semigroup/type G) (mu (mu x y) z) (mu x (mu y z)))
+          ( \ x. is-prop/pi
+              ( Semigroup/type G)
+              ( \ y. (z : Semigroup/type G) -> Path (Semigroup/type G) (mu (mu x y) z) (mu x (mu y z)))
+              ( \ y. is-prop/pi
+                  ( Semigroup/type G)
+                  ( \ z. Path (Semigroup/type G) (mu (mu x y) z) (mu x (mu y z)))
+                  ( \ z. Semigroup/is-set G (mu (mu x y) z) (mu x (mu y z))))))
+      ( preserves-mul-id/center G).1 t.1
+      ( eq-htpy'
+          ( Semigroup/type G)
+          ( Semigroup/map G G)
+          ( preserves-mul-id/center G).1.1 t.1.1
+          ( \ x. eq-htpy'
+              ( Semigroup/type G)
+              ( Semigroup/type G)
+              (( preserves-mul-id/center G).1.1 x)
+              ( t.1.1 x)
+              ( \ y. t.2 x y))))
+
+
+preserves-mul-id/is-contr (G : Semigroup) : is-contr (preserves-mul-id/type G) = 
+ ( preserves-mul-id/center G,
+   preserves-mul-id/contraction G)
+
+Semigroup/iso-eq/is-contr-Equiv-type (G : Semigroup) : is-contr (Sg Semigroup (Semigroup/Iso/Equiv/type G)) =
+  str-principle-id
+    Set
+    is-semi-group
+    ( \ H. Equiv (Semigroup/type G) (Set/type H))
+    ( \ H is-semi-group-H e.
+        preserves-mul
+        ( Semigroup/type G)
+        ( Set/type H)
+        ( Equiv/map (Semigroup/type G) (Set/type H) e)
+        ( Semigroup/op G)
+        ( is-semi-group-H.1))
+    ( substructure/is-contr-total-Eq
+        U
+        ( Equiv (Semigroup/type G))
+        ( is-set)
+        ( ua/is-contr-total-equiv (Semigroup/type G))
+        ( is-set/is-prop)
+        ( Semigroup/type G)
+        ( Equiv/refl (Semigroup/type G))
+        ( Semigroup/is-set G))
+    ( Semigroup/Set G)
+    ( Equiv/refl (Semigroup/type G))
+    ( preserves-mul-id/is-contr G)
+
+Semigroup/iso-eq/contr-Iso (G : Semigroup) : is-contr (Sg Semigroup (Semigroup/Iso G)) =
+  ( is-contr/is-contr-equiv
+      ( Sg Semigroup (Semigroup/Iso G))
+      ( Sg Semigroup (Semigroup/Iso/Equiv/type G))
+      ( Equiv/Sg-fam
+          Semigroup
+          ( Semigroup/Iso G)
+          ( Semigroup/Iso/Equiv/type G)
+          ( \ H. Semigroup/Iso/Equiv G H))
+      ( Semigroup/iso-eq/is-contr-Equiv-type G))
+
+lock Semigroup/hom/htpy/is-equiv
+
+Semigroup/iso-eq/is-equiv (G : Semigroup) : (H : Semigroup) -> is-equiv (Path Semigroup G H) (Semigroup/Iso G H) (Semigroup/iso-eq G H) =
+  fundamental-theorem-id
+    Semigroup
+    ( Semigroup/Iso G) G
+    ( Semigroup/iso-eq G)
+    ( Semigroup/iso-eq/contr-Iso G)
+
+Semigroup/eq-iso (G H : Semigroup) : Semigroup/Iso G H -> Path Semigroup G H =
+  is-equiv/inv-map
+    ( Path Semigroup G H)
+    ( Semigroup/Iso G H)
+    ( Semigroup/iso-eq G H)
+    ( Semigroup/iso-eq/is-equiv G H)
+
+Group/preserves-mul (G H : Group) (f : Group/map G H) : U =
+  Semigroup/preserves-mul
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+    f
+
+Group/hom (G H : Group) : U =
+  Semigroup/hom
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+
+Group/hom/map (G H : Group) (f : Group/hom G H) : Group/map G H =
+  Semigroup/hom/map
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+    f
+
+Group/hom/preserves-mul (G H : Group) (f : Group/hom G H) : Group/preserves-mul G H (Group/hom/map G H f) =
+  Semigroup/hom/preserves-mul
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+    f
+
+Group/hom/id (G : Group) : Group/hom G G =
+  Semigroup/hom/id
+    ( Group/Semigroup G)
+
+Group/hom/comp (G H K : Group) (g : Group/hom H K) (f : Group/hom G H) : Group/hom G K =
+  Semigroup/hom/comp
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+    ( Group/Semigroup K)
+    g f
+
+Group/is-iso (G H : Group) (h : Group/hom G H) : U =
+  Semigroup/is-iso
+    ( Group/Semigroup G)
+    ( Group/Semigroup H) h
+
+Group/Iso (G H : Group) : U =
+  Semigroup/Iso
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+
+Group/Iso/id (G : Group) : Group/Iso G G =
+  Semigroup/Iso/id (Group/Semigroup G)
+
+Group/iso-eq (G H : Group) (p : Path Group G H) : Group/Iso G H =
+  Semigroup/iso-eq
+    ( Group/Semigroup G)
+    ( Group/Semigroup H)
+    ( ap Group Semigroup (\ t. t.1) G H p)
+
+Group/ap-pr1/is-equiv (G H : Group)
+                           : is-equiv
+                                ( Path Group G H)
+                                ( Path Semigroup (Group/Semigroup G) (Group/Semigroup H))
+                                ( ap Group Semigroup (\ t. t.1) G H) =
+  pr1/is-inj Semigroup is-group (is-group/is-prop) G H
+
+Group/iso-eq/is-equiv (G H : Group) : is-equiv (Path Group G H) (Group/Iso G H) (Group/iso-eq G H) =
+  is-equiv/comp-is-equiv
+    ( Path Group G H)
+    ( Path Semigroup
+      ( Group/Semigroup G)
+      ( Group/Semigroup H))
+    ( Group/Iso G H)
+    ( ap Group Semigroup (\ t. t.1) G H)
+    ( Semigroup/iso-eq
+      ( Group/Semigroup G)
+      ( Group/Semigroup H))
+    ( Group/ap-pr1/is-equiv G H)
+    ( Semigroup/iso-eq/is-equiv
+      ( Group/Semigroup G)
+      ( Group/Semigroup H))
+
+Group/eq-iso (G H : Group) : (Group/Iso G H) -> Path Group G H =
+  is-equiv/inv-map
+    ( Path Group G H)
+    ( Group/Iso G H)
+    ( Group/iso-eq G H)
+    ( Group/iso-eq/is-equiv G H)
+
+unlock Semigroup/hom/htpy/is-equiv

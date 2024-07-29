@@ -1,0 +1,9 @@
+-- This file imports every other file.
+-- It is mostly for testing purposes.
+
+module Everything where
+
+import Algebra.Everything
+import Combinatorics.Everything
+import Experiments.Everything
+import Foundation.Everything

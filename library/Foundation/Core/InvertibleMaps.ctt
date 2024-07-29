@@ -1,0 +1,83 @@
+-- This file defines the notion of quasi-inverses.
+
+module Foundation.Core.InvertibleMaps where
+
+import Foundation.Core.BiInvertibleMaps
+import Foundation.Core.Homotopies
+
+-- Definition and accessors
+has-inverse (A B : U) (f : A -> B) : U =
+  Sg ( B -> A)
+    ( \ g. ( Htpy' B B (\ y. f (g y)) (id B)) *
+          ( Htpy' A A (\ x. g (f x)) (id A)))
+
+QInv/map (A B : U) (f : A -> B) (i : has-inverse A B f) : B -> A =
+  i.1
+
+QInv/right-htpy (A B : U) (f : A -> B) (i : has-inverse A B f)
+  : Htpy' B B (\ y. f (QInv/map A B f i y)) (id B) =
+  i.2.1
+
+QInv/left-htpy (A B : U) (f : A -> B) (i : has-inverse A B f)
+  : Htpy' A A (\ x. (QInv/map A B f i (f x))) (id A) =
+  i.2.2
+
+-- Composing inverses
+has-inverse/comp-has-inverse (A B C : U) (f : A -> B) (g : B -> C) (i : has-inverse A B f) (i' : has-inverse B C g)
+  : has-inverse A C (\ x. g (f x)) =
+  let h : C -> A = \ z. (QInv/map A B f i) (QInv/map B C g i' z)
+      H : Htpy' C C (\ z. g (f (h z))) (id C) =
+          \ x. comp C (g (f (h x))) (g (QInv/map B C g i' x))
+                   (ap B C g (f (h x)) (QInv/map B C g i' x) (QInv/right-htpy A B f i (QInv/map B C g i' x))) 
+                   x
+                   (QInv/right-htpy B C g i' x)
+      K : Htpy' A A (\ x. h (g (f x))) (id A) =
+          \ x. comp A (h (g (f x))) ((QInv/map A B f i) (f x))
+                     (ap B A (QInv/map A B f i) ((QInv/map B C g i') (g (f x))) (f x) (QInv/left-htpy B C g i' (f x)))
+                     x
+                     (QInv/left-htpy A B f i x)                   
+  in
+  (h, (H, K))
+
+-- If the composition has an inverse, then the left map has an inverse.
+has-inverse/has-inverse-comp-left (A B C : U) (f : A -> B) (g : B -> C) (i : has-inverse B C g)
+                                  (i' : has-inverse A C (\ x. g (f x)))
+  : has-inverse A B f =
+  let ig : C -> B = QInv/map B C g i
+      h : B -> A = \ y. (QInv/map A C (\ x. g (f x)) i' (g y))
+      H : Htpy' B B (\ y. f (h y)) (id B) =
+          \ x. comp B (f (h x)) (ig (g (f (h x))))
+              (inv B (ig (g (f (h x)))) (f (h x)) (QInv/left-htpy B C g i (f (h x)))) x
+              (comp B (ig (g (f (h x)))) (ig (g x))
+                    (ap C B ig (g (f (h x))) (g x)
+                              (QInv/right-htpy A C (\ z. g (f z)) i' (g x)))
+                x (QInv/left-htpy B C g i x))
+      K : Htpy' A A (\ x. h (f x)) (id A) = QInv/left-htpy A C (\ x. g (f x)) i'
+  in
+  (h, (H, K))
+
+has-inverse/has-inverse-comp-right (A B C : U) (f : A -> B) (g : B -> C) (i : has-inverse A B f)
+                                   (i' : has-inverse A C (\ x. g (f x))) : has-inverse B C g =
+  let if : B -> A = QInv/map A B f i
+      igf : C -> A = (QInv/map A C (\ x. g (f x)) i')
+      h : C -> B  = \ z. f (igf z)
+      H : Htpy' C C (\ z. g (h z)) (id C) = QInv/right-htpy A C (\ x. g (f x)) i'
+      K : Htpy' B B (\ y. h (g y)) (id B) =
+          \ x. comp B (h (g x)) (h (g (f (if x))))
+                     (ap B B (\ y. h (g y)) x (f (if x)) (inv B (f (if x)) x
+                         (QInv/right-htpy A B f i x))) x
+                     ( comp B (h (g (f (if x)))) (f (if x))
+                              (ap A B f (igf (g (f (if x)))) (if x)
+                                  (QInv/left-htpy A C (\ z. g (f z)) i' (if x)))
+                        x (QInv/right-htpy A B f i x))
+  in
+  (h, (H, K))
+
+-- Inverses are bi-invertible.
+has-inverse-is-bi-inv (A B : U) (f : A -> B) (i : has-inverse A B f) : is-bi-inv A B f =
+  let g : B -> A = QInv/map A B f i in
+  ( (g, QInv/right-htpy A B f i),
+    (g, QInv/left-htpy A B f i))
+
+has-inverse/BiInv (A B : U) (f : A -> B) (i : has-inverse A B f) : BiInv A B =
+  ( f, has-inverse-is-bi-inv A B f i)

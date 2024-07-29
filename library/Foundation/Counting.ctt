@@ -1,0 +1,562 @@
+-- This file defines counting in univalent mathematics.
+
+module Foundation.Counting where
+
+import Foundation.Equivalences
+import Foundation.PropositionsProperties
+import Foundation.StandardFiniteTypes
+import Foundation.Subtypes
+import Foundation.EmptyProperties
+
+lock has-inverse/is-equiv
+
+count (A : U) : U =
+  Sg Nat (\ k. Equiv (Fin k) A)
+
+number-of-elements (A : U) (c : count A) : Nat = c.1
+count/Equiv (A : U) (c : count A) : Equiv (Fin (number-of-elements A c)) A = c.2
+
+count/fin-count (k : Nat) : count (Fin k) =
+  (k, IdEquiv (Fin k))
+
+count/zero-count : count (Fin zero) =
+  count/fin-count zero
+
+count/one-count : count (Fin one-Nat) =
+  count/fin-count one-Nat
+
+count/closed-equiv (A B : U) (e : Equiv A B) (c : count B) : count A =
+  (number-of-elements B c,
+   Equiv/trans (Fin (number-of-elements B c)) B A (count/Equiv B c) (Equiv/sym A B e))
+
+count/closed-equiv' (A B : U) (e : Equiv A B) (c : count A) : count B =
+  count/closed-equiv B A (Equiv/sym A B e) c
+
+count/empty-has-zero-count (A : U) (c : count A) (f : is-empty A) : Path Nat zero (number-of-elements A c) =
+  let e : Equiv (Fin (number-of-elements A c)) Empty =
+        Equiv/trans (Fin (number-of-elements A c)) A Empty (count/Equiv A c) (Empty/equiv A f) in
+  ind-Nat (\ k. (Equiv (Fin k) Empty) -> Path Nat zero k)
+          (\ _. refl Nat zero)
+          (\ n _ e'. ex-falso (Path Nat zero (suc n)) ((Equiv/map (Fin (suc n)) Empty e') (zero-Fin n)))
+          (number-of-elements A c) e
+
+count/zero-is-empty (A : U) (c : count A) (p : Path Nat zero (number-of-elements A c)) : is-empty A =
+   ind-Sg Nat (\ k. Equiv (Fin k) A)
+              (\ z. (Path Nat zero z.1) -> is-empty A)
+              (\ k e p'. J Nat zero (\ k' _. Equiv (Fin k') A -> is-empty A) (\ e'. Equiv/inv-map Empty A e') k p' e)
+              c p
+
+-- count/contractible-has-one-element (A : U) (c : count A) (cA : is-contr A) : Path Nat one-Nat (number-of-elements A c) =
+--   ind-Sg A (\ k. Equiv (Fin k) A)
+--            (\ p. Path Nat one-Nat p.1)
+--            (ind-Nat (\ k. Equiv (Fin k) A -> Path Nat one-Nat k)
+--                     (\ e. ex-falso (Path Nat one-Nat zero) (Equiv/inv-map (Fin zero) A e (center A cA)))
+--                     (\ k _ e. ind-Nat (\ k'. Equiv (Fin k') A -> Path Nat one-Nat k')
+--                                      (\ _. refl Nat one-Nat)
+--                                      (\ k' r e'. ex-falso (Path Nat one-Nat k') ?)) k e) c
+
+count/one-element-is-contr (A : U) (c : count A) (p : Path Nat one-Nat (number-of-elements A c)) : is-contr A =
+  J Nat one-Nat (\ k' _. Equiv (Fin k') A -> is-contr A)
+                (\ e'. is-contr/is-contr-equiv' (Fin one-Nat) A e' Fin/fin-one-is-contr)
+                (number-of-elements A c) p (count/Equiv A c)
+
+count/contr-count (A : U) (c : is-contr A) : count A =
+  ( one-Nat,
+    ( is-contr/Equiv
+      ( Fin one-Nat) A
+      ( Fin/fin-one-is-contr) c))
+
+count/countable-is-decidable (X : U) (c : count X) : is-decidable X =
+  ind-Sg Nat (\ k. Equiv (Fin k) X)
+             (\ _. is-decidable X)
+             (ind-Nat (\ k'. Equiv (Fin k') X -> is-decidable X)
+                      (\ e'. is-decidable/Equiv' Empty X e' is-decidable/Empty)
+                      (\ k' _ e'. inl ((Equiv/map (Fin (suc k')) X e') (inr star)))) c
+
+count/is-decidable-is-countable (X : U) (p : is-prop X) : is-decidable X -> count X = split
+  inl x -> (one-Nat, Equiv/trans (Fin one-Nat) Unit X (Equiv/Equiv-copr-empty-type Unit) (Equiv/sym X Unit (is-prop/is-subterminal X p x)))
+  inr f -> (zero, Equiv/sym X Empty (Empty/equiv X f))
+
+count/has-decidable-eq (A : U) (c : count A) : has-decidable-equality A =
+  has-decidable-equality/Equiv' (Fin (number-of-elements A c)) A (count/Equiv A c) (Fin/decidable-eq (number-of-elements A c))
+
+count/is-set (A : U) (c : count A) : is-set A =
+  hedberg A (count/has-decidable-eq A c)
+
+count/Unit : count Unit =
+  (one-Nat, Equiv/Equiv-copr-empty-type Unit)
+
+count/closed-Coprod (A B : U) (cA : count A) (cB : count B) : count (Coprod A B) =
+  let k : Nat = number-of-elements A cA
+      l : Nat = number-of-elements B cB
+  in
+  (plus-Nat k l, (Equiv/trans (Fin (plus-Nat k l)) (Coprod (Fin k) (Fin l)) (Coprod A B)
+                 (Fin/Equiv-add-copr k l) (Coprod/closed-Equiv (Fin k) A (Fin l) B (count/Equiv A cA) (count/Equiv B cB))))
+
+count/closed-Sg/sg (A : U) (B : A -> U) (H : (x : A) -> count (B x)) : (k : Nat) -> (e : Equiv (Fin k) A) -> count (Sg A B) = split
+  zero -> \ e.
+    count/closed-equiv
+      ( Sg A B)
+      ( Empty)
+      ( Equiv/trans
+	( Sg A B)
+	( Sg Empty (\ x. B (Equiv/map Empty A e x)))
+	( Empty)
+	( Equiv/sym (Sg Empty (\ x. B (Equiv/map Empty A e x))) (Sg A B) (Sg/equiv-base Empty A B e))
+	( Equiv/Equiv-Sg-empty (\ x. B (Equiv/map Empty A e x))))
+      ( count/zero-count)
+  suc k -> \ e.
+    let f : Fin (suc k) -> A = (Equiv/map (Fin (suc k)) A e) in
+      count/closed-equiv
+      ( Sg A B)
+      ( Coprod (Sg (Fin k) (\ x. B (f (inl x)))) (B (f (inr star))))
+      ( Equiv/trans
+	( Sg A B)
+	( Sg (Fin (suc k)) (\ x. B (f x)))
+	( Coprod (Sg (Fin k) (\ x. B (f (inl x)))) (B (f (inr star))))
+	( Equiv/sym
+	  ( Sg (Fin (suc k)) (\ x. B (f x)))
+	  ( Sg A B)
+	  ( Sg/equiv-base (Fin (suc k)) A B e)) -- Sg A B ~ Sg (Fin k+1) (B o e)
+	( Equiv/trans
+	  ( Sg (Fin (suc k)) (\ x. B (f x)))
+	  ( Coprod (Sg (Fin k) (\ x. B (f (inl x)))) (Sg Unit (\ x. B (f (inr x)))))
+	  ( Coprod (Sg (Fin k) (\ x. B (f (inl x)))) (B (f (inr star))))
+	  ( Equiv/Sg-distr-over-coprod (Fin k) Unit (\ x. B (f x)))
+	  ( Coprod/closed-Equiv
+	    ( Sg (Fin k) (\ x. B (f (inl x))))
+	    ( Sg (Fin k) (\ x. B (f (inl x))))
+	    ( Sg Unit (\ x. B (f (inr x))))
+	    ( B (f (inr star)))
+	    ( Equiv/refl (Sg (Fin k) (\ x. B (f (inl x)))))
+	    ( Equiv/Sg-unit (\ x. B (f (inr x))))))) -- Sg Unit (B o e o inr) ~ B(e(inr(star)))
+    ( count/closed-Coprod
+      ( Sg (Fin k) (\ x. B (f (inl x))))
+      ( B (f (inr star)))
+      ( count/closed-Sg/sg
+	( Fin k)
+	( \ x. B (f (inl x)))
+	( \ x. H (f (inl x))) k
+	( Equiv/refl (Fin k)))
+	( H (f (inr star))))
+
+count/closed-Sg (A : U) (B : A -> U) (cA : count A) (H : (x : A) -> count (B x)) : count (Sg A B) =
+  count/closed-Sg/sg A B H (number-of-elements A cA) (count/Equiv A cA)
+
+count/closed-fam (A : U) (B : A -> U) (cA : count A) (cT : count (Sg A B)) (x : A) : count (B x) =
+  count/closed-equiv' (Fib (Sg A B) A (\ u. u.1) x) (B x) (Equiv/fib-space-Equiv A B x)
+    (count/closed-Sg (Sg A B) (\ y. Path A x y.1) cT
+      (\ y. count/is-decidable-is-countable
+        (Path A x y.1)
+        (count/is-set A cA x y.1)
+        (count/has-decidable-eq A cA x y.1)))
+
+count/closed-base-sg-map (A : U) (B : A -> U) (b : (x : A) -> B x) (x : A) : Sg A B = (x, b x)
+
+-- count/closed-base-sg-equiv (A : U) (B : A -> U) (b : (x : A) -> B x) : Equiv A (Sg (Sg A B) (Fib A (Sg A B) (count/closed-base-sg-map A B b))) =
+--   equiv-total-fib/Equiv A (Sg A B) (count/closed-base-sg-map A B b)
+
+-- count/closed-base-sg (A : U) (B : A -> U) (b : (x : A) -> B x) (cT : count (Sg A B)) (cF : (x : A) -> count B x) : count A =
+--   count/closed-equiv A
+--     ( Sg (Sg A B) (Fib A (Sg A B) (count/closed-base-sg-map A B b)))
+--     ( count/closed-Sg
+--       ( Sg A B)
+--       ( Fib A (Sg A B) (count/closed-base-sg-map A B b)) cT
+--       ( \ t. count/closed-equiv
+--             ( Fib A (Sg A B) (count/closed-base-sg-map A B b))
+--             ( Sg A (\ x. Path A t.1 x))
+--             ( Equiv/trans
+--               ( Fib A (Sg A B) (count/closed-base-sg-map A B b))  
+--               ( Sg A (\ x. Sg (Path A t.1 x) (\ p. Path (B x) (tr A t.1 x p B t.2) (b x))))
+--               ( Sg A (\ x. Path A t.1 x))
+--               ( Equiv/Sg-fam A
+--                 ( \ x. Path (Sg A B) t (x, b x))
+--                 ( \ x. Sg (Path A t.1 x) (\ p. Path (B x) (tr A t.1 x p B t.2) (b x)))
+--                 ( PathSg/Equiv A B t (x, b x)))
+--               ( Equiv/Sg-target ? ?                      
+--                 ( \ x. count/is-set (B x) (cF x))))))
+
+count/closed-decidable-subtype (X : U) (P : X -> U) (c : count X) (s : is-decidable-subtype X P) (x : X) : count (P x) =
+  count/closed-fam X P c
+    (count/closed-Sg X P c (\ y. count/is-decidable-is-countable (P y) (s.1 y) (s.2 y))) x
+
+count/is-left (A B : U) : Coprod A B -> U = split
+  inl _ -> Unit
+  inr _ -> Empty
+
+count/is-left-count (A B : U) : (c : Coprod A B) -> count (count/is-left A B c) = split
+  inl _ -> count/Unit
+  inr _ -> count/zero-count
+
+count/Equiv-is-left (A B : U) : Equiv (Sg (Coprod A B) (count/is-left A B)) A =
+  Equiv/trans (Sg (Coprod A B) (count/is-left A B)) (Coprod (Sg A (\ _. Unit)) (Sg B (\ _. Empty))) A
+    (Equiv/Sg-distr-over-coprod A B (count/is-left A B))
+    (Equiv/trans (Coprod (Sg A (\ _. Unit)) (Sg B (\ _. Empty))) (Coprod (Sg A (\ _. Unit)) Empty) A
+      (Coprod/closed-Equiv (Sg A (\ _. Unit)) (Sg A (\ _. Unit)) (Sg B (\ _. Empty)) Empty (Equiv/refl (Sg A (\ _. Unit))) (Equiv/Sg-empty B))
+      (Equiv/trans (Coprod (Sg A (\ _. Unit)) Empty) (Sg A (\ _. Unit)) A
+        (Equiv/Equiv-copr-type-empty (Sg A (\ _. Unit)))
+        (Equiv/Sg-base-unit A)))
+
+count/closed-Coprod-left (A B : U) (c : count (Coprod A B)) : count A =
+  count/closed-equiv' (Sg (Coprod A B) (count/is-left A B)) A (count/Equiv-is-left A B)
+    (count/closed-Sg (Coprod A B) (count/is-left A B) c (count/is-left-count A B))
+
+count/is-right (A B : U) : Coprod A B -> U = split
+  inl _ -> Empty
+  inr _ -> Unit
+
+count/is-right-count (A B : U) : (c : Coprod A B) -> count (count/is-right A B c) = split
+  inl _ -> count/zero-count
+  inr _ -> count/Unit  
+
+count/Equiv-is-right (A B : U) : Equiv (Sg (Coprod A B) (count/is-right A B)) B =
+  Equiv/trans (Sg (Coprod A B) (count/is-right A B)) (Coprod (A * Empty) (B * Unit)) B
+    (Equiv/Sg-distr-over-coprod A B (count/is-right A B))
+    (Equiv/trans (Coprod (A * Empty) (B * Unit)) (Coprod Empty (B * Unit)) B
+      (Coprod/closed-Equiv (A * Empty) Empty (B * Unit) (B * Unit) (Equiv/Sg-empty A) (Equiv/refl (B * Unit)))
+      (Equiv/trans (Coprod Empty (B * Unit)) (B * Unit) B
+        (Equiv/Equiv-copr-empty-type (B * Unit))
+        (Equiv/Sg-base-unit B)))
+
+count/closed-Coprod-right (A B : U) (c : count (Coprod A B)) : count B =
+  count/closed-equiv' (Sg (Coprod A B) (count/is-right A B)) B (count/Equiv-is-right A B)
+    (count/closed-Sg (Coprod A B) (count/is-right A B) c (count/is-right-count A B))
+
+count/closed-Prod (A B : U) (cA : count A) (cB : count B) : count (A * B) =
+  count/closed-Sg A (\ _. B) cA (\ _. cB)
+
+-- count/closed-Prod-left (A B : U) (c : count (A * B)) (b : B) : count A =
+--   count/closed-fam
+
+Maybe (X : U) : U = Coprod X Unit
+
+star-value/inj-empty (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (z : Maybe Y) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) z)
+                     (q : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) z) : Empty =
+  let f : Maybe X -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e in
+  Coprod/Eq/eq-map X Unit (inl x) (inr star)
+    (is-bi-inv/inv-map (Path (Maybe X) (inl x) (inr star)) (Path (Maybe Y) (f (inl x)) (f (inr star)))
+      (ap (Maybe X) (Maybe Y) f (inl x) (inr star))
+      (is-bi-inv/is-inj (Maybe X) (Maybe Y) f (Equiv/is-bi-inv (Maybe X) (Maybe Y) e) (inl x) (inr star))
+      (comp (Maybe Y) (f (inl x)) z p (f (inr star)) (inv (Maybe Y) (f (inr star)) z q)))
+
+star-value/inj (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+  : (y : Maybe Y) -> Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) y -> Y = split
+  inl y -> \ _. y
+  inr s -> \ q. ind-Unit (\ z. Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (inr z) -> Y)
+                       (\ r. ex-falso Y (star-value/inj-empty X Y e x (inr star) p r)) s q
+
+star-value (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star)) : Y =
+  star-value/inj X Y e x p (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (refl (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)))
+
+star-value-htpy/inj-empty (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                               : (s : Unit) -> Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (inr s) -> Empty = split
+  star -> (star-value/inj-empty X Y e x (inr star) p)
+
+star-value-htpy/inj' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                     (s : Unit) (q : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (inr s))
+                        : Path (Maybe Y) (inl (star-value X Y e x p)) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) = 
+  ex-falso (Path (Maybe Y) (inl (star-value X Y e x p)) (Equiv/map (Maybe X) (Maybe Y) e (inr star)))
+           (star-value-htpy/inj-empty X Y e x p s q)
+
+star-value-htpy/inj (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                         : (y : Maybe Y) -> Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) y
+                                         -> Path (Maybe Y) (inl (star-value X Y e x p)) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) = split
+  inl y -> \ q. J (Maybe Y) (inl y) (\ z _. (r : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) z) -> Path (Maybe Y) (inl (star-value/inj X Y e x p z r)) z)
+                (\ r. Coprod/Eq/map Y Unit (inl (star-value/inj X Y e x p (inl y) r)) (inl y) (refl Y y))
+                (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (inv (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (inl y) q) (refl (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)))
+  inr s -> star-value-htpy/inj' X Y e x p s
+
+star-value-htpy (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                     : Path (Maybe Y) (inl (star-value X Y e x p)) (Equiv/map (Maybe X) (Maybe Y) e (inr star)) =
+  star-value-htpy/inj X Y e x p (Equiv/map (Maybe X) (Maybe Y) e (inr star)) (refl (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inr star)))
+
+double-counting/map-star (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                              : (s : Unit) -> Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr s) -> Y = split
+  star -> star-value X Y e x
+
+double-counting/map' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                          : (u : Maybe Y) -> Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) u -> Y = split
+  inl y -> \ _. y
+  inr s -> double-counting/map-star X Y e x s
+
+double-counting/map (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) : Y =
+  double-counting/map' X Y e x (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (refl (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)))
+
+double-counting/map-inl-id (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X) (y : Y)
+                           (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inl y)) : Path Y (double-counting/map X Y e x) y =
+  tr (Maybe Y) (inl y) (Equiv/map (Maybe X) (Maybe Y) e (inl x))
+    (inv (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inl y) p)
+    (\ u. (q : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) u) -> Path Y (double-counting/map' X Y e x u q) y)
+    (\ _. refl Y y) (refl (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)))
+
+Unit/inr (A : U) : (s : Unit) -> Path (Maybe A) (inr s) (inr star) = split
+  star -> refl (Coprod A Unit) (inr star)
+
+Unit/copr (A : U) (x : Maybe A) (p : Path (Maybe A) x (inr star)) : (u : Maybe A) -> Path (Maybe A) x u -> Path (Maybe A) u (inr star) = split
+  inl a -> \ q. ex-falso (Path (Maybe A) (inl a) (inr star)) (Coprod/Eq/eq-map A Unit (inr star) (inl a) (comp (Maybe A) (inr star) x (inv (Maybe A) x (inr star) p) (inl a) q))
+  inr s -> \ _. Unit/inr A s
+
+double-counting/map-inr-id/refl (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                                (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                                   : Path Y (double-counting/map' X Y e x (inr star) (comp (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star) p (inr star) (refl (Maybe Y) (inr star))))
+                                            (star-value X Y e x p) =
+  let f : Maybe X -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e in
+  ap (Path (Maybe Y) (f (inl x)) (inr star)) Y (\ q. (double-counting/map' X Y e x (inr star) q))
+     (comp (Maybe Y) (f (inl x)) (inr star) p (inr star) (refl (Maybe Y) (inr star))) p (comp/ident-r (Maybe Y) (f (inl x)) (inr star) p)
+
+double-counting/map-inr-id' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                            (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                               : Path Y (double-counting/map' X Y e x (Equiv/map (Maybe X) (Maybe Y) e (inl x))
+                                          (comp (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star) p
+                                                         (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inv (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star) p)))
+                                        (star-value X Y e x p) =
+  let f : Maybe X -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e in
+  tr (Maybe Y) (inr star) (f (inl x))
+    (inv (Maybe Y) (f (inl x)) (inr star) p)
+    (\ u. (q : Path (Maybe Y) (f (inl x)) (inr star)) -> 
+         (r : Path (Maybe Y) (inr star) u) -> Path Y (double-counting/map' X Y e x u (comp (Maybe Y) (f (inl x)) (inr star) q u r)) (star-value X Y e x q))
+    (\ q r. J (Maybe Y) (inr star) (\ u q'. Path Y (double-counting/map' X Y e x u (comp (Maybe Y) (f (inl x)) (inr star) q u q')) (star-value X Y e x q))
+             (double-counting/map-inr-id/refl X Y e x q) (inr star) r) p (inv (Maybe Y) (f (inl x)) (inr star) p)
+
+double-counting/map-inr-id (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                           (p : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl x)) (inr star))
+                              : Path Y (double-counting/map X Y e x) (star-value X Y e x p) =
+  let f : Maybe X -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e in
+  comp Y (double-counting/map X Y e x)
+         (double-counting/map' X Y e x (f (inl x)) (comp (Maybe Y) (f (inl x)) (inr star) p (f (inl x)) (inv (Maybe Y) (f (inl x)) (inr star) p)))
+         (ap (Path (Maybe Y) (f (inl x)) (f (inl x))) Y (\ q. double-counting/map' X Y e x (f (inl x)) q) (refl (Maybe Y) (f (inl x)))
+             (comp (Maybe Y) (f (inl x)) (inr star) p (f (inl x)) (inv (Maybe Y) (f (inl x)) (inr star) p))
+             (comp/inv-r' (Maybe Y) (f (inl x)) (inr star) p))
+         (star-value X Y e x p) (double-counting/map-inr-id' X Y e x p)
+
+double-counting/inv-map (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) : X =
+  double-counting/map Y X (Equiv/sym (Maybe X) (Maybe Y) e) y
+
+double-counting/inv-map-inl-id (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (x : X)
+                               (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl x)) : Path X (double-counting/inv-map X Y e y) x =
+  double-counting/map-inl-id Y X (Equiv/sym (Maybe X) (Maybe Y) e) y x p
+
+double-counting/inv-map-inr-id (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y)
+                               (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star))
+                                  : Path X (double-counting/inv-map X Y e y) (star-value Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p) =
+  double-counting/map-inr-id Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p
+
+double-counting/has-decidable-eq (X : U) : (x : Maybe X) -> is-decidable (Path (Maybe X) x (inr star)) = split
+  inl x -> inr (\ p. Coprod/Eq/eq-map X Unit (inl x) (inr star) p)
+  inr s -> inl (Coprod/Eq/map X Unit (inr s) (inr star) (Unit/all-elements-equal s star))
+
+double-counting/not-exception-value' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                                          : (u : Maybe X) -> Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) u -> X = split
+  inl x -> \ _. x
+  inr s -> \ p. ex-falso X (f (comp (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr s) p (inr star) (Unit/inr X s)))
+
+double-counting/not-exception-value (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star))) : X =
+  double-counting/not-exception-value' X Y e y f (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (refl (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)))
+
+double-counting/convert-path'' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                               (x : X) (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl x))
+                                  : (q : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)))
+            -> Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl (double-counting/not-exception-value' X Y e y f (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) q)) =
+  tr (Maybe X) (inl x) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y))
+     (inv (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl x) p)
+     (\ u. (r : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) u)
+           -> Path (Maybe X) u (inl (double-counting/not-exception-value' X Y e y f u r)))
+     (\ _. refl (Maybe X) (inl x))
+
+double-counting/convert-path' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                                   : (u : Maybe X) -> Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) u
+                                                   -> Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl (double-counting/not-exception-value X Y e y f)) = split
+  inl x -> \ p. double-counting/convert-path'' X Y e y f x p (refl (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)))
+  inr s -> \ p. ex-falso (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl (double-counting/not-exception-value X Y e y f)))
+                       (f (comp (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr s) p (inr star) (Unit/inr X s)))
+
+double-counting/convert-path (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                                  : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inl (double-counting/not-exception-value X Y e y f)) =
+  double-counting/convert-path' X Y e y f (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (refl (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)))
+
+double-counting/convert-path-Y (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (p : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                                  : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl (double-counting/not-exception-value X Y e y p))) (inl y) =
+  let f : (Maybe X) -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e
+      g : Maybe Y -> Maybe X = Equiv/inv-map (Maybe X) (Maybe Y) e
+      x : X = double-counting/not-exception-value X Y e y p
+  in
+  comp (Maybe Y) (f (inl x)) (f (g (inl y)))
+       (ap (Maybe X) (Maybe Y) f (inl x) (g (inl y)) (inv (Maybe X) (g (inl y)) (inl x) (double-counting/convert-path X Y e y p)))
+       (inl y) (Equiv/inv-right-htpy (Maybe X) (Maybe Y) e (inl y))
+
+double-counting/right-htpy-inr (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (f : neg (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star)))
+                                    : Path Y (double-counting/map X Y e (double-counting/inv-map X Y e y)) y =  
+  let x : X = (double-counting/not-exception-value X Y e y f) in
+  comp Y (double-counting/map X Y e (double-counting/inv-map X Y e y))
+         (double-counting/map X Y e x)
+         (ap X Y (double-counting/map X Y e) (double-counting/inv-map X Y e y) x
+                 (double-counting/inv-map-inl-id X Y e y x (double-counting/convert-path X Y e y f)))
+         y (double-counting/map-inl-id X Y e x y (double-counting/convert-path-Y X Y e y f))
+
+double-counting/right-htpy/star-value (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star))
+                                           : Path (Maybe Y) (Equiv/map (Maybe X) (Maybe Y) e (inl (double-counting/inv-map X Y e y))) (inr star) =
+  let f : (Maybe X) -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) e
+      g : Maybe Y -> Maybe X = Equiv/inv-map (Maybe X) (Maybe Y) e
+      h : Y -> X = double-counting/inv-map X Y e
+  in comp-n (Maybe Y) three-Nat
+            (f (inl (h y))) (f (inl (star-value Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p)))
+            (ap X (Maybe Y) (\ z. f (inl z)) (h y) (star-value Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p)
+                  (double-counting/inv-map-inr-id X Y e y p))
+            (f (g (inr star))) (ap (Maybe X) (Maybe Y) (\ z. f z) (inl (star-value Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p)) (g (inr star))
+                                   (star-value-htpy Y X (Equiv/sym (Maybe X) (Maybe Y) e) y p))
+            (inr star) (Equiv/inv-right-htpy (Maybe X) (Maybe Y) e (inr star))
+
+double-counting/right-htpy/inl (X Y : U) (eq : Equiv (Maybe X) (Maybe Y)) (y : Y) (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) eq (inl y)) (inr star))
+                                    : Path (Maybe Y) (inl ((double-counting/map X Y eq) (double-counting/inv-map X Y eq y))) (inl y) =
+  let e  : (Maybe X) -> Maybe Y = Equiv/map (Maybe X) (Maybe Y) eq
+      e' : Maybe Y -> Maybe X = Equiv/inv-map (Maybe X) (Maybe Y) eq
+      f : X -> Y = double-counting/map X Y eq
+      g : Y -> X = double-counting/inv-map X Y eq
+      q : Path (Maybe Y) (e (inl (g y))) (inr star) = double-counting/right-htpy/star-value X Y eq y p
+  in comp-n (Maybe Y) four-Nat (inl (f (g y))) (inl (star-value X Y eq (g y) q))
+      (ap Y (Maybe Y) (\ z. inl z) (f (g y)) (star-value X Y eq (g y) q) (double-counting/map-inr-id X Y eq (g y) q))
+      (e (inr star)) (star-value-htpy X Y eq (g y) q)
+      (e (e' (inl y))) (ap (Maybe X) (Maybe Y) e (inr star) (e' (inl y)) (inv (Maybe X) (e' (inl y)) (inr star) p))
+      (inl y) (Equiv/inv-right-htpy (Maybe X) (Maybe Y) eq (inl y))
+
+double-counting/right-htpy-inl (X Y : U) (eq : Equiv (Maybe X) (Maybe Y)) (y : Y) (p : Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) eq (inl y)) (inr star))
+                                    : Path Y ((double-counting/map X Y eq) (double-counting/inv-map X Y eq y)) y =
+  Coprod/inl-inj Y Unit ((double-counting/map X Y eq) (double-counting/inv-map X Y eq y)) y (double-counting/right-htpy/inl X Y eq y p)
+
+double-counting/right-htpy-dec (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y)
+                                    : is-decidable (Path (Maybe X) (Equiv/inv-map (Maybe X) (Maybe Y) e (inl y)) (inr star))
+                                      -> Path Y ((double-counting/map X Y e) (double-counting/inv-map X Y e y)) y = split
+  inl p -> double-counting/right-htpy-inl X Y e y p
+  inr f -> double-counting/right-htpy-inr X Y e y f  
+
+double-counting/right-htpy (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (y : Y) : Path Y ((double-counting/map X Y e) (double-counting/inv-map X Y e y)) y =
+  double-counting/right-htpy-dec X Y e y
+    ( double-counting/has-decidable-eq X
+        ( Equiv/inv-map
+          ( Maybe X)
+          ( Maybe Y) e
+          ( inl y)))
+
+double-counting/left-htpy' (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                                : Path X (double-counting/inv-map X Y e (double-counting/map X Y (Equiv/sym (Maybe Y) (Maybe X) (Equiv/sym (Maybe X) (Maybe Y) e)) x)) x =
+  double-counting/right-htpy Y X
+    ( Equiv/sym (Maybe X) (Maybe Y) e) x
+
+double-counting/left-htpy (X Y : U) (e : Equiv (Maybe X) (Maybe Y)) (x : X)
+                               : Path X ((double-counting/inv-map X Y e) (double-counting/map X Y e x)) x =
+  comp X
+    ( (double-counting/inv-map X Y e) (double-counting/map X Y e x))
+    ( (double-counting/inv-map X Y e) (double-counting/map X Y (Equiv/sym (Maybe Y) (Maybe X) (Equiv/sym (Maybe X) (Maybe Y) e)) x))
+    ( ap
+      ( Equiv (Maybe X) (Maybe Y)) X
+      ( \ e'. double-counting/inv-map X Y e ( double-counting/map X Y e' x)) e
+      ( Equiv/sym (Maybe Y) (Maybe X) (Equiv/sym (Maybe X) (Maybe Y) e))
+      ( Equiv/sym/sym' (Maybe X) (Maybe Y) e)) x
+    ( double-counting/left-htpy' X Y e x)
+
+double-counting/is-equiv (X Y : U) (e : Equiv (Maybe X) (Maybe Y))
+                              : is-equiv X Y (double-counting/map X Y e) =
+  has-inverse/is-equiv X Y
+    ( double-counting/map X Y e)
+    ( double-counting/inv-map X Y e,
+      ( double-counting/right-htpy X Y e,
+        double-counting/left-htpy X Y e))
+
+double-counting/Equiv (X Y : U) (e : Equiv (Maybe X) (Maybe Y))
+                           : Equiv X Y =
+  ( double-counting/map X Y e,
+    double-counting/is-equiv X Y e)
+
+Fin/is-inj/z : (l : Nat) -> Equiv (Fin zero) (Fin l) -> Path Nat zero l = split
+  zero -> \ _. refl Nat zero
+  suc l -> \ e. ex-falso
+                ( Path Nat zero (suc l))
+                ( Equiv/inv-map
+                  ( Fin zero)
+                  ( Fin (suc l)) e
+                  ( zero-Fin l))
+
+Fin/is-inj/s (k : Nat) (IH : (l : Nat) -> Equiv (Fin k) (Fin l) -> Path Nat k l) : (l : Nat) -> Equiv (Fin (suc k)) (Fin l) -> Path Nat (suc k) l = split
+  zero -> \ e.  ex-falso
+                ( Path Nat (suc k) zero)
+                ( Equiv/map
+                  ( Fin (suc k))
+                  ( Fin zero) e
+                  ( zero-Fin k))
+  suc l -> \ e. ap Nat Nat
+              ( \ n. suc n) k l
+              ( IH l
+                ( double-counting/Equiv
+                  ( Fin k)
+                  ( Fin l) e))
+
+Fin/is-inj : (k l : Nat) -> Equiv (Fin k) (Fin l) -> Path Nat k l = split
+  zero -> Fin/is-inj/z
+  suc k -> Fin/is-inj/s k
+            ( Fin/is-inj k)
+
+double-counting/sg (A B : U) (k : Nat) (eK : Equiv (Fin k) A) (l : Nat) (eL : Equiv (Fin l) B) (e : Equiv A B)
+                        : Path Nat k l =
+  Fin/is-inj k l
+    ( Equiv/trans (Fin k) A (Fin l) eK
+      ( Equiv/trans A B (Fin l) e
+        ( Equiv/sym (Fin l) B eL)))
+
+double-counting (A B : U) (count-A : count A) (count-B : count B) (e : Equiv A B)
+                     : Path Nat (number-of-elements A count-A) (number-of-elements B count-B) =
+  double-counting/sg A B
+    ( number-of-elements A count-A)
+    ( count/Equiv A count-A)
+    ( number-of-elements B count-B)
+    ( count/Equiv B count-B) e
+
+double-counting' (A : U) (c c' : count A)
+                    : Path Nat (number-of-elements A c) (number-of-elements A c') =
+  double-counting A A c c'
+    ( Equiv/refl A)
+
+Fin/closed-Pi : (k : Nat) (B : Fin k -> U) (cB : (x : Fin k) -> count (B x)) -> count ((x : Fin k) -> B x) = split
+  zero -> \ B _.
+    count/contr-count
+    ( (x : Empty) -> B x)
+    ( Empty/universal-dependent-property
+      ( Empty) B
+      ( Equiv/refl Empty))
+  suc k -> \ B cB.
+    count/closed-equiv
+      ( (x : Fin (suc k)) -> B x)
+      ( ((x : Fin k) -> B (inl x)) * (B (inr star)))
+      ( Equiv/trans
+	( (x : Fin (suc k)) -> B x)
+	( ((x : Fin k) -> B (inl x)) * ((u : Unit) -> B (inr u)))
+	( ((x : Fin k) -> B (inl x)) * (B (inr star)))
+	( Coprod/dependent-universal-property
+	  ( Fin k) Unit B)
+	( Equiv/prod'
+	  ( (x : Fin k) -> B (inl x))
+	  ( (u : Unit) -> B (inr u))
+	  ( B (inr star))
+	  ( Equiv/pi-Unit
+	    ( \ u. B (inr u)))))
+      ( count/closed-Prod
+	( (x : Fin k) -> B (inl x))
+	( B (inr star))
+	( Fin/closed-Pi k
+	  ( \ x. B (inl x))
+	  ( \ x. cB (inl x)))
+	( cB (inr star)))          
+
+count/closed-Pi (A : U) (B : A -> U) (cA : count A) (cB : (x : A) -> count (B x)) : count ((x : A) -> B x) =
+  let k : Nat = number-of-elements A cA
+      e : Equiv (Fin k) A = count/Equiv A cA 
+  in
+  count/closed-equiv
+    ( (x : A) -> B x)
+    ( (x : Fin k) -> B (Equiv/map (Fin k) A e x))
+    ( Equiv/dependent
+      ( Fin k) A B e)
+    ( Fin/closed-Pi k
+      ( \ x. B (Equiv/map (Fin k) A e x))
+      ( \ x. cB (Equiv/map (Fin k) A e x)))
+
+unlock has-inverse/is-equiv

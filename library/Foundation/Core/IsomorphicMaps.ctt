@@ -1,0 +1,12 @@
+-- This file defines isomorphic maps, i.e., maps that have an inverse.
+
+module Foundation.Core.IsomorphicMaps where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Homotopies
+
+Iso (A B : U) : U
+  = (f : A -> B)
+  * (g : B -> A)
+  * Htpy' B B (\y. f (g y)) (id B)
+  * Htpy' A A (\x. g (f x)) (id A)

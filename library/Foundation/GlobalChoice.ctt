@@ -1,0 +1,135 @@
+-- This file defines what's the "global choice" and shows some types which validate it.
+
+module Foundation.GlobalChoice where
+
+import Foundation.StandardFiniteTypes
+import Foundation.PropositionalTruncation
+
+global-choice (A : U) : U =
+  Prop-trunc A -> A
+
+well-ordering/is-prop (P : Nat -> U) (H : (n : Nat) -> is-prop (P n)) : is-prop (Sg Nat (\ n. (P n) * (is-lower-bound P n))) =
+  \ t u.
+    SgPath-prop Nat
+      ( \ n. (P n) * (is-lower-bound P n))
+      ( \ n. is-prop/prod
+	    ( P n)
+	    ( is-lower-bound P n)
+	    ( H n)
+	    ( is-prop/pi Nat
+	      ( \ x. P x -> Prop/type (le n x))
+	      ( \ x. is-prop/pi
+		    ( P x)
+		    ( \ _. Prop/type (le n x))
+		    ( \ _. Prop/is-prop (le n x))))) t u
+      ( le/is-antisymmetric t.1 u.1
+	( t.2.2 u.1 u.2.1)
+	( u.2.2 t.1 t.2.1))            
+
+well-ordering/Prop (P : Nat -> Prop) : Prop =
+  ( Sg Nat (\ n. (Prop/type (P n)) * (is-lower-bound (\ x. Prop/type (P x)) n)),
+    well-ordering/is-prop
+    ( \ x. Prop/type (P x))
+    ( \ x. Prop/is-prop (P x)))
+
+well-ordering/map (P : Nat -> Prop) (H : (x : Nat) -> is-decidable (Prop/type (P x)))
+		     : Prop-trunc (Sg Nat (\ x. Prop/type (P x)))
+		      -> Sg Nat (\ n. (Prop/type (P n)) * (is-lower-bound (\ x. Prop/type (P x)) n)) =
+  rec-Prop-trunc
+    ( Sg Nat (\ x. Prop/type (P x)))
+    ( well-ordering/Prop P)
+    ( well-ordering-principle
+      ( \ x. Prop/type (P x)) H)
+
+Nat-decidable-subtype/global-choice (P : Nat -> Prop) (H : (x : Nat) -> is-decidable (Prop/type (P x)))
+				       : global-choice (Sg Nat (\ x. Prop/type (P x))) =
+  \ p.
+    let t : Sg Nat (\ n. (Prop/type (P n)) * (is-lower-bound (\ x. Prop/type (P x)) n)) = well-ordering/map P H p in
+    ( t.1, t.2.1)
+
+Fin-Nat-family/is-prop (k : Nat) (P : Fin k -> Prop) (n : Nat)
+			  : is-prop (Fin-Nat-family k (\ x. Prop/type (P x)) n) =
+  \ t u. SgPath-prop
+	( Prop/type (lt n k))
+	( \ p. Prop/type (P (Fin/from-classical-Fin k (n, p))))
+	( \ p. Prop/is-prop (P (Fin/from-classical-Fin k (n, p)))) t u
+	( Prop/is-prop (lt n k) t.1 u.1)
+
+Fin-Nat-family/Prop (k : Nat) (P : Fin k -> Prop) (n : Nat) : Prop =
+  ( Fin-Nat-family k (\ x. Prop/type (P x)) n,
+    Fin-Nat-family/is-prop k P n)
+
+Fin-Nat-family/is-decidable'' (k : Nat) (P : Fin k -> Prop) (n : Nat) (p : Prop/type (lt n k))
+				 : Coprod (Prop/type (P (Fin/from-classical-Fin k (n, p))))
+					  (neg (Prop/type (P (Fin/from-classical-Fin k (n, p)))))
+				  -> is-decidable (Fin-Nat-family k (\ x. Prop/type (P x)) n) = split
+  inl x -> inl (p, x)
+  inr np -> inr (\ t. np
+		    ( tr
+		      ( Prop/type (lt n k)) t.1 p
+		      ( Prop/is-prop (lt n k) t.1 p)
+		      ( \ q. Prop/type (P (Fin/from-classical-Fin k (n, q)))) t.2))
+
+Fin-Nat-family/is-decidable' (k : Nat) (P : Fin k -> Prop)
+			     (d : (x : Fin k) -> is-decidable (Prop/type (P x)))
+			     (n : Nat)
+				: Coprod (Prop/type (lt n k)) (neg (Prop/type (lt n k)))
+				 -> is-decidable (Fin-Nat-family k (\ x. Prop/type (P x)) n) = split
+  inl p -> Fin-Nat-family/is-decidable'' k P n p (d (Fin/from-classical-Fin k (n, p)))
+  inr nlt -> inr (\ t. nlt t.1)
+
+Fin-Nat-family/is-decidable (k : Nat) (P : Fin k -> Prop)
+			    (d : (x : Fin k) -> is-decidable (Prop/type (P x)))
+			    (n : Nat)
+			       : is-decidable (Fin-Nat-family k (\ x. Prop/type (P x)) n) =
+  Fin-Nat-family/is-decidable' k P d n
+    ( lt/is-decidable n k)
+
+decidable-subtype/global-choice' (k : Nat) (P : Fin k -> Prop)
+				 (d : (x : Fin k) -> is-decidable (Prop/type (P x)))
+				    : global-choice (Sg (Fin k) (\ x. Prop/type (P x))) =
+  \ p.
+    Equiv/inv-map
+      ( Sg (Fin k) (\ x. Prop/type (P x)))
+      ( Sg Nat (Fin-Nat-family k (\ x. Prop/type (P x))))
+      ( Fin-Nat-family/Equiv k (\ x. Prop/type (P x)))
+      ( Nat-decidable-subtype/global-choice
+	( Fin-Nat-family/Prop k P)
+	( Fin-Nat-family/is-decidable k P d)
+	( Prop-trunc/map 
+	  ( Sg (Fin k) (\ x. Prop/type (P x)))
+	  ( Sg Nat (Fin-Nat-family k (\ x. Prop/type (P x))))
+	  ( Equiv/map 
+	    ( Sg (Fin k) (\ x. Prop/type (P x)))
+	    ( Sg Nat (Fin-Nat-family k (\ x. Prop/type (P x))))
+	    ( Fin-Nat-family/Equiv k (\ x. Prop/type (P x)))) p))
+
+lock decidable-subtype/global-choice'
+decidable-subtype/global-choice (A : U) (k : Nat) (e : Equiv (Fin k) A) (P : A -> Prop)
+				(d : (x : A) -> is-decidable (Prop/type (P x)))
+				   : global-choice (Sg A (\ x. Prop/type (P x))) =
+  \ p.
+    let B : Fin k -> Prop = \ x. P (Equiv/map (Fin k) A e x) 
+	f : Fin k -> A = Equiv/map (Fin k) A e
+	g : A -> Fin k = Equiv/inv-map (Fin k) A e
+	u : Sg (Fin k) (\ x. Prop/type (B x)) = decidable-subtype/global-choice' k B
+			  ( \ x. d (f x))
+			  ( rec-Prop-trunc
+			    ( Sg A (\ x. Prop/type (P x)))
+			    ( Prop-trunc/Prop (Sg (Fin k) (\ x. Prop/type (B x))))
+			    ( \ t. Prop-trunc/unit
+				  ( g t.1, tr A t.1 (f (g t.1))
+					     ( inv A (f (g t.1)) t.1 (Equiv/inv-right-htpy (Fin k) A e t.1))
+					     ( \ x. Prop/type (P x)) t.2)) p)
+    in
+  ( f u.1, u.2)    
+unlock decidable-subtype/global-choice'
+
+count/global-choice (A : U) : (k : Nat) (e : Equiv (Fin k) A) -> global-choice A = split
+  zero -> \ e a.
+      ex-falso A
+      ( rec-Prop-trunc A
+	( Empty/Prop)
+	( \ x. Equiv/inv-map Empty A e x) a)
+  suc k ->
+    \ e _. Equiv/map (Fin (suc k)) A e (zero-Fin k)

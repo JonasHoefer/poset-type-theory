@@ -1,0 +1,6 @@
+-- This file exports every file of combinatorics.
+
+module Combinatorics.Everything where
+
+import Combinatorics.GroupFiniteness
+import Combinatorics.HomotopyFiniteness

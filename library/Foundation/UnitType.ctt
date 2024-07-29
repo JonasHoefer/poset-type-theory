@@ -1,0 +1,37 @@
+-- This file defines the unit type.
+
+module Foundation.UnitType where
+
+import Foundation.Core.Paths
+import Foundation.Core.HomotopyTypes
+
+-- The unit type is composed of one element.
+data Unit : U
+  = star
+
+-- It satisfies the following induction principle.
+ind-Unit (P : Unit -> U) (p : P star) : (x : Unit) -> P x = split
+  star -> p
+
+-- Unit is an inhabited proposition
+Unit/uniqueness (x : Unit) : Path Unit star x =
+  ind-Unit (\ x'. Path Unit star x')
+           (refl Unit star) x
+
+Unit/uniqueness' (x : Unit) : Path Unit x star =
+  inv Unit star x (Unit/uniqueness x)
+
+Unit/all-elements-equal (x : Unit) (y : Unit) : Path Unit x y =
+  comp Unit x star
+    (Unit/uniqueness' x)
+    y
+    (Unit/uniqueness y)
+
+Unit/is-prop : is-prop Unit =
+  Unit/all-elements-equal
+
+Unit/Prop : Prop =
+  ( Unit, Unit/is-prop)
+
+Unit/is-contr : is-contr Unit =
+  (star, Unit/uniqueness)

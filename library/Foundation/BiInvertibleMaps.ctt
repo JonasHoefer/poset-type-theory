@@ -1,0 +1,140 @@
+-- This file shows properties about bi-invertible maps.
+
+module Foundation.BiInvertibleMaps where
+
+import Foundation.Core.BiInvertibleMaps
+import Foundation.Core.InvertibleMaps
+import Foundation.Core.ContractibleTypes
+
+import Foundation.PathsProperties
+
+-- Bi-invertible maps are inverses
+is-bi-inv-has-inverse (A B : U) (f : A -> B) (b : is-bi-inv A B f) : has-inverse A B f =
+  let g : B -> A = is-bi-inv/right-inv A B f b in
+  let h : B -> A = is-bi-inv/left-inv A B f b in
+  let G : Htpy' B B (\ y. f (g y)) (id B) = is-bi-inv/right-htpy A B f b in
+  let H : Htpy' A A (\ x. h (f x)) (id A) = is-bi-inv/left-htpy A B f b in
+  let K : Htpy' B A g h = \ y. comp A (g y) (h (f (g y)))
+                                          (inv A (h (f (g y))) (g y) (H (g y)))
+                                          (h y)
+                                          (ap B A h (f (g y)) y (G y)) in
+  (g, G,
+    \ x. comp A (g (f x)) (h (f x))
+              (K (f x))
+              x (H x))
+
+is-bi-inv/inv-map (A B : U) (f : A -> B) (b : is-bi-inv A B f) : B -> A =
+  QInv/map A B f (is-bi-inv-has-inverse A B f b)
+
+is-bi-inv/inv-right-htpy (A B : U) (f : A -> B) (b : is-bi-inv A B f)
+  : Htpy' B B (\ y. f (is-bi-inv/inv-map A B f b y)) (id B) =
+  QInv/right-htpy A B f (is-bi-inv-has-inverse A B f b)
+
+is-bi-inv/inv-left-htpy (A B : U) (f : A -> B) (b : is-bi-inv A B f)
+  : Htpy' A A (\ x. (is-bi-inv/inv-map A B f b (f x))) (id A) =
+  QInv/left-htpy A B f (is-bi-inv-has-inverse A B f b)
+
+is-bi-inv/inv-is-bi-inv (A B : U) (f : A -> B) (b : is-bi-inv A B f)
+  : is-bi-inv B A (is-bi-inv/inv-map A B f b) =
+  let g : B -> A = is-bi-inv/inv-map A B f b in
+  let left-htpy : Htpy' A A (\ x. g (f x)) (id A) = QInv/left-htpy A B f (is-bi-inv-has-inverse A B f b) in
+  has-inverse-is-bi-inv B A g
+    (f, (left-htpy, is-bi-inv/right-htpy A B f b))
+
+BiInv/sym (A B : U) (b : BiInv A B) : BiInv B A =
+  ( BiInv/right-inv A B b,
+    is-bi-inv/inv-is-bi-inv A B
+    ( BiInv/map A B b)
+    ( BiInv/is-bi-inv A B b))
+
+is-bi-inv/id-is-bi-inv (A : U) : is-bi-inv A A (id A) =
+  ((id A, \ x. refl A x), (id A, \ x. refl A x))
+
+-- Composition of bi-invertible maps
+is-bi-inv/comp-is-bi-inv (A B C : U) (f : A -> B) (g : B -> C) (b : is-bi-inv A B f) (b' : is-bi-inv B C g)
+  : is-bi-inv A C (\ x. g (f x)) =
+  has-inverse-is-bi-inv A C (\ x. g (f x))
+    (has-inverse/comp-has-inverse A B C f g
+      (is-bi-inv-has-inverse A B f b)
+      (is-bi-inv-has-inverse B C g b'))
+
+is-bi-inv/is-bi-inv-comp-left (A B C : U) (f : A -> B) (g : B -> C) (b : is-bi-inv B C g)
+                              (b' : is-bi-inv A C (\ x. g (f x))) : is-bi-inv A B f =
+  has-inverse-is-bi-inv A B f
+    (has-inverse/has-inverse-comp-left A B C f g
+      (is-bi-inv-has-inverse B C g b)
+      (is-bi-inv-has-inverse A C (\ x. g (f x)) b'))
+
+is-bi-inv/is-bi-inv-comp-right (A B C : U) (f : A -> B) (g : B -> C) (b : is-bi-inv A B f)
+                               (b' : is-bi-inv A C (\ x. g (f x))) : is-bi-inv B C g =
+  has-inverse-is-bi-inv B C g
+    (has-inverse/has-inverse-comp-right A B C f g
+      (is-bi-inv-has-inverse A B f b)
+      (is-bi-inv-has-inverse A C (\ x. g (f x)) b'))
+
+is-bi-inv/is-contr-is-bi-inv (A B : U) (f : A -> B) (b : is-bi-inv A B f) (c : is-contr B) : is-contr A =
+  let g : B -> A = is-bi-inv/inv-map A B f b
+      L : Htpy' A A (\ z. g (f z)) (id A) = is-bi-inv/inv-left-htpy A B f b
+      x : A = g (center B c)
+  in (x, \ y. comp A x (g (f y)) (ap B A g (center B c) (f y) (contraction B c (f y)))
+                    y (L y))
+
+is-bi-inv/is-contr-is-bi-inv' (A B : U) (f : A -> B) (b : is-bi-inv A B f) (c : is-contr A) : is-contr B =
+  let g : B -> A = is-bi-inv/inv-map A B f b
+      R : Htpy' B B (\ z. f (g z)) (id B) = is-bi-inv/inv-right-htpy A B f b
+      L : Htpy' A A (\ z. g (f z)) (id A) = is-bi-inv/inv-left-htpy A B f b
+  in is-bi-inv/is-contr-is-bi-inv B A g ((f, L), (f, R)) c
+
+-- Closure under contractibility
+is-bi-inv/is-bi-inv-contr-map (A B : U) (cB : is-contr B) : A -> B =
+  \ _. (center B cB)
+
+is-bi-inv/is-bi-inv-contr-inv-map (A B : U) (cA : is-contr A) : B -> A =
+  \ _. (center A cA)  
+
+is-bi-inv/is-bi-inv-contr (A B : U) (cA : is-contr A) (cB : is-contr B) : is-bi-inv A B (is-bi-inv/is-bi-inv-contr-map A B cB) =
+  let f : A -> B = is-bi-inv/is-bi-inv-contr-map A B cB
+      g : B -> A = is-bi-inv/is-bi-inv-contr-inv-map A B cA
+      R : Htpy' B B (\ z. f (g z)) (id B) = \ x. (contraction B cB x)
+      L : Htpy' A A (\ z. g (f z)) (id A) = \ x. (contraction A cA x)
+  in ((g, R), (g, L))
+
+is-bi-inv/is-bi-inv-contr' (A B : U) (f : A -> B) (cA : is-contr A) (cB : is-contr B) : is-bi-inv A B f =
+  let g : B -> A = is-bi-inv/is-bi-inv-contr-inv-map A B cA
+      R : Htpy' B B (\ z. f (g z)) (id B) = \ x. comp B (f (g x)) (center B cB) (inv B (center B cB) (f (g x)) (contraction B cB (f (g x)))) x (contraction B cB x)
+      L : Htpy' A A (\ z. g (f z)) (id A) = \ x. (contraction A cA x)
+  in ((g, R), (g, L))
+
+-- A bi-invertible map is injective
+is-bi-inv-comp/injective (B C D : U) (g : B -> C) (h : C -> D) (K : is-bi-inv B D (\ y. h (g y)))
+                         : (x y : B) -> Path C (g x) (g y) -> Path B x y = \ x y p.
+  let i : D -> B = is-bi-inv/inv-map B D (\ y'. h (g y')) K
+      q : Path D (h (g x)) (h (g y)) = ap C D h (g x) (g y) p
+      r : Path B (i (h (g x))) (i (h (g y))) = ap D B i (h (g x)) (h (g y)) q
+      H : Htpy' B B (\ z. i (h (g z))) (id B) = is-bi-inv/inv-left-htpy B D (\ y'. h (g y')) K
+  in
+  comp-n B three-Nat x (i (h (g x))) (inv B (i (h (g x))) x (H x))
+                       (i (h (g y))) r
+                       y (H y)
+
+is-bi-inv-comp/is-inj-is-bi-inv-left-map (A B C : U) (f : A -> B) (g : B -> C) (inj : (x y : B) -> Path C (g x) (g y) -> Path B x y)
+                                         (H : is-bi-inv A C (\ x. g (f x))) : is-bi-inv A B f =
+  let i : C -> A = is-bi-inv/inv-map A C (\ x. g (f x)) H
+      h : B -> A = \ y. i (g y)
+      K : Htpy' B B (\ y. f (h y)) (id B) =
+          \ x. inj (f (h x)) x (is-bi-inv/inv-right-htpy A C (\ x'. g (f x')) H (g x))
+  in
+  has-inverse-is-bi-inv A B f
+                        (h, (K, is-bi-inv/inv-left-htpy A C (\ x'. g (f x')) H))
+
+is-bi-inv-comp/is-bi-inv-left-map (A B C D : U) (f : A -> B) (g : B -> C) (h : C -> D) (H : is-bi-inv A C (\ x. g (f x)))
+                                  (K : is-bi-inv B D (\ y. h (g y))) : is-bi-inv A B f =
+  is-bi-inv-comp/is-inj-is-bi-inv-left-map A B C f g (is-bi-inv-comp/injective B C D g h K) H
+
+is-bi-inv-comp/is-bi-inv-middle-map (A B C D : U) (f : A -> B) (g : B -> C) (h : C -> D) (H : is-bi-inv A C (\ x. g (f x)))
+                                   (K : is-bi-inv B D (\ y. h (g y))) : is-bi-inv B C g =
+  is-bi-inv/is-bi-inv-comp-right A B C f g (is-bi-inv-comp/is-bi-inv-left-map A B C D f g h H K) H
+
+is-bi-inv-comp/is-bi-inv-right-map (A B C D : U) (f : A -> B) (g : B -> C) (h : C -> D) (H : is-bi-inv A C (\ x. g (f x)))
+                                   (K : is-bi-inv B D (\ y. h (g y))) : is-bi-inv C D h =
+  is-bi-inv/is-bi-inv-comp-right B C D g h (is-bi-inv-comp/is-bi-inv-middle-map A B C D f g h H K) K

@@ -1,0 +1,24 @@
+-- This file defines the types for different h-levels.
+
+module Foundation.Core.HomotopyTypes where
+
+-- Propositions
+is-prop (A : U) : U
+  = (x y : A) -> Path A x y
+
+Prop : U = (P : U) * is-prop P
+
+-- Sets
+is-set (A : U) : U
+  = (x y : A) -> is-prop (Path A x y)
+
+Set : U = (P : U) * is-set P
+
+-- Proposition families
+is-prop/fam (A : U) (B : A -> U) : U
+  = (x : A) -> is-prop (B x)
+
+PropFam (A : U) : U = (B : A -> U) * is-prop/fam A B
+
+is-prop/fam-2 (A : U) (B : A -> U) (C : (x : A) -> B x -> U) : U
+  = (x : A) (y : B x) -> is-prop (C x y)

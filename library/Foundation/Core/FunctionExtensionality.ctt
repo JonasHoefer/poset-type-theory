@@ -1,0 +1,36 @@
+-- This file defines the function extensionality principle:
+--  eq-htpy : f ∼ g → f = g
+--  htpy-eq : f = g → f ∼ g  
+-- See the Foundation file for the proof that they form an equivalence.
+
+module Foundation.Core.FunctionExtensionality where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Homotopies  
+import Foundation.Core.InvertibleMaps
+
+eq-htpy (A : U) (B : A -> U) (f g : (x : A) -> B x) (H : Htpy A B f g) : Path ((x : A) -> B x) f g =
+  \ i a. H a i
+
+htpy-eq (A : U) (B : A -> U) (f g : (x : A) -> B x) (p : Path ((x : A) -> B x) f g) : Htpy A B f g =
+  \ x i. p i x
+
+eq-htpy' (A B : U) (f g : A -> B) (H : Htpy' A B f g) : Path (A -> B) f g =
+  eq-htpy A (\ _. B) f g H
+
+htpy-eq' (A B : U) (f g : A -> B) (p : Path (A -> B) f g) : Htpy' A B f g =
+  htpy-eq A (\ _. B) f g p
+
+htpy-eq/right-htpy (A : U) (B : A -> U) (f g : (x : A) -> B x)
+                      : Htpy' (Htpy A B f g) (Htpy A B f g) (\ H. htpy-eq A B f g (eq-htpy A B f g H)) (id (Htpy A B f g)) =
+  \ H. refl (Htpy A B f g) (\ x i. H x i)
+
+htpy-eq/left-htpy (A : U) (B : A -> U) (f g : (x : A) -> B x)
+                     : Htpy' (Path ((x : A) -> B x) f g) (Path ((x : A) -> B x) f g) (\ p. eq-htpy A B f g (htpy-eq A B f g p)) (id (Path ((x : A) -> B x) f g)) =
+  \ p. refl (Path ((x : A) -> B x) f g) (\ i a. p i a)
+
+htpy-eq/has-inverse (A : U) (B : A -> U) (f g : (x : A) -> B x) : has-inverse (Path ((x : A) -> B x) f g) (Htpy A B f g) (htpy-eq A B f g) =
+  (eq-htpy A B f g, (htpy-eq/right-htpy A B f g, htpy-eq/left-htpy A B f g))
+
+eq-htpy/has-inverse (A : U) (B : A -> U) (f g : (x : A) -> B x) : has-inverse (Htpy A B f g) (Path ((x : A) -> B x) f g) (eq-htpy A B f g) =
+  (htpy-eq A B f g, (htpy-eq/left-htpy A B f g, htpy-eq/right-htpy A B f g))

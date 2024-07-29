@@ -1,0 +1,230 @@
+-- this file defines propositional truncation as an higher inductive type.
+
+module Foundation.PropositionalTruncation where
+
+import Foundation.EquivalenceRelations
+
+precomp-Prop (A : U) (P : Prop) (f : A -> (Prop/type P)) (Q : Prop) (g : Prop/hom P Q) : A -> Prop/type Q =
+  \ z. g (f z)
+
+is-prop-trunc (A : U) (P : Prop) (f : A -> (Prop/type P)) : U =
+  (Q : Prop) -> is-equiv (Prop/hom P Q) (A -> Prop/type Q) (precomp-Prop A P f Q)
+
+is-prop-trunc/map (A : U) (P : Prop) (f : A -> Prop/type P) (H : is-prop-trunc A P f) (Q : Prop) (g : A -> Prop/type Q) : Prop/hom P Q =
+  (H Q g).1.1
+
+prop-trunc/has-ext-prop (A : U) (P : Prop) (f : A -> Prop/type P) : U =
+  (Q : Prop) -> (A -> Prop/type Q) -> (Prop/hom P Q)
+
+has-ext-property/is-prop-trunc (A : U) (P : Prop) (f : A -> Prop/type P) (H : prop-trunc/has-ext-prop A P f) : is-prop-trunc A P f =
+  \ Q.
+    Prop/is-equiv
+      (Prop/hom P Q, is-prop/pi (Prop/type P) (\ _. Prop/type Q) (\ _. Prop/is-prop Q))
+      (A -> Prop/type Q, is-prop/pi A (\ _. Prop/type Q) (\ _. Prop/is-prop Q))
+      (precomp-Prop A P f Q)
+      (H Q)
+
+data Prop-trunc (A : U) : U
+  = Prop-trunc/unit (a : A)
+  | Prop-trunc/squash (u v : Prop-trunc A) <i> [(i=0) -> u, (i=1) -> v]
+
+Prop-trunc/is-prop (A : U) : is-prop (Prop-trunc A) =
+  \ x y i. Prop-trunc/squash x y i
+
+Prop-trunc/Prop (A : U) : Prop =
+  (Prop-trunc A, Prop-trunc/is-prop A)
+
+rec-Prop-trunc (A : U) (P : Prop) (f : A -> Prop/type P) : Prop-trunc A -> Prop/type P = split
+  Prop-trunc/unit a -> f a
+  Prop-trunc/squash x y i -> (Prop/is-prop P) (rec-Prop-trunc A P f x) (rec-Prop-trunc A P f y) i
+
+ind-Prop-trunc (A : U) (P : Prop-trunc A -> Prop) (f : (x : A) -> Prop/type (P (Prop-trunc/unit x))) : (x : Prop-trunc A) -> Prop/type (P x) = split
+  Prop-trunc/unit a -> f a
+  Prop-trunc/squash x y i ->
+    J ( Prop-trunc A) x
+      ( \ z q. PathP (j. Prop/type (P (q j))) (ind-Prop-trunc A P f x) (ind-Prop-trunc A P f z))
+      ( Prop/is-prop (P x) (ind-Prop-trunc A P f x) (ind-Prop-trunc A P f x)) y
+      ( Prop-trunc/is-prop A x y) i
+
+Prop-trunc/is-prop-trunc (A : U) : is-prop-trunc A (Prop-trunc/Prop A) (\ a. Prop-trunc/unit a) =
+  has-ext-property/is-prop-trunc A (Prop-trunc/Prop A) (\ a. Prop-trunc/unit a) (\ Q. rec-Prop-trunc A Q)
+
+Prop-trunc/map (A B : U) (f : A -> B) : (Prop-trunc A) -> Prop-trunc B =
+  rec-Prop-trunc A
+    ( Prop-trunc/Prop B)
+    ( \ x. Prop-trunc/unit (f x))
+  -- is-prop-trunc/map A (Prop-trunc/Prop A) (\ a. Prop-trunc/unit a) (Prop-trunc/is-prop-trunc A)
+  --   (Prop-trunc/Prop B) (\ a. Prop-trunc/unit (f a))
+
+Equiv/Prop-trunc-map (A B : U) (e : Equiv A B) : (Prop-trunc A) -> Prop-trunc B =
+  Prop-trunc/map A B (Equiv/map A B e)
+
+Equiv/Prop-trunc-inv-map (A B : U) (e : Equiv A B) : (Prop-trunc B) -> Prop-trunc A =
+  Prop-trunc/map B A (Equiv/inv-map A B e)  
+
+Equiv/Prop-trunc (A B : U) (e : Equiv A B) : Equiv (Prop-trunc A) (Prop-trunc B) =
+  Prop/Equiv (Prop-trunc/Prop A) (Prop-trunc/Prop B) (Equiv/Prop-trunc-map A B e) (Equiv/Prop-trunc-inv-map A B e)
+
+mere-eq (A : U) (x y : A) : U =
+  Prop-trunc (Path A x y)
+
+mere-eq/Prop (A : U) (x y : A) : Prop =
+  Prop-trunc/Prop (Path A x y)
+
+mere-eq/refl (A : U) (x : A) : mere-eq A x x =
+  Prop-trunc/unit (refl A x)
+
+mere-eq/sym (A : U) (x y : A) : (p : mere-eq A x y) -> mere-eq A y x =
+  rec-Prop-trunc
+    ( Path A x y)
+    ( mere-eq/Prop A y x)
+    ( \ p. Prop-trunc/unit (inv A x y p))
+
+mere-eq/trans (A : U) (x y : A) (p : mere-eq A x y) (z : A) (q : mere-eq A y z) : mere-eq A x z =
+  rec-Prop-trunc
+    ( Path A x y)
+    ( mere-eq/Prop A x z)
+    ( \ p'. rec-Prop-trunc
+            ( Path A y z)
+            ( mere-eq/Prop A x z)
+            ( \ q'. Prop-trunc/unit (comp A x y p' z q')) q) p
+
+mere-eq/Eq-Rel (A : U) : Eq-Rel A =
+  ( mere-eq/Prop A,
+    ( mere-eq/refl A,
+      ( mere-eq/sym A,
+        \ x y z p. mere-eq/trans A x y p z)))
+
+Prop-trunc/map-out (P : Prop) : Prop-trunc (Prop/type P) -> Prop/type P =
+  rec-Prop-trunc
+    ( Prop/type P) P
+    ( id (Prop/type P))
+
+Prop-trunc/mere-eq (A : Prop) (x y : (Prop/type A)) : Equiv (Path (Prop/type A) x y) (mere-eq (Prop/type A) x y) =
+  Prop/Equiv
+    ( is-prop/Prop-path A x y)
+    ( mere-eq/Prop
+      ( Prop/type A) x y)
+    ( \ p. Prop-trunc/unit p)
+    ( Prop-trunc/map-out
+      ( is-prop/Prop-path A x y))
+
+mere-equiv (X Y : U) : U =
+  Prop-trunc
+    ( Equiv X Y)
+
+mere-equiv/is-prop (X Y : U) : is-prop (mere-equiv X Y) =
+  Prop-trunc/is-prop
+    ( Equiv X Y)
+
+mere-equiv/Prop (X Y : U) : Prop =
+  ( mere-equiv X Y,
+    mere-equiv/is-prop X Y)
+
+mere-equiv/refl (X : U) : mere-equiv X X =
+  rec-Prop-trunc
+    ( Equiv X X)
+    ( mere-equiv/Prop X X)
+    ( \ e. Prop-trunc/unit e)
+    ( Prop-trunc/unit (Equiv/refl X))
+
+mere-equiv/sym (X Y : U) (e : mere-equiv X Y) : mere-equiv Y X =
+  rec-Prop-trunc
+    ( Equiv X Y)
+    ( mere-equiv/Prop Y X)
+    ( \ e'. Prop-trunc/unit (Equiv/sym X Y e')) e    
+
+Pi/Prop (A : U) (B : A -> U) (q : is-prop/fam A B) : Prop =
+  ( Pi A B,
+    is-prop/pi A B q)
+
+mere-equiv/trans (X Y : U) (e : mere-equiv X Y) (Z : U) (e' : mere-equiv Y Z) : mere-equiv X Z =
+  rec-Prop-trunc
+    ( Equiv X Y)
+    ( mere-equiv/Prop X Z)
+    ( \ eX.
+        rec-Prop-trunc
+          ( Equiv Y Z)
+          ( mere-equiv/Prop X Z)
+          ( \ eY. Prop-trunc/unit
+                  ( Equiv/trans X Y Z eX eY)) e') e
+
+Prop-trunc/closed-Prod/map (A B : U) : (Prop-trunc A * Prop-trunc B) -> Prop-trunc (A * B) =
+  \ t.
+    rec-Prop-trunc A
+      ( Prop-trunc/Prop (A * B))
+      ( \ x. rec-Prop-trunc B
+            ( Prop-trunc/Prop (A * B))
+            ( \ y. Prop-trunc/unit (x, y)) t.2) t.1
+
+Prop-trunc/closed-Prod/inv-map (A B : U) : Prop-trunc (A * B) -> Prop-trunc A * Prop-trunc B =
+  rec-Prop-trunc
+    ( A * B)
+    ( Prop/Prod
+      ( Prop-trunc/Prop A)
+      ( Prop-trunc/Prop B))
+    ( \ u. (Prop-trunc/unit u.1, Prop-trunc/unit u.2))  
+
+Prop-trunc/closed-Prod (A B : U) : Equiv (Prop-trunc A * Prop-trunc B) (Prop-trunc (A * B)) =
+  Prop/Equiv
+    ( Prop/Prod
+      ( Prop-trunc/Prop A)
+      ( Prop-trunc/Prop B))
+    ( Prop-trunc/Prop (A * B))
+    ( Prop-trunc/closed-Prod/map A B)
+    ( Prop-trunc/closed-Prod/inv-map A B)
+
+Prop-trunc/closed-Sg/map (A : U) (B : A -> U) : Prop-trunc (Sg A (\ x. Prop-trunc (B x))) -> Prop-trunc (Sg A B) =
+  rec-Prop-trunc
+    ( Sg A (\ x. Prop-trunc (B x)))
+    ( Prop-trunc/Prop (Sg A B))
+    ( \ t. rec-Prop-trunc
+          ( B t.1)
+          ( Prop-trunc/Prop (Sg A B))
+          ( \ b. Prop-trunc/unit (t.1, b)) t.2)
+
+Prop-trunc/closed-Sg/inv-map (A : U) (B : A -> U) : Prop-trunc (Sg A B) -> Prop-trunc (Sg A (\ x. Prop-trunc (B x))) =
+  rec-Prop-trunc
+    ( Sg A B)
+    ( Prop-trunc/Prop (Sg A (\ x. Prop-trunc (B x))))
+    ( \ t. Prop-trunc/unit (t.1, Prop-trunc/unit t.2))
+
+Prop-trunc/closed-Sg/right-htpy (A : U) (B : A -> U) : (t : Prop-trunc (Sg A B))
+                                    -> Path (Prop-trunc (Sg A B))
+                                           (Prop-trunc/closed-Sg/map A B (Prop-trunc/closed-Sg/inv-map A B t)) t =
+  ind-Prop-trunc
+    ( Sg A B)
+    ( \ t. is-prop/Prop-path
+          ( Prop-trunc/Prop (Sg A B))
+          ( Prop-trunc/closed-Sg/map A B (Prop-trunc/closed-Sg/inv-map A B t)) t)
+    ( \ t. refl (Prop-trunc (Sg A B)) (Prop-trunc/unit t))
+
+Prop-trunc/closed-Sg/left-htpy (A : U) (B : A -> U) : (t : Prop-trunc (Sg A (\ x. Prop-trunc (B x))))
+                                   -> Path (Prop-trunc (Sg A (\ x. Prop-trunc (B x))))
+                                          (Prop-trunc/closed-Sg/inv-map A B (Prop-trunc/closed-Sg/map A B t)) t =
+  ind-Prop-trunc
+    ( Sg A (\ x. Prop-trunc (B x)))
+    ( \ t. is-prop/Prop-path
+          ( Prop-trunc/Prop (Sg A (\ x. Prop-trunc (B x))))
+          ( Prop-trunc/closed-Sg/inv-map A B (Prop-trunc/closed-Sg/map A B t)) t)
+    ( \ t. ind-Prop-trunc
+          ( B t.1)
+          ( \ b. is-prop/Prop-path
+                ( Prop-trunc/Prop (Sg A (\ x. Prop-trunc (B x))))
+                ( Prop-trunc/closed-Sg/inv-map A B (Prop-trunc/closed-Sg/map A B (Prop-trunc/unit (t.1, b)))) (Prop-trunc/unit (t.1, b)))
+          ( \ b. refl (Prop-trunc (Sg A (\ x. Prop-trunc (B x)))) (Prop-trunc/unit (t.1, Prop-trunc/unit b))) t.2)
+
+Prop-trunc/closed-Sg (A : U) (B : A -> U) : Equiv (Prop-trunc (Sg A (\ x. Prop-trunc (B x)))) (Prop-trunc (Sg A B)) =
+  has-inverse/Equiv
+    ( Prop-trunc (Sg A (\ x. Prop-trunc (B x))))
+    ( Prop-trunc (Sg A B))
+    ( Prop-trunc/closed-Sg/map A B)
+    ( Prop-trunc/closed-Sg/inv-map A B,
+      ( Prop-trunc/closed-Sg/right-htpy A B,
+        Prop-trunc/closed-Sg/left-htpy A B))
+
+Prop-trunc/Pi/map-out (A : U) (B : A -> U) (g : Prop-trunc ((x : A) -> B x)) (x : A) : Prop-trunc (B x) =
+  rec-Prop-trunc
+    ( (y : A) -> B y)
+    ( Prop-trunc/Prop (B x))
+    ( \ f. Prop-trunc/unit (f x)) g

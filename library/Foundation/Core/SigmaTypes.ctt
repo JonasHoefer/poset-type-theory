@@ -1,0 +1,11 @@
+-- This file defines accessors and shows some properties about Σ-types
+
+module Foundation.Core.SigmaTypes where
+
+import Foundation.Core.Primitives
+
+ind-Sg (A : U) (B : A -> U) (P : Sg A B -> U) (g : (x : A) (y : B x) -> P(x, y)) : (z : Sg A B) -> P z =
+  \ z. g z.1 z.2
+
+pr1 (A : U) (B : A -> U) (u : Sg A B) : A = u.1
+pr2 (A : U) (B : A -> U) (u : Sg A B) : B (pr1 A B u) = u.2

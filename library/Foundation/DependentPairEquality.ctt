@@ -1,0 +1,84 @@
+-- This file defines additional properties on the type of dependent pair paths.
+
+module Foundation.DependentPairEquality where
+
+import Foundation.Core.ContractibleTypes
+import Foundation.Core.DependentPairEquality
+import Foundation.Core.HomotopyTypes
+import Foundation.Core.Univalence
+
+PathSg-eq-SgPathP (A : U) (B : A -> U) (u v : Sg A B) : Path U (Path (Sg A B) u v) (SgPathP A B u v)
+  = equiv-to-path (Path (Sg A B) u v) (SgPathP A B u v) (PathSg-equiv-SgPathP A B u v)
+
+PathSg-eq-SgPathO (A : U) (B : A -> U) (u v : Sg A B) : Path U (Path (Sg A B) u v) (SgPathO A B u v)
+  = comp U (Path (Sg A B) u v) (SgPathP A B u v) (PathSg-eq-SgPathP A B u v) (SgPathO A B u v) (SgPathP-eq-SgPathO A B u v)
+
+SgPathO->PathSg (A : U) (B : A -> U) (u v : Sg A B) : SgPathO A B u v -> Path (Sg A B) u v
+  = coe 1 0 (i. PathSg-eq-SgPathO A B u v i)
+
+SgPath-prop (A : U) (B : A -> U) (prop : is-prop/fam A B) (u v : Sg A B) (p : Path A u.1 v.1) : Path (Sg A B) u v
+  = SgPathO->PathSg A B u v (p, prop v.1 (tr A u.1 v.1 p B u.2) v.2)
+
+Sg-path/left (A : U) (B : A -> U) (u v : Sg A B) (p : Path (Sg A B) u v) : Path A u.1 v.1 =
+  \ i. (p i).1
+
+PathSg->SgPathO (A : U) (B : A -> U) (u v : Sg A B) : Path (Sg A B) u v -> SgPathO A B u v =
+  coe 0 1 (i. PathSg-eq-SgPathO A B u v i)
+
+Sg-path/right (A : U) (B : A -> U) (u v : Sg A B) (p : Path (Sg A B) u v)
+                 : PathO A u.1 v.1 (PathSg->SgPathO A B u v p).1 B u.2 v.2 =
+  (PathSg->SgPathO A B u v p).2
+
+Sg/closed-retract (A : U) (B C : A -> U) (H : (x : A) -> retract-of (B x) (C x)) : retract-of (Sg A B) (Sg A C) =
+  let s : Sg A B -> Sg A C = \ u. (u.1, (H u.1).1 u.2)
+      r : Sg A C -> Sg A B = \ u. (u.1, (H u.1).2.1 u.2) in
+  (s, (r, \ u. SgPathO->PathSg A B (r (s u)) u (refl A u.1, PathO/refl A u.1 B (r (s u)).2 u.2 ((H u.1).2.2 u.2))))
+
+-- Total space over equality is contractible.
+is-contr/Sg-path-center (A : U) (x : A) : Sg A (\ y. Path A x y) =
+  (x, refl A x)
+
+is-contr/Sg-path-contr (A : U) (x : A) (v : Sg A (\ y. Path A x y))
+                          : Path (Sg A (\ y. Path A x y)) (is-contr/Sg-path-center A x) v =
+  let B : A -> U = (\ y. Path A x y)
+      u : Sg A B = (is-contr/Sg-path-center A x)
+  in
+  ind-Sg A B (\ z. Path (Sg A B) u z)
+             (\ y q. J A u.1 (\ y' r. Path (Sg A B) u (y', r))
+                            (SgPathO->PathSg A B u u (refl A u.1, PathO/refl A u.1 B u.2 u.2 (refl (B u.1) u.2)))
+                      y q) v
+
+is-contr/Sg-path-is-contr (A : U) (x : A) : is-contr (Sg A (\ y. Path A x y)) =
+  (is-contr/Sg-path-center A x, is-contr/Sg-path-contr A x)
+
+Sg/left-unit-law-is-contr/map (A : U) (B : A -> U) (c : is-contr A) (a : A) : B a -> Sg A B =
+  \ b. (a, b)
+
+-- Closure under contractibility
+Sg/left-unit-law-is-contr/inv-map (A : U) (B : A -> U) (c : is-contr A) (a : A) : Sg A B -> B a =
+  \ t. tr A t.1 a (comp A t.1 c.1 (inv A c.1 t.1 (c.2 t.1)) a (c.2 a)) B t.2
+
+Sg/left-unit-law-is-contr/right-htpy (A : U) (B : A -> U) (c : is-contr A) (a : A)
+                                        : Htpy' (Sg A B) (Sg A B) (\ t. Sg/left-unit-law-is-contr/map A B c a (Sg/left-unit-law-is-contr/inv-map A B c a t)) (id (Sg A B)) =
+  \ t. SgPathO->PathSg A B (Sg/left-unit-law-is-contr/map A B c a (Sg/left-unit-law-is-contr/inv-map A B c a t)) t
+    (inv A t.1 a (comp A t.1 c.1 (inv A c.1 t.1 (c.2 t.1)) a (c.2 a)),
+     tr/left-inv A B t (Sg/left-unit-law-is-contr/map A B c a (Sg/left-unit-law-is-contr/inv-map A B c a t)) (comp A t.1 c.1 (inv A c.1 t.1 (c.2 t.1)) a (c.2 a)))
+
+Sg/left-unit-law-is-contr (A : U) (B : A -> U) (c : is-contr A) (a : A) : retract-of (Sg A B) (B a) =
+  (Sg/left-unit-law-is-contr/inv-map A B c a, (Sg/left-unit-law-is-contr/map A B c a, Sg/left-unit-law-is-contr/right-htpy A B c a))
+
+Sg/is-contr (A : U) (B : A -> U) (is-contr-A : is-contr A) (is-contr-fam : ((x : A) -> is-contr (B x)))
+               : is-contr (Sg A B) =
+  is-contr/closed-retract
+    (Sg A B)
+    (B (center A is-contr-A))
+    (Sg/left-unit-law-is-contr A B is-contr-A (center A is-contr-A))
+    (is-contr-fam (center A is-contr-A))
+
+Sg/is-contr' (A : U) (B : A -> U) (is-contr-A : is-contr A) (a : A) (is-contr-B : is-contr (B a))
+                : is-contr (Sg A B) =
+  is-contr/closed-retract
+    (Sg A B)
+    (B a)
+    (Sg/left-unit-law-is-contr A B is-contr-A a)
+    (is-contr-B)
