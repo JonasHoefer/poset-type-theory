@@ -1,0 +1,134 @@
+-- This file defines the images of a map, surjectivity, injectivity.
+
+module Foundation.Images where
+
+import Foundation.PropositionalTruncation
+
+im (A X : U) (f : A -> X) : U =
+  Sg X (\ x. Prop-trunc (Fib A X f x))
+
+im/inclusion (A X : U) (f : A -> X) : im A X f -> X =
+  \ t. t.1
+
+im/q (A X : U) (f : A -> X) : A -> im A X f =
+  \ x. (f x, Prop-trunc/unit (x, refl X (f x)))
+
+im/htpy (A X : U) (f : A -> X) : Htpy' A X (\ x. im/inclusion A X f (im/q A X f x)) f =
+  \ x. refl X (f x)
+
+im/htpy' (A X : U) (f : A -> X) : Htpy' A X f (\ x. im/inclusion A X f (im/q A X f x)) =
+  \ x. refl X (f x)
+
+im/is-injective (A X : U) (f : A -> X) (t u : im A X f) (p : Path X (im/inclusion A X f t) (im/inclusion A X f u)) : Path (im A X f) t u =
+  SgPath-prop X
+    ( \ x. Prop-trunc (Fib A X f x))
+    ( \ x. Prop-trunc/is-prop (Fib A X f x))
+    t u p
+
+im/Set (A : U) (X : Set) (f : A -> Set/type X) : Set =
+  Set/closed-Sg X
+    ( \ x. Prop/Set (Prop-trunc/Prop (Fib A (Set/type X) f x)))
+
+im/is-set (A : U) (X : Set) (f : A -> Set/type X) : is-set (im A (Set/type X) f) =
+  Set/is-set
+    ( im/Set A X f)
+
+is-surj (A B : U) (f : A -> B) : U =
+  (b : B) -> Prop-trunc (Fib A B f b)
+
+is-surj/is-prop (A B : U) (f : A -> B) : is-prop (is-surj A B f) =
+  is-prop/pi B
+    ( \ b. Prop-trunc (Fib A B f b))
+    ( \ b. Prop-trunc/is-prop (Fib A B f b))
+
+is-surj/Prop (A B : U) (f : A -> B) : Prop =
+  ( is-surj A B f,
+    is-surj/is-prop A B f)
+
+im/q/is-surj (A X : U) (f : A -> X) : is-surj A (im A X f) (im/q A X f) =
+  \ t.
+    rec-Prop-trunc
+      ( Fib A X f t.1)
+      ( Prop-trunc/Prop (Fib A (im A X f) (im/q A X f) t))
+      ( \ u.
+	Prop-trunc/unit
+	( u.1,
+	  SgPath-prop X
+	    ( \ z. Prop-trunc (Fib A X f z))
+	    ( \ z. Prop-trunc/is-prop (Fib A X f z)) t
+	    ( im/q A X f u.1)
+	    ( u.2))) t.2
+
+is-surj/comp (A B C : U) (g : B -> C) (is-surj-g : is-surj B C g) (f : A -> B) (is-surj-f : is-surj A B f)
+		    : is-surj A C (\ x. g (f x)) =
+  \ c.
+    rec-Prop-trunc
+    ( Fib B C g c)
+    ( Prop-trunc/Prop (Fib A C (\ x. g (f x)) c))
+    ( \ t. rec-Prop-trunc
+	  ( Fib A B f t.1)
+	  ( Prop-trunc/Prop (Fib A C (\ x. g (f x)) c))
+	  ( \ u.
+	      Prop-trunc/unit
+	      ( u.1,
+		comp C c
+		( g t.1) t.2
+		( g (f u.1))
+		( ap B C g t.1 (f u.1) u.2))) (is-surj-f t.1))
+    ( is-surj-g c)
+
+is-inj/is-prop-fib (A B : U) (f : A -> B) (is-inj-f : (x y : A) -> Path B (f x) (f y) -> Path A x y)
+		   (is-set-B : is-set B) (y : B) : is-prop (Fib A B f y) =
+  \ t u.
+    SgPath-prop A
+    ( \ x. Path B y (f x))
+    ( \ x. is-set-B y (f x)) t u
+    ( is-inj-f t.1 u.1
+      ( comp B
+	( f t.1) y
+	( inv B y (f t.1) t.2)
+	( f u.1) u.2))
+
+is-inj-is-surj/is-equiv (A B : U) (is-set-B : is-set B) (f : A -> B) (is-surj-f : is-surj A B f) (is-inj-f : (x y : A) -> Path B (f x) (f y) -> Path A x y)
+			     : is-equiv A B f =
+  \ y.
+    rec-Prop-trunc
+    ( Fib A B f y)
+    ( is-contr (Fib A B f y),
+      is-contr/is-prop (Fib A B f y))
+    ( \ v.
+      let p : is-prop (Fib A B f y) =
+      ( \ t u.
+	SgPath-prop A
+	( \ x. Path B y (f x))
+	( \ x. is-set-B y (f x)) t u
+	( is-inj-f t.1 u.1
+	( comp B (f t.1) y
+	  ( inv B y (f t.1) t.2)
+	  ( f u.1) u.2))) in
+	( v, p v))
+    ( is-surj-f y)
+
+im-Unit/is-contr (A : U) (H : is-set A) (f : Unit -> A) : is-contr (im Unit A f) =
+  is-prop/is-proof-irrelevant
+    ( im Unit A f)
+    ( \ t u.
+	SgPath-prop A
+	( \ x. Prop-trunc (Fib Unit A f x))
+	( \ x. Prop-trunc/is-prop (Fib Unit A f x)) t u
+	( rec-Prop-trunc
+	  ( Fib Unit A f t.1)
+	  ( Set/eq/Prop
+	    ( A, H) t.1 u.1)
+	  ( \ v. rec-Prop-trunc
+		( Fib Unit A f u.1)
+		( Set/eq/Prop
+		  ( A, H) t.1 u.1)
+		( \ w. comp-n A three-Nat t.1
+		      ( f v.1) v.2
+		      ( f w.1)
+		      ( ap Unit A f v.1 w.1
+			( is-contr/all-elements-equal Unit
+			  ( Unit/is-contr) v.1 w.1)) u.1
+		      ( inv A u.1 (f w.1) w.2)) u.2) t.2))
+    ( im/q Unit A f star)

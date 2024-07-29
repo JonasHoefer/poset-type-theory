@@ -1,0 +1,50 @@
+-- This file defines the meaning of decidability.
+
+module Foundation.DecidableTypes where
+
+import Foundation.CoproductType
+import Foundation.EmptyType
+import Foundation.ProdType
+import Foundation.UnitType
+
+-- Definitions
+is-decidable (A : U) : U = Coprod A (neg A)
+
+has-decidable-equality (A : U) : U =
+  (x y : A) -> is-decidable (Path A x y)
+
+-- Unit and empty are decidable.
+is-decidable/Empty : is-decidable Empty =
+  inr (id Empty)
+
+is-decidable/Unit : is-decidable Unit =
+  inl star
+
+-- An inhabited type is decidable.
+is-decidable/inhabited-type (A : U) (a : A) : is-decidable A =
+  inl a
+
+-- Closure under type-formers.
+is-decidable/Coprod (A B : U) (dA : is-decidable A) (dB : is-decidable B) : is-decidable (Coprod A B) =
+  ind-Coprod A (neg A) (\ _. is-decidable (Coprod A B))
+            (\ a. inl (inl a))
+            (\ f. ind-Coprod B (neg B) (\ _. is-decidable (Coprod A B))
+                            (\ b. inl (inr b))
+                            (\ g. inr (ind-Coprod A B (\ _. Empty) f g)) dB) dA
+
+is-decidable/Prod (A B : U) (dA : is-decidable A) (dB : is-decidable B) : is-decidable (A * B) =
+  ind-Coprod A (neg A) (\ _. is-decidable (A * B))
+             (\ a. ind-Coprod B (neg B) (\ _. is-decidable (A * B))
+                             (\ b. inl (a, b))
+                             (\ g. inr (ind-Prod A B (\ _. Empty) (\ _. g))) dB)
+             (\ f. inr (ind-Prod A B (\ _. Empty) (\ x y. f x))) dA
+
+is-decidable/map (A B : U) (dA : is-decidable A) (dB : is-decidable B) : is-decidable (A -> B) =
+  ind-Coprod A (neg A) (\ _. is-decidable (A -> B))
+               (\ a. ind-Coprod B (neg B) (\ _. is-decidable (A -> B))
+                               (\ b. inl (\ x. b))
+                               (\ g. inr (\ h. g (h a))) dB)
+               (\ f. inl (\ a. ex-falso B (f a))) dA
+
+is-decidable/neg (A : U) (d : is-decidable A) : is-decidable (neg A) =
+  is-decidable/map A Empty d is-decidable/Empty

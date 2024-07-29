@@ -1,0 +1,331 @@
+-- Propositions: different definitions, properties, closure under type-formers, etc
+
+module Foundation.PropositionsProperties where
+
+import Foundation.Equivalences
+import Foundation.DecidableEqualities
+import Foundation.Univalence
+
+Prop/is-equiv (A B : Prop) (f : Prop/hom A B) (g : Prop/hom B A) : is-equiv (Prop/type A) (Prop/type B) f =
+  let H : Htpy' (Prop/type B) (Prop/type B) (\ z. f (g z)) (id (Prop/type B)) = \ x. Prop/is-prop B (f (g x)) x
+      K : Htpy' (Prop/type A) (Prop/type A) (\ z. g (f z)) (id (Prop/type A)) = \ x. Prop/is-prop A (g (f x)) x
+  in
+  has-inverse/is-equiv (Prop/type A) (Prop/type B) f (g, (H, K))
+
+Prop/Equiv (A B : Prop) (f : Prop/hom A B) (g : Prop/hom B A) : Equiv (Prop/type A) (Prop/type B) =
+  (f, Prop/is-equiv A B f g)
+
+Pi/is-prop (A : U) (B : A -> Prop) : is-prop ((x : A) -> Prop/type (B x)) =
+  is-prop/pi A
+    ( \ x. Prop/type (B x))
+    ( \ x. Prop/is-prop (B x))
+
+Prop/Pi (A : U) (B : A -> Prop) : Prop =
+  ( (x : A) -> Prop/type (B x),
+    Pi/is-prop A B)
+
+Coprod/is-prop/inl (P Q : Prop) (H : Prop/type P -> neg (Prop/type Q)) (p : Prop/type P)
+                        : (v : (Coprod (Prop/type P) (Prop/type Q)))
+                         -> Path (Coprod (Prop/type P) (Prop/type Q)) (inl p) v = split
+  inl p' -> Coprod/Eq/map (Prop/type P) (Prop/type Q) (inl p) (inl p') (Prop/is-prop P p p')
+  inr q  ->
+    ex-falso
+      ( Path (Coprod (Prop/type P) (Prop/type Q)) (inl p) (inr q))
+      ( H p q)
+
+Coprod/is-prop/inr (P Q : Prop) (H : Prop/type P -> neg (Prop/type Q)) (q : Prop/type Q)
+                        : (v : Coprod (Prop/type P) (Prop/type Q))
+                         -> Path (Coprod (Prop/type P) (Prop/type Q)) (inr q) v = split
+  inl p ->
+    ex-falso
+      ( Path (Coprod (Prop/type P) (Prop/type Q)) (inr q) (inl p))
+      ( H p q)
+  inr q' -> Coprod/Eq/map (Prop/type P) (Prop/type Q) (inr q) (inr q') (Prop/is-prop Q q q')
+
+Coprod/is-prop (P Q : Prop) (H : Prop/type P -> neg (Prop/type Q)) : is-prop (Coprod (Prop/type P) (Prop/type Q)) = split 
+  inl p -> Coprod/is-prop/inl P Q H p
+  inr q -> Coprod/is-prop/inr P Q H q
+
+Coprod/Prop (P Q : Prop) (H : Prop/type P -> neg (Prop/type Q)) : Prop =
+  ( Coprod (Prop/type P) (Prop/type Q),
+    Coprod/is-prop P Q H)
+
+is-prop/path (A : Prop) (x y : Prop/type A) : is-prop (Path (Prop/type A) x y) =
+  is-contr->is-prop
+    ( Path (Prop/type A) x y)
+    ( is-prop/has-contr-eq
+      ( Prop/type A)
+      ( Prop/is-prop A) x y)
+
+is-prop/Prop-path (A : Prop) (x y : Prop/type A) : Prop =
+  ( Path (Prop/type A) x y,
+    is-prop/path A x y)
+
+Equiv/Sg-target (A : U) (B : A -> U) (f : (x : A) -> is-contr (B x)) : Equiv (Sg A B) A =
+  Equiv/trans
+    ( Sg A B)
+    ( Sg A (\ _. Unit)) A
+    ( Equiv/Sg-fam A B (\ _. Unit)
+      ( \ x. is-prop/is-subterminal
+	    ( B x)
+	    ( is-contr/all-elements-equal
+	      ( B x)
+	      ( f x))
+	    ( f x).1))
+    ( Equiv/Sg-base-unit A)
+
+Equiv/Path-tot (A : U) (B : A -> U) (a : A) (x : A) (y : B x) : Equiv (Sg (B a) (\ z. Path (Sg A B) (x, y) (a, z))) (Path A x a) =
+  Equiv/comp two-Nat
+    ( Sg (B a) (\ z. Path (Sg A B) (x, y) (a, z)))
+    ( Sg (B a) (\ z. SgPathO A B (x, y) (a, z)))
+    ( Equiv/Sg-fam
+      ( B a)
+      ( \ z. Path (Sg A B) (x, y) (a, z))
+      ( \ z. SgPathO A B (x, y) (a, z))
+      ( \ z. PathSg/Equiv A B (x, y) (a, z)))
+    ( Sg (Path A x a) (\ p. Sg (B a) (\ z. Path (B a) (tr A x a p B y) z)))
+    ( Equiv/assoc-non-dep-Sg
+      ( B a)
+      ( Path A x a)
+      ( \ z p. Path (B a) (tr A x a p B y) z))
+    ( Path A x a)
+    ( Equiv/Sg-target
+      ( Path A x a)
+      ( \ p. Sg (B a) (\ z. Path (B a) (tr A x a p B y) z))
+      ( \ p. is-contr/Sg-path-is-contr
+	    ( B a)
+	    ( tr A x a p B y)))
+
+Equiv/Path-tot' (A : U) (B : A -> U) (a : A) (x : A) (y : B x) : Equiv (Path A x a) (Sg (B a) (\ z. Path (Sg A B) (x, y) (a, z))) =
+  Equiv/sym
+    ( Sg (B a) (\ z. Path (Sg A B) (x, y) (a, z)))
+    ( Path A x a)
+    ( Equiv/Path-tot A B a x y)
+
+-- Equivalences between propositions
+Equiv/is-prop (A : U) (B : Prop) : is-prop (Equiv A (Prop/type B)) =
+  \ e e'.
+    SgPath-prop
+      ( A -> Prop/type B)
+      ( is-equiv A
+        ( Prop/type B))
+      ( is-equiv/is-prop A
+        ( Prop/type B)) e e'
+      ( is-prop/pi A
+        ( \ _. Prop/type B)
+        ( \ _. Prop/is-prop B) e.1 e'.1)
+
+Prop/eq-Prop (A B : Prop) : is-prop (Path U (Prop/type A) (Prop/type B)) =
+  is-prop/closed-equiv'
+    ( Equiv (Prop/type A) (Prop/type B))
+    ( Path U (Prop/type A) (Prop/type B))
+    ( univalence (Prop/type A) (Prop/type B))
+    ( Equiv/is-prop (Prop/type A) B)
+
+Prop/eq/map (A B : Prop) : Path U (Prop/type A) (Prop/type B) -> Path Prop A B =
+  SgPath-prop U is-prop
+    ( is-prop/is-prop) A B    
+
+Prop/eq (A B : Prop) : Path Prop A B -> Path U (Prop/type A) (Prop/type B) =
+  \ p i. (p i).1
+
+UU-Prop/is-equiv (A : Prop) : (B : Prop) -> is-equiv (Path Prop A B) (Path U (Prop/type A) (Prop/type B)) (Prop/eq A B) =
+  fundamental-theorem-id Prop
+    ( \ B. Path U (Prop/type A) (Prop/type B)) A
+    ( Prop/eq A)
+    ( ( A, refl U (Prop/type A)),
+      ( \ t. SgPath-prop Prop
+            ( \ B. Path U (Prop/type A) (Prop/type B))
+            ( Prop/eq-Prop A)
+            ( A, refl U (Prop/type A)) t
+            ( Prop/eq/map A t.1 t.2)))
+
+Prop/Eq/Equiv (A B : Prop) : Equiv (Path Prop A B) (Path U (Prop/type A) (Prop/type B)) =
+  ( Prop/eq A B,
+    UU-Prop/is-equiv A B)
+
+Prop/is-set (A B : Prop) : is-prop (Path Prop A B) =
+  is-prop/closed-equiv
+    ( Path Prop A B)
+    ( Path U (Prop/type A) (Prop/type B))
+    ( Prop/Eq/Equiv A B)
+    ( Prop/eq-Prop A B)
+
+UU-Prop/Set : Set =
+  ( Prop,
+    Prop/is-set)
+
+Prop/Set (A : Prop) : Set =
+  (Prop/type A, is-prop/is-set (Prop/type A) (Prop/is-prop A))
+
+is-prop/prod (A B : U) (p : is-prop A) (q : is-prop B) : is-prop (A * B) =
+  is-prop/sg A (\ _. B) p (\ _. q)
+
+Prop/Prod (A B : Prop) : Prop =
+  ( Prop/type A * Prop/type B,
+    is-prop/prod
+    ( Prop/type A)
+    ( Prop/type B)
+    ( Prop/is-prop A)
+    ( Prop/is-prop B))
+
+Set/closed-Prod/is-set (A B : Set) : is-set ((Set/type A) * (Set/type B)) =
+  \ t u.
+    is-prop/closed-equiv
+      ( Path ((Set/type A) * (Set/type B)) t u)
+      ( Eq-prod
+        ( Set/type A)
+        ( Set/type B) t u)
+      ( Eq-prod/Equiv
+        ( Set/type A)
+        ( Set/type B) t u)
+      ( is-prop/prod
+        ( Path (Set/type A) t.1 u.1)
+        ( Path (Set/type B) t.2 u.2)
+        ( Set/is-set A t.1 u.1)
+        ( Set/is-set B t.2 u.2))
+
+Set/closed-Prod (A B : Set) : Set =
+  ( (Set/type A) * (Set/type B),
+    Set/closed-Prod/is-set A B)
+
+Set/closed-Sg/is-set (A : Set) (B : (Set/type A) -> Set) : is-set (Sg (Set/type A) (\ x. Set/type (B x))) =
+  \ t u p q.
+    let p' : PathP (i. Set/type (B (p i).1)) t.2 u.2 = \ i. (p i).2
+        q' : PathP (i. Set/type (B (q i).1)) t.2 u.2 = \ i. (q i).2
+        spq : Path (Path (Set/type A) t.1 u.1) (\ i. (p i).1) (\ i. (q i).1) = Set/is-set A t.1 u.1 ( \ i. (p i).1) ( \ i. (q i).1)
+        r  : PathP (i. PathP (j. Set/type (B (spq i j))) t.2 u.2) p' q' = 
+                    square/dependent-fill
+                      ( Set/type A) B t.1 u.1
+                      ( \ i. (p i).1)
+                      ( \ i. (q i).1) spq t.2 u.2 p' q'
+    in
+    \ i. SgPathP->PathSg
+        ( Set/type A)
+        ( \ x. Set/type (B x)) t u
+        ( spq i, r i)
+
+Set/closed-Sg (A : Set) (B : (Set/type A) -> Set) : Set =
+  ( Sg (Set/type A) (\ x. Set/type (B x)),
+    Set/closed-Sg/is-set A B)
+
+Set/closed-Coprod/is-set/inl (A B : Set) (x : Set/type A)
+                                  : (v : Coprod (Set/type A) (Set/type B))
+                                    -> is-prop (Path (Coprod (Set/type A) (Set/type B)) (inl x) v)  = split
+  inl a ->
+    is-prop/closed-equiv
+      ( Path (Coprod (Set/type A) (Set/type B)) (inl x) (inl a))
+      ( Path (Set/type A) x a)
+      ( Coprod/Eq/Equiv (Set/type A) (Set/type B) (inl x) (inl a))
+      ( Set/is-set A x a)
+  inr y ->
+    is-prop/closed-equiv
+      ( Path (Coprod (Set/type A) (Set/type B)) (inl x) (inr y))
+      ( Empty)
+      ( Coprod/Eq/Equiv (Set/type A) (Set/type B) (inl x) (inr y))
+      ( Empty/is-prop)
+
+Set/closed-Coprod/is-set/inr (A B : Set) (y : Set/type B)
+                                  : (v : Coprod (Set/type A) (Set/type B))
+                                    -> is-prop (Path (Coprod (Set/type A) (Set/type B)) (inr y) v)  = split
+  inl a ->
+    is-prop/closed-equiv
+      ( Path (Coprod (Set/type A) (Set/type B)) (inr y) (inl a))
+      ( Empty)
+      ( Coprod/Eq/Equiv (Set/type A) (Set/type B) (inr y) (inl a))
+      ( Empty/is-prop)
+  inr b ->
+    is-prop/closed-equiv
+      ( Path (Coprod (Set/type A) (Set/type B)) (inr y) (inr b))
+      ( Path (Set/type B) y b)
+      ( Coprod/Eq/Equiv (Set/type A) (Set/type B) (inr y) (inr b))
+      ( Set/is-set B y b)
+
+Set/closed-Coprod/is-set (A B : Set) : is-set (Coprod (Set/type A) (Set/type B)) = split
+  inl x -> Set/closed-Coprod/is-set/inl A B x
+  inr y -> Set/closed-Coprod/is-set/inr A B y
+
+Set/closed-Coprod (A B : Set) : Set =
+  ( Coprod (Set/type A) (Set/type B),
+    Set/closed-Coprod/is-set A B)
+
+PathPath/Equiv (A : U) (B : A -> U) (u v : Sg A B) (p q : Path (Sg A B) u v) 
+                  : Equiv (Path (Path (Sg A B) u v) p q) (Path (SgPathP A B u v) (PathSg->SgPathP A B u v p) (PathSg->SgPathP A B u v q))  =
+  Equiv/Equiv-id
+    ( Path (Sg A B) u v)
+    ( SgPathP A B u v)
+    ( PathSg-equiv-SgPathP A B u v) p q
+
+PathPath/map (A : U) (B : A -> U) (u v : Sg A B) (p q : Path (Sg A B) u v) (spq : Path (SgPathP A B u v) (PathSg->SgPathP A B u v p) (PathSg->SgPathP A B u v q))
+         : Path (Path (Sg A B) u v) p q =
+  Equiv/inv-map
+    ( Path (Path (Sg A B) u v) p q)
+    ( Path (SgPathP A B u v) (PathSg->SgPathP A B u v p) (PathSg->SgPathP A B u v q))
+    ( PathPath/Equiv A B u v p q) spq
+
+SgPath-prop' (A : U) (B : A -> U) (H : (x : A) -> is-prop (B x)) (u v : Sg A B) (p : Path A u.1 v.1) : Path (Sg A B) u v =
+  SgPathP->PathSg A B u v (p, J A u.1 (\ z q. (y : B z) -> PathP (i. B (q i)) u.2 y) (\ y. H u.1 u.2 y) v.1 p v.2)
+
+SgPath-prop/right-htpy (A : U) (B : A -> U) (H : (x : A) -> is-prop (B x)) (u v : Sg A B) (p : Path (Sg A B) u v)
+                          : Path (Path (Sg A B) u v) (SgPath-prop' A B H u v (Sg-path/left A B u v p)) p =
+  PathPath/map A B u v 
+    ( SgPath-prop' A B H u v (Sg-path/left A B u v p)) p
+    ( SgPathP->PathSg
+      ( Path A u.1 v.1)
+      ( \ r. PathP (i. B (r i)) u.2 v.2)
+      ( PathSg->SgPathP A B u v
+        ( SgPath-prop' A B H u v (Sg-path/left A B u v p)))
+      ( PathSg->SgPathP A B u v p)
+      ( refl (Path A u.1 v.1) (PathSg->SgPathP A B u v p).1 ,
+        J A u.1
+        ( \ z q. (y :B z) -> (r s : PathP (i. B (q i)) u.2 y) -> Path (PathP (i. B (q i)) u.2 y) r s)
+        ( \ y r s. is-prop/is-set
+                  ( B u.1)
+                  ( H u.1) u.2 y r s) v.1 (\ i. (p i).1) v.2
+                  ( PathSg->SgPathP A B u v
+                    ( SgPath-prop' A B H u v (Sg-path/left A B u v p))).2
+                    (PathSg->SgPathP A B u v p).2))
+
+SgPath-prop/left-htpy (A : U) (B : A -> U) (H : (x : A) -> is-prop (B x)) (u v : Sg A B) (p : Path A u.1 v.1)
+                         : Path (Path A u.1 v.1) (Sg-path/left A B u v (SgPath-prop' A B H u v p)) p =
+  refl (Path A u.1 v.1) p
+
+SgPath-prop/Equiv (A : U) (B : A -> U) (H : (x : A) -> is-prop (B x)) (u v : Sg A B)
+                     : Equiv (Path A u.1 v.1) (Path (Sg A B) u v) =
+  has-inverse/Equiv
+    ( Path A u.1 v.1)
+    ( Path (Sg A B) u v)
+    ( SgPath-prop' A B H u v)
+    ( Sg-path/left A B u v,
+      ( SgPath-prop/right-htpy A B H u v,
+        SgPath-prop/left-htpy A B H u v))
+
+SgPath-prop/Equiv' (A : U) (B : A -> U) (H : (x : A) -> is-prop (B x)) (u v : Sg A B)
+                      : Equiv (Path (Sg A B) u v) (Path A u.1 v.1) =
+  has-inverse/Equiv
+    ( Path (Sg A B) u v)
+    ( Path A u.1 v.1)
+    ( Sg-path/left A B u v)
+    ( SgPath-prop' A B H u v,
+      ( SgPath-prop/left-htpy A B H u v,
+        SgPath-prop/right-htpy A B H u v))
+
+Set/eq/Prop (X : Set) (x y : Set/type X) : Prop =
+  ( Path (Set/type X) x y,
+    Set/is-set X x y)
+
+is-set-is-inj-fib (A : U) (B : A -> U) (a : A) (H : is-set A)
+		  (y z : B a) (p : Path (Sg A B) (a, y) (a, z))
+		       : Path (B a) y z =
+  let axiom-K-A : axiom-K A = is-set/axiom-K A H
+      p' : SgPathO A B (a, y) (a, z) = PathSg->SgPathO A B (a, y) (a, z) p in
+  tr
+    ( B a)
+    ( tr A a a p'.1 B y) y
+    ( comp
+      ( B a)
+      ( tr A a a p'.1 B y)
+      ( tr A a a (refl A a) B y)
+      ( ap (Path A a a) (B a) (\ q. tr A a a q B y) p'.1 (refl A a) (inv (Path A a a) (refl A a) p'.1 (axiom-K-A a p'.1))) y
+      ( tr/refl-path A a B y))
+    ( \ u. Path (B a) u z) p'.2

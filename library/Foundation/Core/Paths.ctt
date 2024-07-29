@@ -1,0 +1,125 @@
+-- This file defines primitives about paths, like the action-on-path,
+-- the transport and the induction principle of identity types.
+
+module Foundation.Core.Paths where
+
+import Foundation.Core.Primitives
+
+ap (A B : U) (f : A -> B) (x y : A) (p : Path A x y) : Path B (f x) (f y)
+  = \i. f (p i)
+
+-- Transport.
+
+tr (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : P y
+  = coe 0 1 (i. P (p i)) u
+
+tr/path' (A : U) (x y : A) (p : Path A x y) (P : A -> U) (u : P x) : PathP (i. P (p i)) u (tr A x y p P u)
+  = \j. coe 0 j (i. P (p i)) u
+
+tr/refl' (A : U) (x : A) (P : A -> U) : Path (P x -> P x) (id (P x)) (tr A x x (refl A x) P)
+  = \j. coe 0 j (i. P x)
+
+-- Induction principle on paths.
+
+J (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) (y : A) (p : Path A x y) : M y p
+  = tr (Singl A x) (x , refl A x) (y , p) ((Singl/is-contr A x).2 (y , p)) (\s. M s.1 s.2) m
+
+J/comp' (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) m (J A x M m x (refl A x))
+  = tr/path' (Singl A x) (x , refl A x) (x , refl A x) ((Singl/is-contr A x).2 (x , refl A x)) (\s. M s.1 s.2) m
+
+-- Properties about transport
+
+tr/is-equiv/refl (A : U) (x : A) (P : A -> U) : is-equiv (P x) (P x) (tr A x x (refl A x) P)
+  = tr (P x -> P x) (id (P x)) (tr A x x (refl A x) P) (tr/refl' A x P) (is-equiv (P x) (P x)) (id/is-equiv (P x))
+
+tr/is-equiv (A : U) (x y : A) (p : Path A x y) (P : A -> U) : is-equiv (P x) (P y) (tr A x y p P)
+  = J A x (\y' p'. is-equiv (P x) (P y') (tr A x y' p' P)) (tr/is-equiv/refl A x P) y p
+
+-- Properties about paths
+
+inv (A : U) (x : A) : (y : A) -> Path A x y -> Path A y x
+  = J A x (\y _. Path A y x) (refl A x)
+
+tr' (A : U) (x y : A) (p : Path A y x) : (P : A -> U) -> P x -> P y
+  = tr A x y (inv A y x p)
+
+comp (A : U) (x : A) : (y : A) -> Path A x y -> (z : A) -> Path A y z -> Path A x z
+  = J A x (\y _. (z : A) -> Path A y z -> Path A x z) (\_ q. q)
+
+-- Paths over and relation to dependent paths.
+
+PathO (A : U) (x y : A) (p : Path A x y) (B : A -> U) (u : B x) (v : B y) : U
+  = Path (B y) (tr A x y p B u) v
+
+-- similar to CCHM but we can built the filler for transport directly
+PathP-eq-PathO (A : U) (x y : A) (p : Path A x y) (B : A -> U) (u : B x) (v : B y)
+  : Path U (PathP (i. B (p i)) u v) (PathO A x y p B u v)
+  = \i. PathP (j. B (p (i \/ j))) (coe 0 i (j. B (p (i /\ j))) u) v
+
+-- J, inv, compositions
+J/comp (A : U) (x : A) (M : (y : A) (p : Path A x y) -> U) (m : M x (refl A x)) : Path (M x (refl A x)) (J A x M m x (refl A x)) m
+  = inv (M x (refl A x)) m (J A x M m x (refl A x)) (J/comp' A x M m)
+
+inv/refl (A : U) (x : A) : Path (Path A x x) (inv A x x (refl A x)) (refl A x)
+  = J/comp A x (\y _. Path A y x) (refl A x)
+
+comp/ident-l (A : U) (x z : A) (q : Path A x z) : Path (Path A x z) (comp A x x (refl A x) z q) q
+  = \i. J/comp A x (\y _. (z' : A) -> Path A y z' -> Path A x z') (\_ q'. q') i z q
+
+comp/ident-l' (A : U) (x z : A) (q : Path A x z) : Path (Path A x z) q (comp A x x (refl A x) z q)
+  = \i. J/comp' A x (\y _. (z' : A) -> Path A y z' -> Path A x z') (\_ q'. q') i z q
+
+comp/ident-r (A : U) (x : A) : (y : A) (p : Path A x y) -> Path (Path A x y) (comp A x y p y (refl A y)) p
+  = J A x (\y p. Path (Path A x y) (comp A x y p y (refl A y)) p) (comp/ident-l A x x (refl A x))
+
+-- | inv refl * refl = refl
+comp/inv-l/refl (A : U) (x : A) : Path (Path A x x) (comp A x x (inv A x x (refl A x)) x (refl A x)) (refl A x)
+  = comp (Path A x x)
+      (comp A x x (inv A x x (refl A x)) x (refl A x))
+      (comp A x x (refl A x) x (refl A x))             (\i. (comp A x x ((inv/refl A x) i) x (refl A x)))
+      (refl A x)                                       (comp/ident-l A x x (refl A x))
+
+-- | inv p * p = refl
+comp/inv-l (A : U) (x : A) : (y : A) (p : Path A x y) -> Path (Path A y y) (comp A y x (inv A x y p) y p) (refl A y)
+  = J A x (\y p. Path (Path A y y) (comp A y x (inv A x y p) y p) (refl A y)) (comp/inv-l/refl A x)
+
+-- Some more properties about transport
+tr/refl (A : U) (x : A) (P : A -> U) : Path (P x -> P x) (tr A x x (refl A x) P) (id (P x))
+  = inv (P x -> P x)  (id (P x)) (tr A x x (refl A x) P) (tr/refl' A x P)
+
+tr/refl-path (A : U) (x : A) (P : A -> U) (u : P x) : Path (P x) (tr A x x (refl A x) P u) u =
+  \ i. tr/refl A x P i u
+
+tr/refl-path' (A : U) (x : A) (P : A -> U) (u : P x) : Path (P x) u (tr A x x (refl A x) P u) =
+  inv
+    ( P x)
+    ( tr A x x (refl A x) P u) u
+    ( tr/refl-path A x P u)
+
+tr/path (A : U) (x y : A) (p : Path A x y) (P : U) (u : P) : Path P (tr A x y p (\ _. P) u) u =
+  J A x (\ z q. Path P (tr A x z q (\ _. P) u) u) (tr/refl-path A x (\ _. P) u) y p
+
+tr/inv-path (A : U) (x y : A) (p : Path A x y) (P : U) (u : P) : Path P u (tr A x y p (\ _. P) u) =
+  inv P (tr A x y p (\ _. P) u) u (tr/path A x y p P u)
+
+PathO/refl (A : U) (x : A) (P : A -> U) (u v : P x) (q : Path (P x) u v) : PathO A x x (refl A x) P u v =
+  comp (P x) (tr A x x (refl A x) P u) u (tr/refl-path A x P u) v q
+
+tr/left-inv/refl (A : U) (B : A -> U) (x : A) (y : B x)
+                     :  Path (B x) (tr A x x (inv A x x (refl A x)) B (tr A x x (refl A x) B y)) y =
+  comp
+    ( B x)
+    ( tr A x x (inv A x x (refl A x)) B (tr A x x (refl A x) B y)) (tr A x x (refl A x) B (tr A x x (refl A x) B y))
+    ( ap (Path A x x) (B x) (\ p. (tr A x x p B (tr A x x (refl A x) B y))) (inv A x x (refl A x)) (refl A x)
+         (inv/refl A x)) y
+    ( comp
+      ( B x)
+      ( tr A x x (refl A x) B (tr A x x (refl A x) B y))
+      ( tr A x x (refl A x) B y)
+      ( tr/refl-path A x B (tr A x x (refl A x) B y)) y
+      ( tr/refl-path A x B y))
+
+tr/left-inv (A : U) (B : A -> U) (u v : Sg A B) (p : Path A u.1 v.1)
+               : Path (B u.1) (tr A v.1 u.1 (inv A u.1 v.1 p) B (tr A u.1 v.1 p B u.2)) u.2 =
+  J A u.1 (\ x q. Path (B u.1) (tr A x u.1 (inv A u.1 x q) B (tr A u.1 x q B u.2)) u.2)
+    (tr/left-inv/refl A B u.1 u.2) v.1 p

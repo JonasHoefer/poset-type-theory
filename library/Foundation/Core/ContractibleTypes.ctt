@@ -1,0 +1,38 @@
+-- This file defines accessors to contractible types and shows properties.
+
+module Foundation.Core.ContractibleTypes where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Paths
+import Foundation.Core.SigmaTypes
+import Foundation.Core.Retractions
+import Foundation.Core.Paths
+
+center (A : U) (c : is-contr A) : A =
+  c.1
+
+contraction (A : U) (c : is-contr A) : (x : A) -> Path A (center A c) x =
+  c.2
+
+is-contr/all-elements-equal (A : U) (c : is-contr A) (x y : A) : Path A x y =
+  comp A x
+    ( center A c)
+    ( inv A (center A c) x (contraction A c x))
+    y (contraction A c y)
+
+is-contr/closed-retract (A B : U) (ret : retract-of A B) (cntr : is-contr B) : is-contr A =
+  let c : A = ret.2.1 cntr.1
+  in  (c, retract-ind A B (\a. Path A c a) ret (\b i. ret.2.1 (cntr.2 b i)))
+
+-- Properties for h-level 0.
+-- Given (c, C) we built: inv (C x) * C y
+is-contr->is-prop (A : U) (cntr : is-contr A) : is-prop A
+  = \x y. comp A x cntr.1 (inv A cntr.1 x (cntr.2 x)) y (cntr.2 y)
+
+is-contr/closed-upwards (A : U) (cntr : is-contr A) (x y : A) : is-contr (Path A x y) =
+  let is-contr/closed-upwards/path : (p : Path A x y) -> Path (Path A x y) (is-contr->is-prop A cntr x y) p
+        = J A x (\y' p'. Path (Path A x y') (is-contr->is-prop A cntr x y') p') (comp/inv-l A cntr.1 x (cntr.2 x)) y
+  in  (is-contr->is-prop A cntr x y, is-contr/closed-upwards/path)
+
+is-contr->is-set (A : U) (cntr : is-contr A) : is-set A
+  = \x y. is-contr->is-prop (Path A x y) (is-contr/closed-upwards A cntr x y)

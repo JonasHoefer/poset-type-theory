@@ -1,0 +1,35 @@
+-- This file implements Russel paradox (as we have type in type).
+
+module Experiments.RusselParadox where
+
+import Foundation.Core.Paths
+
+import Foundation.EmptyType
+
+data SET : U =
+  set (X : U) (f : X -> SET)
+
+SET/mem (a : SET) : SET -> U = split
+  set X f -> (x : X) * (Path SET a (f x))
+
+SET/nmem (a b : SET) : U =
+  neg (SET/mem a b)
+
+RUSSEL-SET : SET =
+  set ((s : SET) * (SET/nmem s s)) (\ x. x.1)
+
+IN-RUSSEL-SET (X : SET) (t : SET/mem X RUSSEL-SET) : SET/nmem X X =
+  J SET t.1.1
+    ( \ Y _. SET/nmem Y Y)
+    ( t.1.2) X
+    ( inv SET X t.1.1 t.2)
+
+RUSSEL-SET-NOT-IN-RUSSEL-SET : SET/nmem RUSSEL-SET RUSSEL-SET =
+  \ t. IN-RUSSEL-SET RUSSEL-SET t t
+
+IN-RUSSEL-SET' (X : SET) (f : SET/nmem X X) : SET/mem X RUSSEL-SET =
+  ((X, f), refl SET X)
+
+RUSSEL-falso : Empty =
+  RUSSEL-SET-NOT-IN-RUSSEL-SET
+    ( IN-RUSSEL-SET' RUSSEL-SET RUSSEL-SET-NOT-IN-RUSSEL-SET)

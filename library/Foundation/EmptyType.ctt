@@ -1,0 +1,17 @@
+-- This file defines the empty type.
+
+module Foundation.EmptyType where
+
+-- Definition as an inductive datatype.
+data Empty : U =
+
+-- It satisfies the following induction principle.
+ind-Empty (P : Empty -> U) : (x : Empty) -> P x = split
+
+-- In particular, for a constant type family:
+ex-falso (A : U) : Empty -> A = ind-Empty (\ _. A)
+
+-- We can then define the negation and the emptiness of a type.
+neg (A : U) : U = A -> Empty
+
+is-empty (A : U) : U = neg A

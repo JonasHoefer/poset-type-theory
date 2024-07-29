@@ -1,0 +1,31 @@
+-- This file puts in relation different ways to state equality between dependent pairs.
+
+module Foundation.Core.DependentPairEquality where
+
+import Foundation.Core.Paths
+
+-- Using dependent paths.
+SgPathP (A : U) (B : A -> U) (u v : Sg A B) : U
+  = (p : Path A u.1 v.1) * PathP (i. B (p i)) u.2 v.2
+
+-- Using transports.
+SgPathO (A : U) (B : A -> U) (u v : Sg A B) : U
+  = (p : Path A u.1 v.1) * PathO A u.1 v.1 p B u.2 v.2
+
+-- Both of those formulations are equal.
+SgPathP-eq-SgPathO (A : U) (B : A -> U) (u v : Sg A B)
+  : Path U (SgPathP A B u v) (SgPathO A B u v)
+  = \i. (p : Path A u.1 v.1) * PathP-eq-PathO A u.1 v.1 p B u.2 v.2 i
+
+SgPathP->PathSg (A : U) (B : A -> U) (u v : Sg A B) (p : SgPathP A B u v) : Path (Sg A B) u v
+  = \i. (p.1 i, p.2 i)
+
+PathSg->SgPathP (A : U) (B : A -> U) (u v : Sg A B) (p : Path (Sg A B) u v) : SgPathP A B u v
+  = (\i. (p i).1, \i. (p i).2)
+
+PathSg-equiv-SgPathP (A : U) (B : A -> U) (u v : Sg A B) : Equiv (Path (Sg A B) u v) (SgPathP A B u v)
+  = (PathSg->SgPathP A B u v -- a strict iso is almost directly a contractible map
+    , \pq. ((SgPathP->PathSg A B u v pq , refl (SgPathP A B u v) pq)
+           , \f i. (SgPathP->PathSg A B u v (f.2 i) , \j. f.2 (i /\ j))
+           )
+    )

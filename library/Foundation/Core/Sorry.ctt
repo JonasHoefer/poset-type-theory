@@ -1,0 +1,12 @@
+-- This file implements the primitive "sorry", as a placeholder for a proof.
+
+module Foundation.Core.Sorry where
+
+data SINGL : U = tt
+
+falso (P : U) : SINGL -> P = split
+  tt -> falso P tt
+
+sorry (P : U) : P = falso P tt
+
+lock sorry

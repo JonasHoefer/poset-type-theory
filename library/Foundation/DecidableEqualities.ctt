@@ -1,0 +1,453 @@
+-- This file defines decidable equalities of types.
+
+module Foundation.DecidableEqualities where
+
+import Foundation.FundamentalTheoremOfIdentityTypes
+import Foundation.HomotopyTypes
+
+-- Hedberg's theorem
+fundamental-theorem-id-map (A : U) (R : A -> A -> U) (r : (x : A) -> R x x) (x y : A) (p : Path A x y) : R x y =
+  J A x (\ z _. R x z) (r x) y p
+
+fundamental-theorem-id-isretr (A : U) (R : A -> A -> U) (H : (x y : A) -> is-prop (R x y)) (rf : (x : A) -> R x x) (M : (x y : A) -> R x y -> Path A x y)
+                              (x y : A) : retract-of (R x y) (Path A x y) =
+  let s : R x y -> Path A x y = M x y
+      r : Path A x y -> R x y = fundamental-theorem-id-map A R rf x y
+  in
+  (s, (r, \ u. H x y (r (s u)) u))
+
+fundamental-theorem-id'' (A : U) (R : A -> A -> U) (H : (x y : A) -> is-prop (R x y)) (r : (x : A) -> R x x) (M : (x y : A) -> R x y -> Path A x y)
+                         (x y : A) : is-equiv (Path A x y) (R x y) (fundamental-theorem-id-map A R r x y) =
+  fundamental-theorem-id A (R x) x (fundamental-theorem-id-map A R r x)
+    (is-contr/closed-retract (Sg A (R x)) (Sg A (\ z. Path A x z)) (Sg/closed-retract A (R x) (\ z. Path A x z) (fundamental-theorem-id-isretr A R H r M x)) (is-contr/Sg-path-is-contr A x)) y
+
+fundamental-theorem-id/Equiv (A : U) (R : A -> A -> U) (H : (x y : A) -> is-prop (R x y)) (r : (x : A) -> R x x) (M : (x y : A) -> R x y -> Path A x y)
+                             (x y : A) : Equiv (Path A x y) (R x y) =
+  (fundamental-theorem-id-map A R r x y, fundamental-theorem-id'' A R H r M x y)
+
+id-rel/is-set (A : U) (R : A -> A -> U) (H : (x y : A) -> is-prop (R x y)) (r : (x : A) -> R x x) (M : (x y : A) -> R x y -> Path A x y) : is-set A =
+  \ x y. is-prop/closed-equiv (Path A x y) (R x y) (fundamental-theorem-id/Equiv A R H r M x y) (H x y)
+
+hedberg/bin-rel' (A : U) (x y : A) : (Coprod (Path A x y) (neg (Path A x y))) -> U = split
+  inl _ -> Unit
+  inr _ -> Empty
+
+hedberg/bin-rel (A : U) (d : has-decidable-equality A) (x y : A) : U =
+  hedberg/bin-rel' A x y (d x y)
+
+hedberg/bin-rel/refl (A : U) (d : has-decidable-equality A) (x : A) : hedberg/bin-rel A d x x =
+  ind-Coprod (Path A x x) (neg (Path A x x)) (\ p. hedberg/bin-rel' A x x p)
+    (\ _. star) (\ f. f (refl A x)) (d x x)
+
+hedberg/bin-rel/is-prop (A : U) (d : has-decidable-equality A) (x y : A) : is-prop (hedberg/bin-rel A d x y) =
+  ind-Coprod (Path A x y) (neg (Path A x y)) (\ q. is-prop (hedberg/bin-rel' A x y q))
+    (\ _. Unit/is-prop)
+    (\ _ z t. ex-falso (Path Empty z t) z) (d x y)
+
+hedberg/bin-rel/id' (A : U) (d : has-decidable-equality A) (x y : A) : (q : Coprod (Path A x y) (neg (Path A x y))) -> hedberg/bin-rel' A x y q -> Path A x y = split
+  inl p -> \ _. p
+  inr _ -> \ e. ex-falso (Path A x y) e
+
+hedberg/bin-rel/id (A : U) (d : has-decidable-equality A) (x y : A) (r : hedberg/bin-rel A d x y) : Path A x y =
+  hedberg/bin-rel/id' A d x y (d x y) r
+
+hedberg (A : U) (d : has-decidable-equality A) : is-set A =
+  id-rel/is-set A (hedberg/bin-rel A d) (hedberg/bin-rel/is-prop A d) (hedberg/bin-rel/refl A d) (hedberg/bin-rel/id A d)
+
+-- Coproduct observational equality
+Coprod/Eq-inl (A B : U) (a : A) : Coprod A B -> U = split
+  inl x -> Path A a x
+  inr _ -> Empty
+
+Coprod/Eq-inr (A B : U) (b : B) : Coprod A B -> U = split
+  inl _ -> Empty
+  inr y -> Path B b y
+
+Coprod/Eq (A B : U) : Coprod A B -> Coprod A B -> U = split
+  inl a -> Coprod/Eq-inl A B a
+  inr b -> Coprod/Eq-inr A B b
+
+Coprod/Eq/refl (A B : U) : (x : Coprod A B) -> Coprod/Eq A B x x = split
+  inl y -> refl A y
+  inr z -> refl B z
+
+Coprod/Eq/is-contr (A B : U) : (s : Coprod A B) -> is-contr (Sg (Coprod A B) (Coprod/Eq A B s)) = split
+  inl x -> is-contr/is-contr-equiv (Sg (Coprod A B) (Coprod/Eq A B (inl x))) (Sg A (\ y. Path A x y))
+            (Equiv/trans (Sg (Coprod A B) (Coprod/Eq A B (inl x))) (Coprod (Sg A (\ y. Path A x y)) (B * Empty)) (Sg A (\ y. Path A x y))
+              (Equiv/Sg-distr-over-coprod A B (Coprod/Eq A B (inl x)))
+              (Equiv/trans (Coprod (Sg A (\ y. Path A x y)) (B * Empty)) (Coprod (Sg A (\ y. Path A x y)) Empty) (Sg A (\ y. Path A x y))
+                (Coprod/closed-Equiv (Sg A (\ y. Path A x y)) (Sg A (\ y. Path A x y)) (B * Empty) Empty (Equiv/refl (Sg A (\ y. Path A x y))) (Equiv/Sg-empty B))
+                (Equiv/Equiv-copr-type-empty (Sg A (\ y. Path A x y)))))
+            (is-contr/Sg-path-is-contr A x)
+  inr y -> is-contr/is-contr-equiv (Sg (Coprod A B) (Coprod/Eq A B (inr y))) (Sg B (\ z. Path B y z))
+            (Equiv/trans (Sg (Coprod A B) (Coprod/Eq A B (inr y))) (Coprod (A * Empty) (Sg B (\ z. Path B y z))) (Sg B (\ z. Path B y z))
+              (Equiv/Sg-distr-over-coprod A B (Coprod/Eq A B (inr y)))
+              (Equiv/trans (Coprod (A * Empty) (Sg B (\ z. Path B y z))) (Coprod Empty (Sg B (\ z. Path B y z))) (Sg B (\ z. Path B y z))
+                (Coprod/closed-Equiv (A * Empty) Empty (Sg B (\ z. Path B y z)) (Sg B (\ z. Path B y z))
+                  (Equiv/Sg-empty A) (Equiv/refl (Sg B (\ z. Path B y z))))
+                (Equiv/Equiv-copr-empty-type (Sg B (\ z. Path B y z)))))
+            (is-contr/Sg-path-is-contr B y)
+
+Coprod/Eq/eq-map (A B : U) (s : Coprod A B) : (t : Coprod A B) -> Path (Coprod A B) s t -> Coprod/Eq A B s t = split
+  inl x -> \ p. J (Coprod A B) (inl x) (\ t _. Coprod/Eq A B t (inl x)) (refl A x) s (inv (Coprod A B) s (inl x) p)
+  inr y -> \ p. J (Coprod A B) (inr y) (\ t _. Coprod/Eq A B t (inr y)) (refl B y) s (inv (Coprod A B) s (inr y) p)
+
+Coprod/Eq/is-equiv-eq-map (A B : U) (s t : Coprod A B) : is-equiv (Path (Coprod A B) s t) (Coprod/Eq A B s t) (Coprod/Eq/eq-map A B s t) =
+  fundamental-theorem-id (Coprod A B) (Coprod/Eq A B s) s (Coprod/Eq/eq-map A B s) (Coprod/Eq/is-contr A B s) t
+
+Coprod/Eq/Equiv (A B : U) (s t : Coprod A B) : Equiv (Path (Coprod A B) s t) (Coprod/Eq A B s t) =
+  ( Coprod/Eq/eq-map A B s t,
+    Coprod/Eq/is-equiv-eq-map A B s t)
+
+Coprod/Eq/Equiv' (A B : U) (s t : Coprod A B) : Equiv (Coprod/Eq A B s t) (Path (Coprod A B) s t) =
+  Equiv/sym 
+    ( Path (Coprod A B) s t)
+    ( Coprod/Eq A B s t)
+    ( Coprod/Eq/Equiv A B s t)
+
+Coprod/Eq/map (A B : U) (s t : Coprod A B) : Coprod/Eq A B s t -> Path (Coprod A B) s t =
+  is-equiv/inv-map (Path (Coprod A B) s t) (Coprod/Eq A B s t) (Coprod/Eq/eq-map A B s t) (Coprod/Eq/is-equiv-eq-map A B s t)
+
+Coprod/inl-inj (A B : U) (x y : A) (p : Path (Coprod A B) (inl x) (inl y)) : Path A x y =
+  Coprod/Eq/eq-map A B (inl x) (inl y) p
+
+Coprod/inr-inj (A B : U) (x y : B) (p : Path (Coprod A B) (inr x) (inr y)) : Path B x y =
+  Coprod/Eq/eq-map A B (inr x) (inr y) p
+
+Coprod/dependent-universal-property/map (A B : U) (P : Coprod A B -> U) : ((z : Coprod A B) -> P z) -> ((x : A) -> P (inl x)) * ((y : B) -> P (inr y)) =
+  \ f. (\ x. f (inl x), \ y. f (inr y))
+
+Coprod/dependent-universal-property/inv-map (A B : U) (P : Coprod A B -> U) (t : ((x : A) -> P (inl x)) * ((y : B) -> P (inr y))) : (z : Coprod A B) -> P z = split
+  inl x -> t.1 x
+  inr y -> t.2 y
+
+Coprod/dependent-universal-property/right-htpy' (A B : U) (P : Coprod A B -> U) (f : ((x : A) -> P (inl x))) (g : ((y : B) -> P (inr y))) 
+                                                     : Path (((x : A) -> P (inl x)) * ((y : B) -> P (inr y)))
+                                                            (Coprod/dependent-universal-property/map A B P (Coprod/dependent-universal-property/inv-map A B P (f, g))) (f, g) =
+  let u : ((x : A) -> P (inl x)) * ((y : B) -> P (inr y)) = Coprod/dependent-universal-property/map A B P (Coprod/dependent-universal-property/inv-map A B P (f, g)) in
+  Eq-prod/eq
+    ( (x : A) -> P (inl x))
+    ( (y : B) -> P (inr y))
+    ( Coprod/dependent-universal-property/map A B P (Coprod/dependent-universal-property/inv-map A B P (f, g))) (f, g)
+    ( eq-htpy A
+      ( \ x. P (inl x)) u.1 f
+      ( \ x. refl (P (inl x)) (f x)),
+      eq-htpy B
+      ( \ y. P (inr y)) u.2 g
+      ( \ y. refl (P (inr y)) (g y)))      
+
+Coprod/dependent-universal-property/right-htpy (A B : U) (P : Coprod A B -> U) (t : ((x : A) -> P (inl x)) * ((y : B) -> P (inr y)))
+                                                    : Path (((x : A) -> P (inl x)) * ((y : B) -> P (inr y)))
+                                                           (Coprod/dependent-universal-property/map A B P (Coprod/dependent-universal-property/inv-map A B P t)) t =
+  Coprod/dependent-universal-property/right-htpy' A B P t.1 t.2
+
+Coprod/dependent-universal-property/left-htpy/Coprod (A B : U) (P : Coprod A B -> U) (f : (z : Coprod A B) -> P z)
+                                                          : (z : Coprod A B)
+                                                          -> Path (P z) (Coprod/dependent-universal-property/inv-map A B P (Coprod/dependent-universal-property/map A B P f) z) (f z) = split
+  inl x -> refl (P (inl x)) (f (inl x))
+  inr y -> refl (P (inr y)) (f (inr y))
+
+Coprod/dependent-universal-property/left-htpy (A B : U) (P : Coprod A B -> U) (f : (z : Coprod A B) -> P z)
+                                                    : Path ((z : Coprod A B) -> P z)
+                                                           (Coprod/dependent-universal-property/inv-map A B P (Coprod/dependent-universal-property/map A B P f)) f =
+  eq-htpy
+    ( Coprod A B) P
+    ( Coprod/dependent-universal-property/inv-map A B P (Coprod/dependent-universal-property/map A B P f)) f
+    ( Coprod/dependent-universal-property/left-htpy/Coprod A B P f)
+
+Coprod/dependent-universal-property/is-equiv (A B : U) (P : Coprod A B -> U)
+                                                  : is-equiv ((z : Coprod A B) -> P z) (((x : A) -> P (inl x)) * ((y : B) -> P (inr y))) (Coprod/dependent-universal-property/map A B P) =
+  has-inverse/is-equiv
+    ( (z : Coprod A B) -> P z)
+    ( ((x : A) -> P (inl x)) * ((y : B) -> P (inr y)))
+    ( Coprod/dependent-universal-property/map A B P)
+    ( Coprod/dependent-universal-property/inv-map A B P,
+      ( Coprod/dependent-universal-property/right-htpy A B P,
+        Coprod/dependent-universal-property/left-htpy A B P))
+
+Coprod/dependent-universal-property (A B : U) (P : Coprod A B -> U) : Equiv ((z : Coprod A B) -> P z) (((x : A) -> P (inl x)) * ((y : B) -> P (inr y))) =
+  ( Coprod/dependent-universal-property/map A B P,
+    Coprod/dependent-universal-property/is-equiv A B P)
+
+-- Some facts about decidability
+is-decidable/closed-Equiv (A B : U) (e : Equiv A B) : is-decidable B -> is-decidable A = split
+  inl y -> inl (Equiv/inv-map A B e y)
+  inr f -> inr (\ y. f (Equiv/map A B e y))
+
+is-decidable/closed-Equiv' (A B : U) (e : Equiv A B) : is-decidable A -> is-decidable B = split
+  inl x -> inl (Equiv/map A B e x)
+  inr f -> inr (\ x. f (Equiv/inv-map A B e x))
+
+is-decidable/is-prop/inl (A : U) (is-prop-A : is-prop A) (a : A) : (d : Coprod A (neg A)) -> Path (Coprod A (neg A)) (inl a) d = split
+  inl x -> Coprod/Eq/map A (neg A) (inl a) (inl x) (is-prop-A a x)
+  inr f -> ex-falso (Path (Coprod A (neg A)) (inl a) (inr f)) (f a)
+
+is-decidable/is-prop/inr (A : U) (is-prop-A : is-prop A) (f : neg A) : (d : Coprod A (neg A)) -> Path (Coprod A (neg A)) (inr f) d = split
+  inl a -> ex-falso (Path (Coprod A (neg A)) (inr f) (inl a)) (f a)
+  inr g -> Coprod/Eq/map A (neg A) (inr f) (inr g) (is-prop/pi A (\ _. Empty) (\ _. Empty/is-prop) f g)
+
+is-decidable/is-prop (A : U) (is-prop-A : is-prop A) : is-prop (is-decidable A) = split
+  inl a -> is-decidable/is-prop/inl A is-prop-A a
+  inr f -> is-decidable/is-prop/inr A is-prop-A f
+
+is-decidable/Prop (A : U) (is-prop-A : is-prop A) : Prop =
+  ( is-decidable A,
+    is-decidable/is-prop A is-prop-A)
+
+has-decidable-equality/is-prop (A : U) (H : (x y : A) -> is-prop (Path A x y)) : is-prop (has-decidable-equality A) =
+  is-prop/pi-2 A 
+    ( \ _. A)
+    ( \ x y. is-decidable (Path A x y))
+    ( \ x y. is-decidable/is-prop
+              ( Path A x y)
+              ( H x y))
+
+has-decidable-equality/Prop (A : U) (H : (x y : A) -> is-prop (Path A x y)) : Prop =
+  ( has-decidable-equality A,
+    has-decidable-equality/is-prop A H)
+
+is-contr/is-decidable (A : Prop) : is-decidable (Prop/type A) -> is-decidable (is-contr (Prop/type A)) = split
+  inl a -> inl (a, Prop/is-prop A a)
+  inr f -> inr (\ c. f c.1)
+
+-- Observational equality of fibrations
+Eq-fib (A B : U) (f : A -> B) (y : B) (a b : Fib A B f y) : U =
+  let x : A = a.1
+      p : Path B y (f x) = a.2
+      x' : A = b.1
+      p' : Path B y (f x') = b.2
+  in Sg (Path A x x') (\ H. Path (Path B y (f x')) (comp B y (f x) p (f x') (ap A B f x x' H)) p')
+
+Eq-fib/refl (A B : U) (f : A -> B) (y : B) (a : Fib A B f y) : Eq-fib A B f y a a =
+  let x : A = a.1
+      p : Path B y (f x) = a.2
+  in (refl A x, comp/ident-r B y (f x) p)
+
+Eq-fib/eq-map (A B : U) (f : A -> B) (y : B) (a b : Fib A B f y) (p : Path (Fib A B f y) a b) : Eq-fib A B f y a b =
+  J (Fib A B f y) a (\ c _. Eq-fib A B f y a c) (Eq-fib/refl A B f y a) b p
+
+Eq-fib/map-eq/refl-sg (A B : U) (f : A -> B) (y : B) (a : Fib A B f y) : Path (Fib A B f y) a a =
+  let x : A = a.1
+      p : Path B y (f x) = a.2
+  in
+  SgPathO->PathSg A (\ z. Path B y (f z)) a a (refl A x, PathO/refl A x (\ z. Path B y (f z)) p p (refl (Path B y (f x)) p))
+
+Eq-fib/map-eq/refl-refl (A B : U) (f : A -> B) (y : B) (a : Fib A B f y) (p : Path B y (f a.1))
+                        (q : Path (Path B y (f a.1)) (comp B y (f a.1) a.2 (f a.1) (refl B (f a.1))) p)
+                             : Path (Fib A B f y) a (a.1, p) =
+  let x : A = a.1
+      r : Path B y (f x) = a.2
+      q' : Path (Path B y (f x)) r p = comp (Path B y (f x)) r (comp B y (f x) r (f x) (refl B (f x))) (refl/comp-r B y (f x) r) p q
+  in
+  J (Path B y (f x)) a.2 (\ s _. Path (Fib A B f y) a (a.1, s))
+                         (Eq-fib/map-eq/refl-sg A B f y a) p q'
+
+Eq-fib/map-eq/refl (A B : U) (f : A -> B) (y : B) (a b : Fib A B f y) (p : Path A a.1 b.1)
+                   (q : Path (Path B y (f b.1)) (comp B y (f a.1) a.2 (f b.1) (ap A B f a.1 b.1 p)) b.2)
+                        : Path (Fib A B f y) a b =
+  let x : A = a.1
+      r : Path B y (f x) = a.2
+  in
+  J A x (\ c t. (s : Path B y (f c)) -> (Path (Path B y (f c)) (comp B y (f x) r (f c) (ap A B f x c t)) s) -> Path (Fib A B f y) (x, r) (c, s))
+        (Eq-fib/map-eq/refl-refl A B f y a) b.1 p b.2 q
+
+Eq-fib/map-eq (A B : U) (f : A -> B) (y : B) (a b : Fib A B f y) (eq-fib : Eq-fib A B f y a b) : Path (Fib A B f y) a b =
+  Eq-fib/map-eq/refl A B f y a b eq-fib.1 eq-fib.2
+
+-- Decidable equality of naturals
+Nat/has-decidable-eq/z : (n : Nat) -> is-decidable (Nat/eq zero n) = split
+  zero -> is-decidable/Unit
+  suc n -> is-decidable/Empty
+
+Nat/has-decidable-eq/s (m : Nat) (IH : (n : Nat) -> is-decidable (Nat/eq m n)) : (n : Nat) -> is-decidable (Nat/eq (suc m) n) = split
+  zero -> is-decidable/Empty
+  suc n -> IH n
+
+Nat/has-decidable-eq' : (m n : Nat) -> is-decidable (Nat/eq m n) = split
+  zero -> Nat/has-decidable-eq/z
+  suc m -> Nat/has-decidable-eq/s m
+            ( Nat/has-decidable-eq' m)
+
+Nat/has-decidable-eq : has-decidable-equality Nat =
+  \ m n. Coprod/map
+          ( Nat/eq m n)
+          ( neg (Nat/eq m n))
+          ( Path Nat m n)
+          ( neg (Path Nat m n))
+          ( Nat/eq/path m n)
+          ( \ f p. f (Nat/path/eq m n p))
+          ( Nat/has-decidable-eq' m n)
+
+Nat/is-set : is-set Nat =
+  hedberg Nat
+    ( Nat/has-decidable-eq)
+
+Nat/eq/Prop (m n : Nat) : Prop =
+  ( Path Nat m n,
+    Nat/is-set m n)
+
+le/s (m : Nat) (IH : Nat -> Prop) : Nat -> Prop = split
+  zero -> Empty/Prop
+  suc n -> IH n
+
+le : Nat -> Nat -> Prop = split
+  zero -> \ _. Unit/Prop
+  suc m -> le/s m (le m)
+
+le/is-reflexive : (n : Nat) -> Prop/type (le n n) = split
+  zero -> star
+  suc n -> le/is-reflexive n
+
+le/lower-bound : (n : Nat) -> Prop/type (le zero n) = split
+  zero -> star
+  suc n -> le/lower-bound n
+
+le/suc/s (m : Nat) (IH : (n : Nat) -> Prop/type (le m n) -> Prop/type (le m (suc n)))
+	    : (n : Nat) -> Prop/type (le (suc m) n) -> Prop/type (le (suc m) (suc n)) = split
+  zero -> ex-falso (Prop/type (le (suc m) one-Nat))
+  suc n -> \ le-sm-sn. IH n le-sm-sn
+
+le/suc : (m n : Nat) (le-m-n : Prop/type (le m n)) -> Prop/type (le m (suc n)) = split
+  zero -> \ n _. le/lower-bound (suc n)
+  suc m -> le/suc/s m (le/suc m)
+
+le/left-inj (m : Nat) : (n : Nat) -> Prop/type (le (suc m) n) -> Prop/type (le m n) = split
+  zero -> ex-falso (Prop/type (le m zero)) 
+  suc n -> \ le-sm-sn. le/suc m n le-sm-sn
+
+le/is-antisymmetric/z : (n : Nat) -> Prop/type (le zero n) -> Prop/type (le n zero) -> Path Nat zero n = split
+  zero -> \ _ _. refl Nat zero
+  suc n -> \ _ x. ex-falso (Path Nat zero (suc n)) x
+
+le/is-antisymmetric/s (m : Nat) (IH : (n : Nat) -> Prop/type (le m n) -> Prop/type (le n m) -> Path Nat m n)
+			 : (n : Nat) -> Prop/type (le (suc m) n) -> Prop/type (le n (suc m)) -> Path Nat (suc m) n = split
+  zero -> \ x _. ex-falso (Path Nat (suc m) zero) x
+  suc n -> \ le-sm-sn le-sn-sm. ap Nat Nat (\ z. suc z) m n (IH n le-sm-sn le-sn-sm)
+
+le/is-antisymmetric : (m n : Nat) -> Prop/type (le m n) -> Prop/type (le n m) -> Path Nat m n = split
+  zero -> le/is-antisymmetric/z
+  suc m -> le/is-antisymmetric/s m (le/is-antisymmetric m)
+
+le/is-transitive/s' (m n : Nat) (le-sm-sn : Prop/type (le (suc m) (suc n)))
+		    (IH : (p : Nat) -> Prop/type (le m n) -> Prop/type (le n p) -> Prop/type (le m p))
+			: (p : Nat) -> Prop/type (le (suc n) p) -> Prop/type (le (suc m) p) = split
+  zero -> ex-falso (Prop/type (le (suc m) zero))
+  suc p -> IH p le-sm-sn
+
+le/is-transitive/s (m : Nat) (IH : (n p : Nat) -> Prop/type (le m n) -> Prop/type (le n p) -> Prop/type (le m p))
+		      : (n p : Nat) -> Prop/type (le (suc m) n) -> Prop/type (le n p)
+			-> Prop/type (le (suc m) p) = split
+  zero -> \ p x _. ex-falso (Prop/type (le (suc m) p)) x
+  suc n -> \ p le-sm-sn. le/is-transitive/s' m n le-sm-sn (IH n) p
+
+le/is-transitive : (m n p : Nat) -> Prop/type (le m n) -> Prop/type (le n p)
+				 -> Prop/type (le m p) = split
+  zero -> \ _ p _ _. le/lower-bound p
+  suc m -> le/is-transitive/s m (le/is-transitive m)
+
+le/is-decidable/s (m : Nat) (H : (n : Nat) -> is-decidable (Prop/type (le m n)))
+		     : (n : Nat) -> is-decidable (Prop/type (le (suc m) n)) = split
+  zero -> is-decidable/Empty
+  suc n -> H n
+
+le/is-decidable : (m n : Nat) -> is-decidable (Prop/type (le m n)) = split
+  zero -> \ _. is-decidable/Unit
+  suc m -> le/is-decidable/s m (le/is-decidable m)
+
+le/neg' (m : Nat) (IH : (n : Nat) -> neg (Prop/type (le m n)) -> Prop/type (le n m))
+	   : (n : Nat) -> (neg (Prop/type (le (suc m) n))) -> Prop/type (le n (suc m)) = split
+  zero -> \ _. le/lower-bound (suc m)
+  suc n -> \ f. IH n f
+
+le/neg : (m n : Nat) (f : neg (Prop/type (le m n))) -> Prop/type (le n m) = split
+  zero -> \ n f. ex-falso (Prop/type (le n zero)) (f (le/lower-bound n))
+  suc m -> le/neg' m (le/neg m)
+
+le/is-total' (m n : Nat) : Coprod (Prop/type (le m n)) (neg (Prop/type (le m n)))
+		  -> Coprod (Prop/type (le m n)) (Prop/type (le n m)) = split
+  inl x -> inl x
+  inr nx -> inr (le/neg m n nx)
+
+le/is-total (m n : Nat) : Coprod (Prop/type (le m n)) (Prop/type (le n m)) =
+  le/is-total' m n
+    ( le/is-decidable m n)
+
+one-le-suc : (k : Nat) -> Prop/type (le one-Nat (suc k)) = split
+  zero -> le/is-reflexive one-Nat
+  suc k -> one-le-suc k
+
+le/double-suc/s (m : Nat) : (n : Nat) -> Prop/type (le (suc m) n) -> Prop/type (le (suc (suc m)) (suc n)) = split
+  zero -> ex-falso (Prop/type (le (suc (suc m)) one-Nat))
+  suc n -> \ x. x
+
+le/double-suc : (m n : Nat) -> Prop/type (le m n) -> Prop/type (le (suc m) (suc n)) = split
+  zero -> \ n _. one-le-suc n
+  suc m -> le/double-suc/s m
+
+lt (m n : Nat) : Prop =
+  le (suc m) n
+
+lt/suc-right (m n : Nat) (lt-m-n : Prop/type (lt m n)) : Prop/type (lt m (suc n)) =
+  le/suc (suc m) n lt-m-n
+
+lt/next (n : Nat) : Prop/type (lt n (suc n)) =
+  le/is-reflexive n
+
+lt/irreflexive : (n : Nat) -> neg (Prop/type (lt n n)) = split
+  zero -> \ x. x
+  suc n -> lt/irreflexive n
+
+lt/double-suc (m n : Nat) (lt-m-n : Prop/type (lt m n)) : Prop/type (lt (suc m) (suc n)) =
+  le/double-suc (suc m) n lt-m-n
+
+le-neq-lt/z : (n : Nat) (f : neg (Path Nat zero n))              
+		 -> Prop/type (lt zero n) = split
+  zero -> \ f. ex-falso (Prop/type (lt zero zero)) (f (refl Nat zero))
+  suc n -> \ _. one-le-suc n
+
+le-neq-lt/s (k : Nat) (IH : (n : Nat) -> Prop/type (le k n) -> neg (Path Nat k n) -> Prop/type (lt k n))
+	       : (n : Nat) -> Prop/type (le (suc k) n) -> neg (Path Nat (suc k) n)
+			   -> Prop/type (lt (suc k) n) = split
+  zero -> \ x _. ex-falso (Prop/type (lt (suc k) zero)) x
+  suc n -> \ le-sk-sn f.
+    IH n le-sk-sn (\ p. f (ap Nat Nat (\ x. suc x) k n p))
+
+le-neq-lt : (k n : Nat) (le-k-n : Prop/type (le k n)) (f : neg (Path Nat k n))
+		 -> Prop/type (lt k n) = split
+  zero -> \ n _ f. le-neq-lt/z n f
+  suc k -> le-neq-lt/s k (le-neq-lt k)
+
+lt-neq (k n : Nat) (lt-k-n : Prop/type (lt k n)) : neg (Path Nat k n) =
+  \ p. lt/irreflexive n
+	( tr Nat k n p (\ x. Prop/type (lt x n)) lt-k-n)
+
+lt/is-decidable (k n : Nat) : is-decidable (Prop/type (lt k n)) =
+  le/is-decidable (suc k) n
+
+is-lower-bound (P : Nat -> U) (n : Nat) : U =
+  (x : Nat) -> P x -> Prop/type (le n x)
+
+well-ordering-principle'' (Q : Nat -> U) (qnz : neg (Q zero)) (n : Nat) (H : (x : Nat) -> is-decidable (Q x))
+			  (H' : is-lower-bound (\ x. Q (suc x)) n)
+			     : (x : Nat) -> (q : Q x) -> Prop/type (le (suc n) x) = split
+  zero -> \ q. ex-falso (Prop/type (le (suc n) zero)) (qnz q)
+  suc x -> H' x
+
+well-ordering-principle' (Q : Nat -> U) (n : Nat) (H : (x : Nat) -> is-decidable (Q x))
+			 (IH : (Q' : Nat -> U) -> ((x : Nat) -> is-decidable (Q' x)) -> Q' n -> Sg Nat (\ m. (Q' m) * is-lower-bound Q' m))
+			 (q : Q (suc n)) : Coprod (Q zero) (neg (Q zero))
+			  -> Sg Nat (\ m. (Q m) * is-lower-bound Q m) = split
+  inl qz -> (zero, (qz, \ x _. le/lower-bound x))
+  inr qnz ->
+    let t : Sg Nat (\ m. (Q (suc m)) * is-lower-bound (\ x. Q (suc x)) m) = IH (\ m. Q (suc m)) (\ m. H (suc m)) q in
+    ( suc t.1, (t.2.1, well-ordering-principle'' Q qnz t.1 H t.2.2))
+
+well-ordering-principle-bis : (n : Nat) (Q : Nat -> U) -> ((x : Nat) -> is-decidable (Q x)) -> Q n
+			     -> Sg Nat (\ m. (Q m) * is-lower-bound Q m) = split
+  zero -> \ Q _ q. (zero, (q, \ x _. le/lower-bound x))
+  suc n -> \ Q H q. well-ordering-principle' Q n H (well-ordering-principle-bis n) q (H zero)
+
+well-ordering-principle (P : Nat -> U) (H : (x : Nat) -> is-decidable (P x))
+			   : (Sg Nat P) -> (Sg Nat (\ n. (P n) * (is-lower-bound P n))) =
+  \ t.
+    well-ordering-principle-bis t.1 P H t.2

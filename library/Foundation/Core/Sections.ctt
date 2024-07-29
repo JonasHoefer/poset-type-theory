@@ -1,0 +1,26 @@
+-- This file defines sections, i.e., right inverses.
+
+module Foundation.Core.Sections where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Homotopies
+
+-- Definition
+
+is-section (A B : U) (f : A -> B) (g : B -> A) : U
+  = Htpy' B B (\x. f (g x)) (id B)
+
+Sec (A B : U) (f : A -> B) : U
+  = (s : B -> A) * is-section A B f s
+
+-- Properties
+
+Sec/left-factor (A B C : U) (f : B -> C) (g : A -> B) (sec : Sec A C (\x. f (g x))) : Sec B C f
+  = (\c. g (sec.1 c), sec.2)
+
+Sec/comp (B C : U) (f2 : B -> C) (s2 : Sec B C f2) (A : U) (f1 : A -> B) (s1 : Sec A B f1) : Sec A C (\x. f2 (f1 x))
+  = (\z. s1.1 (s2.1 z)
+    , Htpy'/comp C C (\z. f2 (f1 (s1.1 (s2.1 z)))) (\z. f2 (s2.1 z)) (id C)
+        (Htpy'/whisker C B B C (\x. f1 (s1.1 x)) (id B) f2 s1.2 s2.1)
+        s2.2
+    )

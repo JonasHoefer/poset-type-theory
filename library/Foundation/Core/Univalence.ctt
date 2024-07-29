@@ -1,0 +1,11 @@
+
+module Foundation.Core.Univalence where
+
+import Foundation.Core.Primitives
+import Foundation.Core.HomotopyTypes
+
+equiv-to-path (A B : U) (e : Equiv A B) : Path U A B
+  = \i. Ext B [ (i=0) -> (A, e.1, e.2), (i=1) -> (B, id B, id/is-equiv B) ]
+
+path-to-equiv (A B : U) (p : Path U A B) : Equiv A B
+  = (tr U A B p (id U), tr/is-equiv U A B p (id U))

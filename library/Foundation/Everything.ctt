@@ -1,0 +1,35 @@
+-- This file exports all the definitions of Foundation.
+
+module Foundation.Everything where
+
+import Foundation.Core.Everything
+
+import Foundation.BiInvertibleMaps
+import Foundation.ContractibleMaps
+import Foundation.CoproductType
+import Foundation.Counting
+import Foundation.DecidableEqualities
+import Foundation.DecidableTypes
+import Foundation.DependentPairEquality
+import Foundation.EmptyProperties
+import Foundation.EmptyType
+import Foundation.Equivalences
+import Foundation.EquivalenceRelations
+import Foundation.FiniteTypes
+import Foundation.FunctionExtensionality
+import Foundation.FundamentalTheoremOfIdentityTypes
+import Foundation.GlobalChoice
+import Foundation.HomotopyTypes
+import Foundation.Images
+import Foundation.IsoToEquiv
+import Foundation.NaturalNumbers
+import Foundation.PathsProperties  
+import Foundation.ProdType
+import Foundation.PropositionsProperties
+import Foundation.PropositionalTruncation
+import Foundation.StandardFiniteTypes
+import Foundation.SetQuotients
+import Foundation.SetTruncation
+import Foundation.Subtypes
+import Foundation.UnitType
+import Foundation.Univalence

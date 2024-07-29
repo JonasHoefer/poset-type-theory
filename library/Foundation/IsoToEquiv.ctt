@@ -1,0 +1,109 @@
+-- This file implements the optimized version of the proof that an isomorphism is an equivalence.
+-- You can find another proof in Foundation.ContractibleMap
+
+module Foundation.IsoToEquiv where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Homotopies
+import Foundation.Core.InvertibleMaps
+import Foundation.Core.Paths
+import Foundation.Core.HomotopyTypes
+
+Square (A : U) (a0 b0 a1 b1 : A)
+       (p : Path A a0 a1) (q : Path A b0 b1)
+       (r0 : Path A a0 b0) (r1 : Path A a1 b1) : U =
+  PathP (i. (Path A (p i) (q i))) r0 r1
+
+iso-to-equiv/center (A B : U) (f : A -> B) (i : has-inverse A B f) (y : B)
+			 : Fib A B f y =
+  let g : B -> A = QInv/map A B f i in      
+  ( g y,
+    inv B (f (g y)) y
+    ( QInv/right-htpy A B f i y))
+
+lem-iso/rem (A B : U) (f : A -> B) (g : B -> A)
+	    (K : Htpy' A A (\ x. g (f x)) (id A))
+	    (y : B) (x : A) (p : Path B y (f x))
+	       : Path A (g y) x =
+  \ i. hComp 0 1 A (g (p i)) [ (i=0) -> _. g y, (i=1) -> j. K x j ]
+
+lem-iso/p (A B : U) (f : A -> B) (g : B -> A)
+	  (K : Htpy' A A (\ x. g (f x)) (id A))
+	  (y : B) (x0 x1 : A)
+	  (p0 : Path B y (f x0))
+	  (p1 : Path B y (f x1))
+	      : Path A x0 x1 =
+  \ i. hComp 0 1 A (g y) [ (i=0) -> j. lem-iso/rem A B f g K y x0 p0 j,
+			  (i=1) -> j. lem-iso/rem A B f g K y x1 p1 j ]
+
+lem-iso/fill (A B : U) (f : A -> B) (g : B -> A)
+	     (K : Htpy' A A (\ x. g (f x)) (id A))
+	     (y : B) (x : A) (p : Path B y (f x))
+  : Square A (g y) (g y) (g (f x)) x
+	     (\ i. g (p i))
+	     (lem-iso/rem A B f g K y x p)
+	     (\ i. g y)
+	     (K x) =
+  \ i j. hComp 0 1 A (g (p i)) [ (i=0) -> _. g y,
+				(i=1) -> k. K x (j /\ k),
+				(j=0) -> _. g (p i) ]
+
+lem-iso/fill' (A B : U) (f : A -> B) (g : B -> A)
+	      (K : Htpy' A A (\ x. g (f x)) (id A))
+	      (y : B) (x0 x1 : A)
+	      (p0 : Path B y (f x0))
+	      (p1 : Path B y (f x1))
+  : Square A (g y) x0 (g y) x1
+	     (\ _. g y)
+	     (lem-iso/p A B f g K y x0 x1 p0 p1)
+	     (lem-iso/rem A B f g K y x0 p0)
+	     (lem-iso/rem A B f g K y x1 p1) =
+  \ i j. hComp 0 1 A (g y) [ (i=0) -> k. lem-iso/rem A B f g K y x0 p0 (j /\ k),
+			    (i=1) -> k. lem-iso/rem A B f g K y x1 p1 (j /\ k),
+			    (j=0) -> _. g y ]
+
+lem-iso/sq (A B : U) (f : A -> B) (g : B -> A)
+	   (K : Htpy' A A (\ x. g (f x)) (id A))
+	   (y : B) (x0 x1 : A)
+	   (p0 : Path B y (f x0))
+	   (p1 : Path B y (f x1))
+  : Square A (g y) (g (f x0)) (g y) (g (f x1))
+      (\ _. g y)
+      (\ i. g (f (lem-iso/p A B f g K y x0 x1 p0 p1 i)))
+      (\ i. g (p0 i))
+      (\ i. g (p1 i)) =
+  \ i j. hComp 1 0 A (lem-iso/fill' A B f g K y x0 x1 p0 p1 i j)
+	  [ (i=0) -> k. lem-iso/fill A B f g K y x0 p0 j k,
+	    (i=1) -> k. lem-iso/fill A B f g K y x1 p1 j k,
+	    (j=0) -> _. g y,
+	    (j=1) -> k. K (lem-iso/p A B f g K y x0 x1 p0 p1 i) k ]
+
+lem-iso/sq' (A B : U) (f : A -> B) (g : B -> A)
+	    (H : Htpy' B B (\ y. f (g y)) (id B))
+	    (K : Htpy' A A (\ x. g (f x)) (id A))
+	    (y : B) (x0 x1 : A)
+	    (p0 : Path B y (f x0))
+	    (p1 : Path B y (f x1))
+  : Square B y (f x0) y (f x1)
+      (\ _. y)
+      (\ i. f (lem-iso/p A B f g K y x0 x1 p0 p1 i)) p0 p1 =
+  \ i j. hComp 0 1 B (f (lem-iso/sq A B f g K y x0 x1 p0 p1 i j))
+	  [ (i=0) -> k. H (p0 j) k,
+	    (i=1) -> k. H (p1 j) k,
+	    (j=0) -> k. H y k,
+	    (j=1) -> k. H (f (lem-iso/p A B f g K y x0 x1 p0 p1 i)) k ]
+
+lem-iso/is-prop-fib (A B : U) (f : A -> B) (e : has-inverse A B f)
+		    (y : B) : is-prop (Fib A B f y) =
+  let g : B -> A = QInv/map A B f e
+      H : Htpy' B B (\ y'. f (g y')) (id B) = QInv/right-htpy A B f e
+      K : Htpy' A A (\ x. g (f x)) (id A) = QInv/left-htpy A B f e in
+  \ t u i.
+    ( lem-iso/p A B f g K y t.1 u.1 t.2 u.2 i,
+      lem-iso/sq' A B f g H K y t.1 u.1 t.2 u.2 i)
+
+iso-to-equiv (A B : U) (f : A -> B) (i : has-inverse A B f)
+		  : is-equiv A B f =
+  \ y.
+  let c : Fib A B f y = iso-to-equiv/center A B f i y in
+  ( c, lem-iso/is-prop-fib A B f i y c)

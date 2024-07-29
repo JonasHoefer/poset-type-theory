@@ -1,0 +1,44 @@
+-- This file defines homotopies, i.e., filling the space between functions.
+
+module Foundation.Core.Homotopies where
+
+import Foundation.Core.Primitives
+
+-- Definitions
+
+Htpy (A : U) (B : A -> U) (f g : Pi A B) : U = (x : A) -> Path (B x) (f x) (g x)
+
+Htpy' (A B : U) : (f g : A -> B) -> U = Htpy A (\_. B)
+
+-- Composition of homotopies
+
+Htpy/comp (A : U) (B : A -> U) (f g h : Pi A B) (H1 : Htpy A B f g) (H2 : Htpy A B g h) : Htpy A B f h
+  = \x. comp (B x) (f x) (g x) (H1 x) (h x) (H2 x)
+
+Htpy'/comp (A B : U) : (f g h : A -> B) -> Htpy' A B f g -> Htpy' A B g h -> Htpy' A B f h
+  = Htpy/comp A (\_. B)
+
+-- Inversion of homotopies
+Htpy/sym (A : U) (B : A -> U) (f g : (x : A) -> B x) (H : Htpy A B f g) : Htpy A B g f =
+  \ x. inv (B x) (f x) (g x) (H x)
+
+Htpy'/sym (A B : U) : (f : A -> B) -> (g : A -> B) -> Htpy' A B f g -> Htpy' A B g f =
+  Htpy/sym A (\ _. B)
+
+Htpy/inv : (A : U) -> (B : A -> U) -> (f g : (x : A) -> B x) -> (H : Htpy A B f g) -> Htpy A B g f = Htpy/sym
+
+Htpy'/inv : (A B : U) -> (f g : A -> B) -> (H : Htpy' A B f g) -> Htpy' A B g f = Htpy'/sym
+
+-- Reflexive homotopy
+Htpy/refl (A : U) (B : A -> U) (f : (x : A) -> B x) : Htpy A B f f =
+  \ x. refl (B x) (f x)
+
+Htpy'/refl (A B : U) : (f : A -> B) -> Htpy' A B f f =
+  Htpy/refl A (\ _. B)
+
+-- Whiskering
+
+Htpy'/whisker (A B C D : U) (g1 g2 : B -> C) (f : C -> D) (H : Htpy' B C g1 g2) (h : A -> B)
+  : Htpy' A D (\x. f (g1 (h x))) (\x. f (g2 (h x)))
+  = \x i. f (H (h x) i)
+

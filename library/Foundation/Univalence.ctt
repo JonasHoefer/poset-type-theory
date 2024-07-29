@@ -1,0 +1,79 @@
+-- This file shows that path-to-equiv is an isomorphism and hence an equivalence.
+
+module Foundation.Univalence where
+
+import Foundation.Core.Univalence
+import Foundation.Core.IsomorphicMaps
+
+import Foundation.HomotopyTypes
+import Foundation.FundamentalTheoremOfIdentityTypes
+import Foundation.FunctionExtensionality
+
+path-to-equiv/refl (A : U) : Path (Equiv A A) (path-to-equiv A A (refl U A)) (IdEquiv A)
+  = SgPath-prop (A -> A) (is-equiv A A) (is-equiv/is-prop A A) (path-to-equiv A A (refl U A)) (IdEquiv A)
+      (tr/refl U A (id U))
+
+-- this relies on coe in Ext types
+-- an alternative would be to show that Ext types yield that (A : U) * Path U A B has
+-- an extension operation and is thus contractible, yielding univalence by the
+-- fundamental theorem of Id types
+equiv-to-path/comp/fun (A B : U) (e : Equiv A B)
+  : Path (A -> B) (tr U A B (equiv-to-path A B e) (id U)) e.1
+  = \i a. hComp i 1 B (coe i 1 (_. B) (e.1 a)) []
+
+equiv-to-path/comp (A B : U) (e : Equiv A B)
+  : Path (Equiv A B) (path-to-equiv A B (equiv-to-path A B e)) e
+  = SgPath-prop (A -> B) (is-equiv A B) (is-equiv/is-prop A B) (path-to-equiv A B (equiv-to-path A B e)) e
+      (equiv-to-path/comp/fun A B e)
+
+equiv-to-path/IdEquiv (A : U) : Path (Path U A A) (equiv-to-path A A (IdEquiv A)) (refl U A)
+  = \j i. Ext A
+      [ (i=0) -> (A, id A, id/is-equiv A)
+      , (i=1) -> (A, id A, id/is-equiv A)
+      , (j=1) -> (A, id A, id/is-equiv A)
+      ]
+
+equiv-to-path/unique (A : U) : (B : U) (p : Path U A B) -> Path (Path U A B) (equiv-to-path A B (path-to-equiv A B p)) p
+  = J U A (\B p. Path (Path U A B) (equiv-to-path A B (path-to-equiv A B p)) p)
+      (comp (Path U A A)
+        (equiv-to-path A A (path-to-equiv A A (refl U A)))
+        (equiv-to-path A A (IdEquiv A))                    (\i. equiv-to-path A A ((path-to-equiv/refl A) i))
+        (refl U A)                                         (equiv-to-path/IdEquiv A)
+      )
+
+univalence/Iso (A B : U) : Iso (Equiv A B) (Path U A B)
+  = (equiv-to-path A B, path-to-equiv A B, equiv-to-path/unique A B, equiv-to-path/comp A B)
+
+Htpy/is-contr-total-htpy (A : U) (B : A -> U) (f : (x : A) -> B x)
+  : is-contr (Sg ((x : A) -> B x) (\ g. Htpy A B f g)) =
+  fundamental-theorem-id' ((x : A) -> B x) (\ g. Htpy A B f g) f
+    (htpy-eq A B f) (htpy-eq/is-equiv A B f)
+
+ua/is-contr-total-equiv (A : U) : is-contr (Sg U (Equiv A)) =
+  let i : (B : U) -> has-inverse (Path U A B) (Equiv A B) (path-to-equiv A B) = \ B. (equiv-to-path A B, (equiv-to-path/comp A B, equiv-to-path/unique A B)) in
+  fundamental-theorem-id' U
+    ( Equiv A) A
+    ( path-to-equiv A)
+    ( \ B. has-inverse/is-equiv
+            ( Path U A B)
+            ( Equiv A B)
+            ( path-to-equiv A B)
+            ( i B))
+
+univalence (A B : U) : Equiv (Equiv A B) (Path U A B) =
+  has-inverse/Equiv
+    ( Equiv A B)
+    ( Path U A B)
+    ( equiv-to-path A B)
+    ( path-to-equiv A B,
+      ( equiv-to-path/unique A B,
+        equiv-to-path/comp A B))
+
+univalence' (A B : U) : Equiv (Path U A B) (Equiv A B) =
+  has-inverse/Equiv
+    ( Path U A B)
+    ( Equiv A B)
+    ( path-to-equiv A B)
+    ( equiv-to-path A B,
+      ( equiv-to-path/comp A B,
+        equiv-to-path/unique A B))

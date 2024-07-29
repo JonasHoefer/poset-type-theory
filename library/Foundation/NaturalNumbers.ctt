@@ -1,0 +1,86 @@
+-- This file defines the data-type of natural numbers.
+
+module Foundation.NaturalNumbers where
+
+import Foundation.Core.Paths
+
+import Foundation.UnitType
+import Foundation.EmptyType
+
+-- Definition as an inductive datatype.
+data Nat : U
+  = zero
+  | suc (n : Nat)
+
+-- Induction principle
+ind-Nat (P : Nat -> U) (pz : P zero) (ps : ((n : Nat) -> P n -> P (suc n))) : (n : Nat) -> P n = split
+  zero -> pz
+  suc n' -> ps n' (ind-Nat P pz ps n')
+
+-- Shortcuts
+one-Nat : Nat = suc zero
+
+two-Nat : Nat = suc one-Nat
+
+three-Nat : Nat = suc two-Nat
+
+four-Nat : Nat = suc three-Nat
+
+five-Nat : Nat = suc four-Nat
+
+six-Nat : Nat = suc five-Nat
+
+seven-Nat : Nat = suc six-Nat
+
+eight-Nat : Nat = suc seven-Nat
+
+nine-Nat : Nat = suc eight-Nat
+
+ten-Nat : Nat = suc nine-Nat
+
+-- Functions
+plus-Nat (m : Nat) : Nat -> Nat = split
+  zero -> m
+  suc k -> suc (plus-Nat m k)
+
+times-Nat (m : Nat) : Nat -> Nat = split
+  zero -> zero
+  suc k -> plus-Nat m (times-Nat k m)
+
+-- Equality
+Nat/eq/z : Nat -> U = split
+  zero -> Unit
+  suc _ -> Empty
+
+Nat/eq/s (n : Nat) (IH : (m : Nat) -> U) : Nat -> U = split
+  zero -> Empty
+  suc m -> IH m
+
+Nat/eq : Nat -> Nat -> U = split
+  zero -> Nat/eq/z
+  suc n -> Nat/eq/s n
+            ( Nat/eq n)
+
+Nat/eq/refl : (n : Nat) -> Nat/eq n n = split
+  zero -> star
+  suc n -> Nat/eq/refl n
+
+Nat/path/eq (m n : Nat) (p : Path Nat m n) : Nat/eq m n =
+  J Nat m
+    ( \ k _. Nat/eq m k)
+    ( Nat/eq/refl m) n p
+
+Nat/eq/path/z : (n : Nat) -> Nat/eq zero n -> Path Nat zero n = split
+  zero -> \ _. refl Nat zero
+  suc n -> \ f. ex-falso (Path Nat zero (suc n)) f
+
+Nat/eq/path/s (m : Nat) (IH : (n : Nat) -> Nat/eq m n -> Path Nat m n) : (n : Nat) -> Nat/eq (suc m) n -> Path Nat (suc m) n = split
+  zero -> \ f. ex-falso (Path Nat (suc m) zero) f
+  suc n -> \ p. ap Nat Nat
+                ( \ k. suc k) m n
+                ( IH n p)
+
+Nat/eq/path : (m n : Nat) -> Nat/eq m n -> Path Nat m n = split
+  zero -> Nat/eq/path/z
+  suc m -> Nat/eq/path/s m
+            ( Nat/eq/path m)

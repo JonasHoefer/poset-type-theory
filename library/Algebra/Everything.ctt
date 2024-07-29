@@ -1,0 +1,5 @@
+-- This file imports every Algebra file.
+
+module Algebra.Everything where
+
+import Algebra.Groups

@@ -1,0 +1,50 @@
+-- This file defines what's a (decidable) subtype and shows some properties
+
+module Foundation.Subtypes where
+
+import Foundation.Equivalences
+
+is-subtype (X : U) (P : X -> U) : U = (x : X) -> is-prop (P x)
+
+is-decidable-subtype (X : U) (P : X -> U) : U = is-subtype X P * ((x : X) -> is-decidable (P x))
+
+substructure/is-contr-total-Eq (A : U) (B C : A -> U) (is-contr-tot : is-contr (Sg A B)) (is-subtype-C : is-subtype A C) (a : A) (b : B a) (c : C a)
+                                  : is-contr (Sg (Sg A C) (\ t. B t.1)) =
+  is-contr/is-contr-equiv (Sg (Sg A C) (\ t. B t.1)) (Sg (Sg A B) (\ t. C t.1))
+    (Equiv/assoc-Sg A C B)
+    (is-contr/closed-retract (Sg (Sg A B) (\ t. C t.1)) (C a)
+      (Sg/left-unit-law-is-contr (Sg A B) (\ t. C t.1) is-contr-tot (a, b))
+      (is-prop/is-proof-irrelevant (C a) (is-subtype-C a) c))
+
+subtype/Equiv-tot (A : U) (P Q : A -> U) (is-subtype-P : is-subtype A P) (is-subtype-Q : is-subtype A Q)
+                  (f : (x : A) -> P x -> Q x) (g : (x : A) -> Q x -> P x) : Equiv (Sg A P) (Sg A Q) =
+  fam-equiv/Equiv-tot A P Q f
+    (\ x. Prop/is-equiv
+          ( P x, is-subtype-P x)
+          ( Q x, is-subtype-Q x)
+          ( f x)
+          ( g x))
+
+subtype/is-inj-prop-map (A B : U) (f : A -> B) (is-subtype-fib : (b : B) -> is-prop (Fib A B f b)) (x : A)
+                             : (y : A) -> is-equiv (Path A x y) (Path B (f x) (f y)) (ap A B f x y) =
+  fundamental-theorem-id 
+    A
+    ( \ y. Path B (f x) (f y)) x
+    ( ap A B f x)
+    ( is-prop/is-proof-irrelevant
+      ( Fib A B f (f x))
+      ( is-subtype-fib (f x))
+      ( x, refl B (f x)))
+
+pr1/is-inj (A : U) (B : A -> U) (is-prop-B : (x : A) -> is-prop (B x)) (t u : Sg A B)
+                      : is-equiv (Path (Sg A B) t u) (Path A t.1 u.1) (ap (Sg A B) A (\ v. v.1) t u) =
+  subtype/is-inj-prop-map
+    ( Sg A B)
+    A
+    ( \ v. v.1)
+    ( \ x. is-prop/closed-equiv
+      ( Fib (Sg A B) A (\ v. v.1) x)
+      ( B x)
+      ( Equiv/fib-space-Equiv A B x)
+      ( is-prop-B x))
+    t u

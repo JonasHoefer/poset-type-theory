@@ -1,0 +1,19 @@
+-- This file defines sections, i.e., left inverses.
+
+module Foundation.Core.Retractions where
+
+import Foundation.Core.Primitives
+import Foundation.Core.Homotopies
+
+-- Definitions
+
+is-retraction (A B : U) (f : A -> B) (g : B -> A) : U
+  = Htpy' A A (\x. g (f x)) (id A)
+
+Ret (A B : U) (f : A -> B) : U
+  = (r : B -> A) * is-retraction A B f r
+
+retract-of (A B : U) : U = (i : A -> B) * Ret A B i
+
+retract-ind (A B : U) (P : A -> U) (ret : retract-of A B) (p : (b : B) -> P (ret.2.1 b)) (a : A) : P a
+  = tr A (ret.2.1 (ret.1 a)) a (ret.2.2 a) P (p (ret.1 a))

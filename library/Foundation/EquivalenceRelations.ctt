@@ -1,0 +1,157 @@
+
+module Foundation.EquivalenceRelations where
+
+import Foundation.Subtypes
+import Foundation.PropositionsProperties
+
+Relation (A : U) : U =
+  A -> A -> U
+
+is-reflexive (A : U) (R : Relation A) : U =
+  (x : A) -> R x x  
+
+is-transitive (A : U) (R : Relation A) : U =
+  (x y z : A) -> R x y -> R y z -> R x z
+
+is-symmetric (A : U) (R : Relation A) : U =
+  (x y : A) -> R x y -> R y x
+
+Relation-Prop (A : U) : U =
+  A -> A -> Prop
+
+Relation-Prop/type (A : U) (R : Relation-Prop A) : Relation A =
+  \ x y. Prop/type (R x y)
+
+Relation-Prop/is-reflexive (A : U) (R : Relation-Prop A) : U =
+  is-reflexive A (Relation-Prop/type A R)
+
+Relation-Prop/is-transitive (A : U) (R : Relation-Prop A) : U =
+  is-transitive A (Relation-Prop/type A R)
+
+Relation-Prop/is-symmetric (A : U) (R : Relation-Prop A) : U =
+  is-symmetric A (Relation-Prop/type A R)
+
+is-reflexive/is-prop (A : U) (R : Relation-Prop A) : is-prop (Relation-Prop/is-reflexive A R) =
+  is-prop/pi A
+    ( \ x. Prop/type (R x x))
+    ( \ x. Prop/is-prop (R x x))
+
+is-reflexive/Prop (A : U) (R : Relation-Prop A) : Prop =
+  ( Relation-Prop/is-reflexive A R,
+    is-reflexive/is-prop A R)
+
+is-transitive/is-prop (A : U) (R : Relation-Prop A) : is-prop (Relation-Prop/is-transitive A R) =
+  is-prop/pi A
+    ( \ x. (y z : A) -> Prop/type (R x y) -> Prop/type (R y z) -> Prop/type (R x z))
+    ( \ x. is-prop/pi A
+          ( \ y. (z : A) -> Prop/type (R x y) -> Prop/type (R y z) -> Prop/type (R x z))
+          ( \ y. is-prop/pi A
+                ( \ z. Prop/type (R x y) -> Prop/type (R y z) -> Prop/type (R x z))
+                ( \ z. is-prop/pi
+                      ( Prop/type (R x y))
+                      ( \ _. Prop/type (R y z) -> Prop/type (R x z))
+                      ( \ _. is-prop/pi
+                            ( Prop/type (R y z))
+                            ( \ _. Prop/type (R x z))
+                            ( \ _. Prop/is-prop (R x z))))))
+
+is-transitive/Prop (A : U) (R : Relation-Prop A) : Prop =
+  ( Relation-Prop/is-transitive A R,
+    is-transitive/is-prop A R)
+
+is-symmetric/is-prop (A : U) (R : Relation-Prop A) : is-prop (Relation-Prop/is-symmetric A R) =
+  is-prop/pi A
+    ( \ x. (y : A) -> Prop/type (R x y) -> Prop/type (R y x))
+    ( \ x. is-prop/pi A
+          ( \ y. Prop/type (R x y) -> Prop/type (R y x))
+          ( \ y. is-prop/pi
+                ( Prop/type (R x y))
+                ( \ _. Prop/type (R y x))
+                ( \ _. Prop/is-prop (R y x))))
+
+is-symmetric/Prop (A : U) (R : Relation-Prop A) : Prop =
+  ( Relation-Prop/is-symmetric A R,
+    is-symmetric/is-prop A R)
+
+is-equivalence-relation (A : U) (R : Relation-Prop A) : U =
+  Relation-Prop/is-reflexive A R *
+    ( Relation-Prop/is-symmetric A R *
+      Relation-Prop/is-transitive A R)
+
+Eq-Rel (A : U) : U =
+  Sg (Relation-Prop A) (is-equivalence-relation A)
+
+Eq-Rel/Relation (A : U) (R : Eq-Rel A) : Relation-Prop A = R.1
+
+Eq-Rel/type (A : U) (R : Eq-Rel A) (x y : A) : U = Prop/type (Eq-Rel/Relation A R x y)
+
+Eq-Rel/is-reflexive (A : U) (R : Eq-Rel A) : Relation-Prop/is-reflexive A (Eq-Rel/Relation A R) = R.2.1
+
+Eq-Rel/is-symmetric (A : U) (R : Eq-Rel A) : Relation-Prop/is-symmetric A (Eq-Rel/Relation A R) = R.2.2.1
+
+Eq-Rel/is-transitive (A : U) (R : Eq-Rel A) : Relation-Prop/is-transitive A (Eq-Rel/Relation A R) = R.2.2.2
+
+reflects-Eq-Rel (A : U) (R : Eq-Rel A) (B : U) (f : A -> B) : U =
+  (x y : A) -> (Eq-Rel/type A R x y) -> Path B (f x) (f y)
+
+reflecting-map-Eq-Rel (A : U) (R : Eq-Rel A) (B : U) : U =
+  Sg (A -> B) (reflects-Eq-Rel A R B)
+
+reflecting-map-Eq-Rel/map (A : U) (R : Eq-Rel A) (B : U) (t : reflecting-map-Eq-Rel A R B) : A -> B = t.1
+
+reflecting-map-Eq-Rel/reflects-Eq (A : U) (R : Eq-Rel A) (B : U) (t : reflecting-map-Eq-Rel A R B) : reflects-Eq-Rel A R B (reflecting-map-Eq-Rel/map A R B t) = t.2  
+
+reflects-Eq-Rel/is-prop (A : U) (R : Eq-Rel A) (B : Set) (f : A -> Set/type B)
+                           : is-prop (reflects-Eq-Rel A R (Set/type B) f) =
+  is-prop/pi-2 A
+    ( \ _. A)
+    ( \ x y. Eq-Rel/type A R x y -> Path (Set/type B) (f x) (f y))
+    ( \ x y. is-prop/pi
+            ( Eq-Rel/type A R x y)
+            ( \ _. Path (Set/type B) (f x) (f y))
+            ( \ _. Set/is-set B (f x) (f y)))
+
+reflecting-map-Eq-Rel/htpy (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) (g : reflecting-map-Eq-Rel A R (Set/type B)) : U =
+  Htpy' A (Set/type B) f.1 g.1
+
+reflecting-map-Eq-Rel/refl-htpy (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) : reflecting-map-Eq-Rel/htpy A R B f f =
+  Htpy'/refl A (Set/type B) f.1
+
+reflecting-map-Eq-Rel/eq-htpy (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) (g : reflecting-map-Eq-Rel A R (Set/type B))
+                              (p : Path (reflecting-map-Eq-Rel A R (Set/type B)) f g) : reflecting-map-Eq-Rel/htpy A R B f g =
+  J ( reflecting-map-Eq-Rel A R (Set/type B)) f
+    ( \ h _. reflecting-map-Eq-Rel/htpy A R B f h)
+    ( reflecting-map-Eq-Rel/refl-htpy A R B f) g p
+
+reflecting-map-Eq-Rel/is-contr-total-htpy (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B))
+                                             : is-contr (Sg (reflecting-map-Eq-Rel A R (Set/type B)) (reflecting-map-Eq-Rel/htpy A R B f)) =
+  substructure/is-contr-total-Eq
+    ( A -> (Set/type B))
+    ( Htpy' A (Set/type B) f.1)
+    ( reflects-Eq-Rel A R (Set/type B))
+    ( Htpy/is-contr-total-htpy A
+      ( \ _. Set/type B) f.1)
+    ( reflects-Eq-Rel/is-prop A R B) f.1
+    ( reflecting-map-Eq-Rel/refl-htpy A R B f) f.2
+
+reflecting-map-Eq-Rel/eq-htpy/is-equiv (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) (g : reflecting-map-Eq-Rel A R (Set/type B))
+                                          : is-equiv (Path (reflecting-map-Eq-Rel A R (Set/type B)) f g)
+                                                     (reflecting-map-Eq-Rel/htpy A R B f g) (reflecting-map-Eq-Rel/eq-htpy A R B f g) =
+  fundamental-theorem-id
+    ( reflecting-map-Eq-Rel A R (Set/type B))
+    ( reflecting-map-Eq-Rel/htpy A R B f) f
+    ( reflecting-map-Eq-Rel/eq-htpy A R B f)
+    ( reflecting-map-Eq-Rel/is-contr-total-htpy A R B f) g
+
+reflecting-map-Eq-Rel/htpy-eq (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) (g : reflecting-map-Eq-Rel A R (Set/type B))
+                                 : (reflecting-map-Eq-Rel/htpy A R B f g) -> (Path (reflecting-map-Eq-Rel A R (Set/type B)) f g) =
+  is-equiv/inv-map
+    ( Path (reflecting-map-Eq-Rel A R (Set/type B)) f g)
+    ( reflecting-map-Eq-Rel/htpy A R B f g)
+    ( reflecting-map-Eq-Rel/eq-htpy A R B f g)
+    ( reflecting-map-Eq-Rel/eq-htpy/is-equiv A R B f g)
+
+reflecting-map-Eq-Rel/Equiv (A : U) (R : Eq-Rel A) (B : Set) (f : reflecting-map-Eq-Rel A R (Set/type B)) (g : reflecting-map-Eq-Rel A R (Set/type B))
+                               : Equiv (Path (reflecting-map-Eq-Rel A R (Set/type B)) f g) (reflecting-map-Eq-Rel/htpy A R B f g) =
+  ( reflecting-map-Eq-Rel/eq-htpy A R B f g,
+    reflecting-map-Eq-Rel/eq-htpy/is-equiv A R B f g)

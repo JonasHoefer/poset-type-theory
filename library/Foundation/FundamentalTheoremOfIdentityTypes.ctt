@@ -1,0 +1,64 @@
+-- This file defines Rijke's "fundamental theorem of identity types"
+-- as well as Rijke's structure identity principle.
+
+module Foundation.FundamentalTheoremOfIdentityTypes where
+
+import Foundation.Equivalences
+
+fundamental-theorem-id (A : U) (B : A -> U) (a : A) (f : (x : A) -> (Path A a x) -> B x) (c : is-contr (Sg A B)) (x : A) : is-equiv (Path A a x) (B x) (f x) =
+  is-equiv-tot/fam-equiv A (\ y. Path A a y) B f (is-contr/is-equiv (Sg A (\ y. Path A a y)) (Sg A B) (tot A (\ y. Path A a y) B f) (is-contr/Sg-path-is-contr A a) c) x
+
+fundamental-theorem-id' (A : U) (B : A -> U) (a : A) (f : (x : A) -> (Path A a x) -> B x) (e : (x : A) -> is-equiv (Path A a x) (B x) (f x)) : is-contr (Sg A B) =
+  is-contr/is-contr-equiv' (Sg A (\ x. Path A a x)) (Sg A B) (fam-equiv/Equiv-tot A (\ x. Path A a x) B f e)
+    (is-contr/Sg-path-is-contr A a)
+
+str-principle/map (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U)
+                     : (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) -> (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2))) =
+  \ t. ((t.1.1, t.2.1), (t.1.2, t.2.2))
+
+str-principle/inv-map (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U)
+                         : (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2))) -> (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) =
+  \ t. ((t.1.1, t.2.1), (t.1.2, t.2.2))
+
+str-principle/right-htpy/sg (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U) (a : A) (b : B a) (c : C a) (d : D a b c)
+                               : Path (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)))
+                                      (str-principle/map A B C D (str-principle/inv-map A B C D ((a, c), (b, d)))) ((a, c), (b, d)) =
+  refl (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2))) ((a, c), (b, d))
+
+str-principle/right-htpy (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U) (u : Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)))
+                            : Path (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)))
+                                   (str-principle/map A B C D (str-principle/inv-map A B C D u)) u =
+  str-principle/right-htpy/sg A B C D u.1.1 u.2.1 u.1.2 u.2.2
+
+str-principle/left-htpy/sg (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U) (a : A) (b : B a) (c : C a) (d : D a b c)
+                              : Path (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2)))
+                                     (str-principle/inv-map A B C D (str-principle/map A B C D ((a, b), (c, d)))) ((a, b), (c, d)) =
+  refl (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) ((a, b), (c, d))
+
+str-principle/left-htpy (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U) (u : Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2)))
+                           : Path (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2)))
+                                   (str-principle/inv-map A B C D (str-principle/map A B C D u)) u =
+  str-principle/left-htpy/sg A B C D u.1.1 u.1.2 u.2.1 u.2.2
+
+str-principle/is-equiv (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U)
+                          : is-equiv (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2))) (str-principle/map A B C D) =
+  has-inverse/is-equiv
+    ( Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2)))
+    ( Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)))
+    ( str-principle/map A B C D)
+    ( str-principle/inv-map A B C D,
+      ( str-principle/right-htpy A B C D,
+        str-principle/left-htpy A B C D))
+
+str-principle/Equiv (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U)
+                       : Equiv (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) (Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2))) =
+  ( str-principle/map A B C D,
+    str-principle/is-equiv A B C D)
+
+str-principle-id (A : U) (B C : A -> U) (D : (x : A) -> B x -> C x -> U) (is-contr-AC : is-contr (Sg A C)) (a : A) (c : C a)
+                 (is-contr-tot : is-contr (Sg (B a) (\ y. D a y c))) : is-contr (Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2))) =
+  is-contr/is-contr-equiv
+    ( Sg (Sg A B) (\ t. Sg (C t.1) (D t.1 t.2)))
+    ( Sg (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)))
+    ( str-principle/Equiv A B C D)
+    ( Sg/is-contr' (Sg A C) (\ t. Sg (B t.1) (\ y. D t.1 y t.2)) is-contr-AC (a, c) is-contr-tot)
