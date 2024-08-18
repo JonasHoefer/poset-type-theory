@@ -86,7 +86,13 @@ evalModule m p = do
 --------------------------------------------------------------------------------
 ---- Repl
 
-data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int String deriving (Show, Read, Eq)
+data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int String | Infer String deriving (Show)
+
+inferCmd :: Mod CommandFields ReplCmd
+inferCmd = command ":infer"
+  (info
+    (Infer . unwords <$> many (strArgument (metavar "FILE"))) -- we just take all remaining strings
+    (progDesc "Infers type of give term and remembers it"))
 
 loadCmd :: Mod CommandFields ReplCmd
 loadCmd = command ":load"
@@ -107,17 +113,17 @@ quitCmd = command ":quit" (info (pure Quit) (progDesc "Quit repl"))
 unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
   (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1 <> help "Number of unfold steps")
-          <*> argument str (metavar "DEF"))
-  (progDesc "Perform head linear unfolding steps on a definition in the context")
+          <*> (unwords <$> many (argument str (metavar "DEF"))))
+  (progDesc "Perform a single unfolding steps on given definition or, if not argument is given, on the last considered term.")
 
 replCmdStrings :: [String]
-replCmdStrings = [":load", ":reload", ":quit", ":unfold"]
+replCmdStrings = [":load", ":reload", ":quit", ":unfold", ":infer"]
 
 replCmds :: ParserInfo ReplCmd
-replCmds = info (subparser (quitCmd <> loadCmd <> reloadCmd <> unfoldCmd)) mempty
+replCmds = info (subparser (quitCmd <> loadCmd <> reloadCmd <> unfoldCmd <> inferCmd)) mempty
 
 parseReplCmd :: String -> Either String ReplCmd
-parseReplCmd ""          = Left ""
+parseReplCmd ""                                 = Left ""
 parseReplCmd cmd@(':':_) = case execParserPure (prefs showHelpOnError) replCmds (words cmd) of
   Success replCmd           -> Right replCmd
   Failure (ParserFailure f) -> Left $ show $ (fst3 (f "")) { helpUsage = mempty }
@@ -136,6 +142,7 @@ data ReplState = ReplState
   , currentFile :: !(Maybe FilePath)
   , scopeCheckerEnv :: !ScopingEnv
   , context :: !Cxt
+  , lastUnfold :: !(Maybe (Either String Tm))
   }
 
 environment :: ReplState -> Env
@@ -144,16 +151,21 @@ environment = env . context
 type Repl a = InputT (StateT ReplState IO) a
 
 replCompletion :: CompletionFunc (StateT ReplState IO)
-replCompletion input@(s, _)
-  | ":load" `isPrefixOf` reverse s = completeFilename input -- also for unfold?
-  | ":"     `isPrefixOf` reverse s = completeWord Nothing [] (return . cmdSearch) input
-  | otherwise                      = completeWord' Nothing (\c -> not (isAlphaNum c || c `elem` ("-/\\<>"::String))) nameSearch input
+replCompletion input@(reverse -> s, _)
+  | ":load"   `isPrefixOf` s = completeFilename input -- also for unfold?
+  | ":infer"  `isPrefixOf` s = identCompletion
+  | ":unfold" `isPrefixOf` s = identCompletion
+  | ":"       `isPrefixOf` s = completeWord Nothing [] (return . cmdSearch) input
+  | otherwise                = identCompletion
   where
+    identCompletion :: StateT ReplState IO (String, [Completion])
+    identCompletion = completeWord' Nothing (\c -> not (isAlphaNum c || c `elem` ("-/\\<>"::String))) nameSearch input
+
     cmdSearch :: String -> [Completion]
-    cmdSearch s = map simpleCompletion $ filter (s `isPrefixOf`) replCmdStrings
+    cmdSearch s' = map simpleCompletion $ filter (s' `isPrefixOf`) replCmdStrings
 
     nameSearch :: String -> StateT ReplState IO [Completion]
-    nameSearch s = map simpleCompletion <$> gets (filter (s `isPrefixOf`) . map show . envIdents . env . context)
+    nameSearch s' = map simpleCompletion <$> gets (filter (s' `isPrefixOf`) . map show . envIdents . env . context)
 
 replSettings :: Settings (StateT ReplState IO)
 replSettings = Settings { historyFile = Just ".postt_history", complete = replCompletion, autoAddHistory = True }
@@ -162,7 +174,7 @@ runRepl :: Repl a -> IO a
 runRepl = flip evalStateT initialReplState . runInputT replSettings
 
 initialReplState :: ReplState
-initialReplState = ReplState "" Nothing mempty emptyCxt
+initialReplState = ReplState "" Nothing mempty emptyCxt Nothing
 
 repl :: Repl ()
 repl = do
@@ -185,6 +197,20 @@ repl = do
             Just p  -> replLoad silent p
             Nothing -> outputStrLn "No module loaded!"
           repl
+        Right (Infer t) -> do
+          scpEnv <- gets scopeCheckerEnv
+          case parsePTm scpEnv t of
+            Left err -> outputStrLn err
+            Right pt -> do
+              cxt <- gets context
+              let (res, msgs) = runTC cxt (infer pt)
+              mapM_ outputStrLn msgs
+              case res of
+                Left err       -> outputStrLn $ show err
+                Right (tm, ty) -> do
+                  outputStrLn ("Infered Type: " ++ bindStage terminalStage prettyVal ty)
+                  modify $ \s -> s{ lastUnfold = Just (Right tm) }
+          repl
         Right (Term t) -> do
           scpEnv <- gets scopeCheckerEnv
           case parsePTm scpEnv t of
@@ -197,17 +223,49 @@ repl = do
                 Left err          -> outputStrLn $ show err
                 Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
-        Right (Unfold k d) -> do
-          gets (lookup (fromString d) . environment) >>= \case
-            Just (EntryDef t _) -> do
-              ρ <- gets environment
-              let (u, t') = headUnfold ρ t (Just k)
-              modify $ \s -> s{ context = (context s) { env = modifyAt (fromString d) (\(EntryDef _ ty) -> EntryDef t' ty) (env (context s)) } }
-              outputStrLn $ pretty t'
-              outputStrLn ""
-              outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
-            _ -> outputStrLn $ d ++ " is not defined!"
+        Right (Unfold k "") -> do
+          lastUnfoldTarget >>= \case
+            Nothing       ->
+              outputStrLn "No current unfold target. Either unfold a definition using `:unfold DEF` or load a term using `:infer TERM`"
+            Just (t, rep) -> do
+              unfoldTerm k t >>= rep
           repl
+        Right (Unfold k d) -> do
+          defUnfoldTarget d >>= \case
+            Just (t, rep) -> 
+              unfoldTerm k t >>= rep
+            Nothing       ->
+              outputStrLn $ d ++ " is not a definition!"
+          repl
+
+unfoldTerm :: Int -> Tm -> Repl Tm
+unfoldTerm k t = do
+  ρ <- gets environment
+  let (u, t') = headUnfold ρ t (Just k)
+  outputStrLn $ pretty t'
+  outputStrLn ""
+  outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
+  return t'
+  
+-- | Returns the term associated to a definition, and a way to replace it, if this definition exists.
+defUnfoldTarget :: String -> Repl (Maybe (Tm, Tm -> Repl ()))
+defUnfoldTarget d = gets (lookup (fromString d) . environment) >>= \case
+  Just (EntryDef t _) -> do
+    let rep t' = modify $ \s ->
+          s{ context = (context s) { env = modifyAt (fromString d) (\(EntryDef _ ty) -> EntryDef t' ty) (env (context s)) }
+           , lastUnfold = Just (Left d)
+           }
+    return $ Just (t, rep)
+  _notDefined -> return Nothing
+
+-- | Returns the term that was last unfolded, and a way to replace it, if such a term exists.
+lastUnfoldTarget :: Repl (Maybe (Tm, Tm -> Repl ()))
+lastUnfoldTarget = gets lastUnfold >>= \case
+  Nothing        -> return Nothing
+  Just (Left d)  -> defUnfoldTarget d
+  Just (Right t) -> do
+    let rep t' = modify $ \s -> s{ lastUnfold = Just (Right t') }
+    return $ Just (t, rep)
 
 replLoad :: Bool -> FilePath -> Repl ()
 replLoad silent p = do
@@ -218,7 +276,7 @@ replLoad silent p = do
         unless silent $ mapM_ outputStrLn msgs
         case res of
           Right cxt -> do
-            put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt
+            put $ ReplState (moduleName $ head ms) (Just p) scpEnv cxt Nothing
             outputStrLn $ "Successfully checked " ++ show (length (env cxt)) ++ " definitions"
           Left err -> outputStrLn $ show err
       Left err -> outputStrLn $ show err
