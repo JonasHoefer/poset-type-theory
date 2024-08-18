@@ -69,9 +69,10 @@ blockedNames = \case
 
 singleReduction :: AtStage (AtStage (Name -> Val) -> Val -> Maybe (Name, Val))
 singleReduction δ = \case
-  VNeu n     -> Just (singleReductionNeu δ n) -- a neutral always makes progess, when we unfold something
-  VCon c [a] -> (fmap . fmap) (VCon c . return) (singleReduction δ a)
-  _          -> Nothing
+  VNeu n             -> Just (singleReductionNeu δ n) -- a neutral always makes progess, when we unfold something
+  VCon c [a]         -> (fmap . fmap) (VCon c . return) (singleReduction δ a)
+  VHCon c [a] is bs  -> (fmap . fmap) (\a' -> VHCon c [a'] is bs) (singleReduction δ a)
+  _                  -> Nothing
 
 singleReductionNeu :: AtStage (AtStage (Name -> Val) -> Neu -> (Name, Val))
 singleReductionNeu δ = \case
