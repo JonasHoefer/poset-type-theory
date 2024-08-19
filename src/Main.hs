@@ -88,7 +88,7 @@ evalModule m p = do
 
 data UnfoldStepPresentation = Sequential | Summed deriving (Show, Read)
 
-data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int UnfoldStepPresentation String | Infer String deriving Show
+data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int UnfoldStepPresentation Bool String | Infer String deriving Show
 
 inferCmd :: Mod CommandFields ReplCmd
 inferCmd = command ":infer"
@@ -116,6 +116,7 @@ unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
   (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1 <> help "Number of unfold steps")
           <*> option auto (short 'd' <> metavar "[Summed|Sequential]" <> showDefault <> value Sequential <> help "Presentation of unfolded steps")
+          <*> switch (long "hide-term" <> short 'h' <> help "Do not print the final term")
           <*> (unwords <$> many (argument str (metavar "DEF"))))
   (progDesc "Perform a single unfolding steps on given definition or, if not argument is given, on the last considered term.")
 
@@ -226,27 +227,26 @@ repl = do
                 Left err          -> outputStrLn $ show err
                 Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
-        Right (Unfold k s "") -> do
+        Right (Unfold k s h "") -> do
           lastUnfoldTarget >>= \case
             Nothing       ->
               outputStrLn "No current unfold target. Either unfold a definition using `:unfold DEF` or load a term using `:infer TERM`"
             Just (t, rep) -> do
-              unfoldTerm k s t >>= rep
+              unfoldTerm k s h t >>= rep
           repl
-        Right (Unfold k s d) -> do
+        Right (Unfold k s h d) -> do
           defUnfoldTarget d >>= \case
             Just (t, rep) -> 
-              unfoldTerm k s t >>= rep
+              unfoldTerm k s h t >>= rep
             Nothing       ->
               outputStrLn $ d ++ " is not a definition!"
           repl
 
-unfoldTerm :: Int -> UnfoldStepPresentation -> Tm -> Repl Tm
-unfoldTerm k s t = do
+unfoldTerm :: Int -> UnfoldStepPresentation -> Bool -> Tm -> Repl Tm
+unfoldTerm k s h t = do
   ρ <- gets environment
   let (u, t') = headUnfold ρ t (Just k)
-  outputStrLn (pretty t')
-  outputStrLn ""
+  unless h (outputStrLn (pretty t') >> outputStrLn "")
   case s of
     Sequential -> outputStrLn (show u)
     Summed     -> do
