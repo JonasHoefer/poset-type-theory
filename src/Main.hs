@@ -248,7 +248,7 @@ unfoldTerm k s h t = do
   let (u, t') = headUnfold ρ t (Just k)
   unless h (outputStrLn (pretty t') >> outputStrLn "")
   case s of
-    Sequential -> outputStrLn (show u)
+    Sequential -> mapM_ (outputStrLn . show) u
     Summed     -> do
       let u' = M.fromListWith (+) (map (,1::Int) u)
       outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u']
