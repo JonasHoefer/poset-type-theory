@@ -1,8 +1,6 @@
 module PosTT.HeadLinearReduction where
 
-import           Control.Applicative
-
-import qualified Data.Map as M
+import           Data.Tuple.Extra (first)
 
 import           PosTT.Common
 import           PosTT.Eval
@@ -12,8 +10,8 @@ import           PosTT.Terms
 import           PosTT.Values
 
 
-headUnfold :: Env -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
-headUnfold δ = go M.empty
+headUnfold :: Env -> Tm -> Maybe Int -> ([Name], Tm)
+headUnfold δ = go
   where
     ρ = blockedEnv δ
     s = foldr sExtName terminalStage (blockedNames δ)
@@ -30,11 +28,11 @@ headUnfold δ = go M.empty
     unfold t = bindStage s $ (fmap . fmap) readBack
       $ singleReduction blockedLookup $ eval ρ t
 
-    go :: M.Map Name Int -> Tm -> Maybe Int -> (M.Map Name Int, Tm)
-    go u t (Just 0) = (u, t)
-    go u t steps    = case unfold t of
-      Nothing      -> (u, t)
-      Just (d, t') -> go (M.alter (\e -> fmap succ e <|> Just 1) d u) t' (pred <$> steps)
+    go :: Tm -> Maybe Int -> ([Name], Tm)
+    go t (Just 0) = ([], t)
+    go t steps    = case unfold t of
+      Nothing      -> ([], t)
+      Just (d, t') -> first (d:) $ go t' (pred <$> steps)
 
 
 --------------------------------------------------------------------------------

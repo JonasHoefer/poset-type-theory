@@ -78,15 +78,17 @@ evalModule m p = do
         putStrLn $ "Head linear unfolding of " ++ pretty s
         putStrLn $ "Yields " ++ pretty s'
         putStrLn ""
-        putStrLn $ "Unfold counts: " ++ intercalate ", " [ show d ++ ": " ++ show c | (d, c) <- M.toList u]
-        putStrLn $ "Hence " ++ show (sum u) ++ " unfold steps"
+        print u
+        putStrLn $ "Hence " ++ show (length u) ++ " unfold steps"
     _ -> putStrLn "No definitions"
 
 
 --------------------------------------------------------------------------------
 ---- Repl
 
-data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int String | Infer String deriving (Show)
+data UnfoldStepPresentation = Sequential | Summed deriving (Show, Read)
+
+data ReplCmd = Term String | Load Bool FilePath | Reload Bool | Quit | Unfold Int UnfoldStepPresentation String | Infer String deriving Show
 
 inferCmd :: Mod CommandFields ReplCmd
 inferCmd = command ":infer"
@@ -113,6 +115,8 @@ quitCmd = command ":quit" (info (pure Quit) (progDesc "Quit repl"))
 unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
   (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1 <> help "Number of unfold steps")
+          <*> option auto (short 'd' <> metavar "DISPLAY-STYLE" <> showDefault <> value Sequential
+                             <> help "Presentation of unfolded steps. Either `Summed` or `Sequential`")
           <*> (unwords <$> many (argument str (metavar "DEF"))))
   (progDesc "Perform a single unfolding steps on given definition or, if not argument is given, on the last considered term.")
 
@@ -223,28 +227,32 @@ repl = do
                 Left err          -> outputStrLn $ show err
                 Right (_, val, _) -> outputStrLn $ bindStage terminalStage prettyVal val
           repl
-        Right (Unfold k "") -> do
+        Right (Unfold k s "") -> do
           lastUnfoldTarget >>= \case
             Nothing       ->
               outputStrLn "No current unfold target. Either unfold a definition using `:unfold DEF` or load a term using `:infer TERM`"
             Just (t, rep) -> do
-              unfoldTerm k t >>= rep
+              unfoldTerm k s t >>= rep
           repl
-        Right (Unfold k d) -> do
+        Right (Unfold k s d) -> do
           defUnfoldTarget d >>= \case
             Just (t, rep) -> 
-              unfoldTerm k t >>= rep
+              unfoldTerm k s t >>= rep
             Nothing       ->
               outputStrLn $ d ++ " is not a definition!"
           repl
 
-unfoldTerm :: Int -> Tm -> Repl Tm
-unfoldTerm k t = do
+unfoldTerm :: Int -> UnfoldStepPresentation -> Tm -> Repl Tm
+unfoldTerm k s t = do
   ρ <- gets environment
   let (u, t') = headUnfold ρ t (Just k)
-  outputStrLn $ pretty t'
+  outputStrLn (pretty t')
   outputStrLn ""
-  outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u]
+  case s of
+    Sequential -> outputStrLn (show u)
+    Summed     -> do
+      let u' = M.fromListWith (+) (map (,1::Int) u)
+      outputStrLn $ "Unfold counts: " ++ intercalate ", " [ show x ++ ": " ++ show c | (x, c) <- M.toList u']
   return t'
   
 -- | Returns the term associated to a definition, and a way to replace it, if this definition exists.
