@@ -115,8 +115,7 @@ quitCmd = command ":quit" (info (pure Quit) (progDesc "Quit repl"))
 unfoldCmd :: Mod CommandFields ReplCmd
 unfoldCmd = command ":unfold" $ info
   (Unfold <$> option auto (short 's' <> metavar "STEPS" <> showDefault <> value 1 <> help "Number of unfold steps")
-          <*> option auto (short 'd' <> metavar "DISPLAY-STYLE" <> showDefault <> value Sequential
-                             <> help "Presentation of unfolded steps. Either `Summed` or `Sequential`")
+          <*> option auto (short 'd' <> metavar "[Summed|Sequential]" <> showDefault <> value Sequential <> help "Presentation of unfolded steps")
           <*> (unwords <$> many (argument str (metavar "DEF"))))
   (progDesc "Perform a single unfolding steps on given definition or, if not argument is given, on the last considered term.")
 
